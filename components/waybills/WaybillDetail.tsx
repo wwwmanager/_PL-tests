@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Waybill, Route, Vehicle, Employee, WaybillStatus, Organization, SavedRoute, FuelType, SeasonSettings, Attachment, AppSettings, StockTransaction, GarageStockItem } from '../../types';
 import {
   getVehicles, getEmployees, getOrganizations, addWaybill, updateWaybill, addSavedRoutesFromWaybill, getSavedRoutes,
@@ -421,7 +421,7 @@ export const WaybillDetail: React.FC<WaybillDetailProps> = ({ waybill, isPrefill
   };
 
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
 
     if (name === 'driverId') {
@@ -446,21 +446,22 @@ export const WaybillDetail: React.FC<WaybillDetailProps> = ({ waybill, isPrefill
       }
 
     } else {
-      let newFormData = { ...formData, [name]: value };
+      setFormData(prev => {
+        let newFormData = { ...prev, [name]: value };
 
-      if (dayMode === 'single' && name === 'validFrom') {
-        const datePart = value.split('T')[0];
-        const timePart = formData.validTo.split('T')[1] || '18:00';
-        newFormData.validTo = `${datePart}T${timePart}`;
-      }
+        if (dayMode === 'single' && name === 'validFrom') {
+          const datePart = value.split('T')[0];
+          const timePart = prev.validTo.split('T')[1] || '18:00';
+          newFormData.validTo = `${datePart}T${timePart}`;
+        }
 
-      newFormData.date = newFormData.validFrom.split('T')[0];
-
-      setFormData(newFormData);
+        newFormData.date = newFormData.validFrom.split('T')[0];
+        return newFormData;
+      });
     }
-  };
+  }, [employees, isPrefill, dayMode]);
 
-  const handleNumericChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleNumericChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     let numericValue = value === '' ? undefined : Number(value);
 
@@ -477,7 +478,7 @@ export const WaybillDetail: React.FC<WaybillDetailProps> = ({ waybill, isPrefill
       }
     }
     setFormData(prev => ({ ...prev, [name]: numericValue }));
-  }
+  }, [fuelCardBalance]);
 
   const handleVehicleChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
     const vehicleId = e.target.value;
@@ -552,22 +553,24 @@ export const WaybillDetail: React.FC<WaybillDetailProps> = ({ waybill, isPrefill
     }
   };
 
-  const handleAddRoute = () => {
-    const lastRoute = formData.routes.length > 0 ? formData.routes[formData.routes.length - 1] : null;
-    const newRoute = {
-      id: generateId(),
-      from: lastRoute ? lastRoute.to : '',
-      to: '',
-      distanceKm: 0,
-      isCityDriving: false,
-      isWarming: false,
-      date: lastRoute?.date ? lastRoute.date : (dayMode === 'multi' ? formData.validFrom.split('T')[0] : undefined)
-    };
-    setFormData(prev => ({
-      ...prev,
-      routes: [...prev.routes, newRoute],
-    }));
-  };
+  const handleAddRoute = useCallback(() => {
+    setFormData(prev => {
+      const lastRoute = prev.routes.length > 0 ? prev.routes[prev.routes.length - 1] : null;
+      const newRoute = {
+        id: generateId(),
+        from: lastRoute ? lastRoute.to : '',
+        to: '',
+        distanceKm: 0,
+        isCityDriving: false,
+        isWarming: false,
+        date: lastRoute?.date ? lastRoute.date : (dayMode === 'multi' ? prev.validFrom.split('T')[0] : undefined)
+      };
+      return {
+        ...prev,
+        routes: [...prev.routes, newRoute],
+      };
+    });
+  }, [dayMode]);
 
 
 
@@ -623,12 +626,12 @@ export const WaybillDetail: React.FC<WaybillDetailProps> = ({ waybill, isPrefill
     });
   };
 
-  const handleRemoveRoute = (id: string) => {
+  const handleRemoveRoute = useCallback((id: string) => {
     setFormData(prev => ({
       ...prev,
       routes: prev.routes.filter(r => r.id !== id),
     }));
-  };
+  }, []);
 
   const handleGenerateRoutes = async () => {
     if (!aiPrompt) return;
@@ -741,6 +744,10 @@ export const WaybillDetail: React.FC<WaybillDetailProps> = ({ waybill, isPrefill
 
       if (savedWaybill && savedWaybill.routes.length > 0) {
         await addSavedRoutesFromWaybill(savedWaybill.routes);
+
+        // Обновляем сохраненные маршруты для autocomplete
+        const updatedRoutes = await getSavedRoutes();
+        setSavedRoutes(updatedRoutes);
       }
 
       // Handle transaction linking

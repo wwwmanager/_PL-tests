@@ -47,7 +47,59 @@ export default defineConfig({
 
   // --- Настройки сборки (npm run build) ---
   build: {
-    outDir: 'dist',     // Куда будет собираться production-сборка
-    sourcemap: true,    // Генерировать source maps для отладки в production
+    outDir: 'dist',
+    sourcemap: false,    // Отключено для production (уменьшает размер бандла)
+
+    // Увеличиваем лимит для предупреждения о размере чанка
+    chunkSizeWarningLimit: 1000,
+
+    // Настройки минификации
+    minify: 'terser',
+    terserOptions: {
+      compress: {
+        drop_console: true,  // Удаляем console.log в production
+        drop_debugger: true,
+        pure_funcs: ['console.log', 'console.info', 'console.debug'],
+      },
+    },
+
+    // Оптимальное разделение кода
+    rollupOptions: {
+      output: {
+        // Разделяем vendor-библиотеки для лучшего кеширования
+        manualChunks: {
+          // React core
+          'react-vendor': ['react', 'react-dom'],
+
+          // Forms и validation
+          'forms-vendor': ['react-hook-form', '@hookform/resolvers', 'zod'],
+
+          // UI библиотеки
+          'ui-vendor': ['recharts', 'localforage'],
+
+          // Google AI (большой модуль)
+          'ai-vendor': ['@google/generative-ai'],
+
+          // Парсинг
+          'parser-vendor': ['cheerio'],
+        },
+
+        // Оптимизация имён чанков
+        chunkFileNames: 'assets/[name]-[hash].js',
+        entryFileNames: 'assets/[name]-[hash].js',
+        assetFileNames: 'assets/[name]-[hash].[ext]',
+      },
+    },
+  },
+
+  // Оптимизация для development
+  optimizeDeps: {
+    include: [
+      'react',
+      'react-dom',
+      'react-hook-form',
+      'zod',
+      'localforage',
+    ],
   },
 });

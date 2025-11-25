@@ -126,6 +126,24 @@ const FIELD_LABELS: Record<keyof typeof INITIAL_FIELD_POSITIONS, string> = {
 
 type FieldKey = keyof typeof INITIAL_FIELD_POSITIONS;
 
+// Set of fields that belong to the "Итоги" (totals) section
+const TOTAL_FIELDS = new Set<FieldKey>([
+  'departureDate',
+  'departureTime',
+  'odometerStart',
+  'fuelFilled',
+  'fuelAtStart',
+  'fuelAtEnd',
+  'fuelPlanned',
+  'fuelActual',
+  'odometerEnd',
+  'arrivalDate',
+  'arrivalTime',
+  'totalDistance',
+  'calculatorPosition',
+  'calculatorShortName',
+]);
+
 const PAGE_FIELD_MAP: Record<PageKey, FieldKey[]> = {
   page1: [
     'waybillDay',
@@ -226,9 +244,9 @@ const formatDateOnly = (dateStr?: string): string =>
 const formatTime = (dateStr?: string): string =>
   dateStr
     ? new Date(dateStr).toLocaleTimeString('ru-RU', {
-        hour: '2-digit',
-        minute: '2-digit',
-      })
+      hour: '2-digit',
+      minute: '2-digit',
+    })
     : '';
 
 const formatPrintNumber = (num?: number): string => {
@@ -338,8 +356,8 @@ const PrintableWaybill: FC<PrintableWaybillProps> = ({
         case 'orgMedicalLicense':
           return medicalOrg
             ? `№${medicalOrg.medicalLicenseNumber || ''} от ${formatDateOnly(
-                medicalOrg.medicalLicenseIssueDate,
-              )}`
+              medicalOrg.medicalLicenseIssueDate,
+            )}`
             : '';
         case 'departureDate':
           return formatDateOnly(waybill.validFrom);
@@ -425,6 +443,10 @@ const PrintableWaybill: FC<PrintableWaybillProps> = ({
     startPoint: { x: number; y: number };
     startPositions: PrintPositions;
   } | null>(null);
+
+  // NEW: checkboxes state for data selection
+  const [showInitialData, setShowInitialData] = useState(true);
+  const [showTotals, setShowTotals] = useState(true);
 
   const { showToast } = useToast();
 
@@ -629,7 +651,14 @@ const PrintableWaybill: FC<PrintableWaybillProps> = ({
   const pageKeysToRender = useMemo(() => {
     const keys: PageKey[] = ['page1'];
 
-    const meaningfulPage2Fields = PAGE_FIELD_MAP.page2.filter((fieldId) => {
+    // Filter fields according to the selected print options
+    const filterFields = (ids: FieldKey[]) =>
+      ids.filter((id) =>
+        (showTotals && TOTAL_FIELDS.has(id)) ||
+        (showInitialData && !TOTAL_FIELDS.has(id)),
+      );
+
+    const meaningfulPage2Fields = filterFields(PAGE_FIELD_MAP.page2).filter((fieldId) => {
       const value = renderValue(fieldId);
       if (value === undefined || value === null) return false;
       const cleaned = String(value).replace(/[_\s.,-]/g, '');
@@ -647,7 +676,7 @@ const PrintableWaybill: FC<PrintableWaybillProps> = ({
     }
 
     return keys;
-  }, [forcePage2, hasRoutesWithDistance, renderValue, totalDistance]);
+  }, [forcePage2, hasRoutesWithDistance, renderValue, totalDistance, showInitialData, showTotals]);
 
   const DraggableField = useCallback(
     ({ id, label, value }: { id: FieldKey; label: string; value: string }) => {
@@ -679,9 +708,8 @@ const PrintableWaybill: FC<PrintableWaybillProps> = ({
           }}
         >
           <div
-            className={`print-field ${
-              editingEnabled ? 'draggable-active' : ''
-            } ${isSelected ? 'draggable-selected' : ''}`}
+            className={`print-field ${editingEnabled ? 'draggable-active' : ''
+              } ${isSelected ? 'draggable-selected' : ''}`}
           >
             {editingEnabled && showLabels && (
               <span className="print-label">{label}:</span>
@@ -802,6 +830,26 @@ const PrintableWaybill: FC<PrintableWaybillProps> = ({
                 />
                 Пустые поля
               </label>
+              {/* NEW: Checkbox for initial data */}
+              <label className="inline-flex items-center gap-2 ml-4">
+                <input
+                  type="checkbox"
+                  checked={showInitialData}
+                  onChange={(e) => setShowInitialData(e.target.checked)}
+                  className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                />
+                Печать начальных данных
+              </label>
+              {/* NEW: Checkbox for totals */}
+              <label className="inline-flex items-center gap-2 ml-4">
+                <input
+                  type="checkbox"
+                  checked={showTotals}
+                  onChange={(e) => setShowTotals(e.target.checked)}
+                  className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                />
+                Печать итогов
+              </label>
               <label className="inline-flex items-center gap-2">
                 <input
                   type="checkbox"
@@ -869,11 +917,11 @@ const PrintableWaybill: FC<PrintableWaybillProps> = ({
               const gridStyles =
                 editingEnabled && showGrid
                   ? {
-                      backgroundSize: `${gridSize}px ${gridSize}px`,
-                      backgroundImage:
-                        'linear-gradient(to right, #ccc 1px, transparent 1px), linear-gradient(to bottom, #ccc 1px, transparent 1px)',
-                      backgroundPosition: '-1px -1px',
-                    }
+                    backgroundSize: `${gridSize}px ${gridSize}px`,
+                    backgroundImage:
+                      'linear-gradient(to right, #ccc 1px, transparent 1px), linear-gradient(to bottom, #ccc 1px, transparent 1px)',
+                    backgroundPosition: '-1px -1px',
+                  }
                   : {};
 
               return (
@@ -887,14 +935,20 @@ const PrintableWaybill: FC<PrintableWaybillProps> = ({
                       ...gridStyles,
                     }}
                   >
-                    {PAGE_FIELD_MAP[pageKey].map((id) => (
-                      <DraggableField
-                        key={id}
-                        id={id}
-                        label={FIELD_LABELS[id]}
-                        value={renderValue(id)}
-                      />
-                    ))}
+                    {PAGE_FIELD_MAP[pageKey].map((id) => {
+                      const isTotalField = TOTAL_FIELDS.has(id);
+                      const shouldRender =
+                        (showTotals && isTotalField) ||
+                        (showInitialData && !isTotalField);
+                      return shouldRender ? (
+                        <DraggableField
+                          key={id}
+                          id={id}
+                          label={FIELD_LABELS[id]}
+                          value={renderValue(id)}
+                        />
+                      ) : null;
+                    })}
                   </div>
                 </div>
               );

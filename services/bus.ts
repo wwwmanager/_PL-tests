@@ -8,7 +8,8 @@ type Topic =
   | 'stock'
   | 'settings'
   | 'audit'
-  | 'policies';
+  | 'policies'
+  | 'routes';
 
 type Handler = (msg: { topic: Topic; payload?: unknown; ts: number }) => void;
 
@@ -29,7 +30,7 @@ export function broadcast(topic: Topic, payload?: unknown) {
   const msg = { topic, payload, ts: Date.now() };
   try {
     getBus().postMessage(msg);
-  } catch {}
+  } catch { }
 
   // FIX: BroadcastChannel does not fire events in the tab that sent the message.
   // We must manually trigger local handlers to update the UI in the current tab immediately.

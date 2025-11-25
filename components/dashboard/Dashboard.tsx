@@ -1,55 +1,55 @@
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { ResponsiveContainer, XAxis, YAxis, CartesianGrid, Tooltip, Legend, BarChart, Bar, LabelList } from 'recharts';
 import { getDashboardData, getIssues, getVehicles } from '../../services/mockApi';
 import { TruckIcon, UserGroupIcon, CogIcon, XIcon, BanknotesIcon } from '../Icons';
 import { KpiData, Vehicle } from '../../types';
 
 interface DashboardProps {
-  onNavigateToWaybill: (waybillId: string) => void;
+    onNavigateToWaybill: (waybillId: string) => void;
 }
 
 // =============================================================================
 // Modal Component
 // =============================================================================
 interface ModalProps {
-  title: string;
-  onClose: () => void;
-  children: React.ReactNode;
+    title: string;
+    onClose: () => void;
+    children: React.ReactNode;
 }
 
-const Modal: React.FC<ModalProps> = ({ title, onClose, children }) => {
-  useEffect(() => {
-    const handleEsc = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', handleEsc);
-    return () => window.removeEventListener('keydown', handleEsc);
-  }, [onClose]);
+const Modal = React.memo<ModalProps>(({ title, onClose, children }) => {
+    useEffect(() => {
+        const handleEsc = (event: KeyboardEvent) => {
+            if (event.key === 'Escape') onClose();
+        };
+        window.addEventListener('keydown', handleEsc);
+        return () => window.removeEventListener('keydown', handleEsc);
+    }, [onClose]);
 
-  return (
-    <div
-      className="fixed inset-0 bg-black bg-opacity-60 z-50 flex justify-center items-center p-4 transition-opacity duration-300"
-      aria-labelledby="modal-title" role="dialog" aria-modal="true"
-      onClick={onClose}
-    >
-      <div
-        className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col transform transition-all duration-300"
-        onClick={e => e.stopPropagation()}
-      >
-        <header className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
-          <h3 id="modal-title" className="text-xl font-bold text-gray-900 dark:text-white">{title}</h3>
-          <button onClick={onClose} className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300" aria-label="Закрыть">
-            <XIcon className="h-6 w-6" />
-          </button>
-        </header>
-        <main className="p-6 overflow-y-auto">
-          {children}
-        </main>
-      </div>
-    </div>
-  );
-};
+    return (
+        <div
+            className="fixed inset-0 bg-black bg-opacity-60 z-50 flex justify-center items-center p-4 transition-opacity duration-300"
+            aria-labelledby="modal-title" role="dialog" aria-modal="true"
+            onClick={onClose}
+        >
+            <div
+                className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col transform transition-all duration-300"
+                onClick={e => e.stopPropagation()}
+            >
+                <header className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
+                    <h3 id="modal-title" className="text-xl font-bold text-gray-900 dark:text-white">{title}</h3>
+                    <button onClick={onClose} className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300" aria-label="Закрыть">
+                        <XIcon className="h-6 w-6" />
+                    </button>
+                </header>
+                <main className="p-6 overflow-y-auto">
+                    {children}
+                </main>
+            </div>
+        </div>
+    );
+});
 
 // =============================================================================
 // Modal Content Components
@@ -69,7 +69,7 @@ const IssuesContent: React.FC<{ vehicleId: string }> = ({ vehicleId }) => {
     }, [vehicleId]);
 
     if (loading) return <div className="text-center text-gray-600 dark:text-gray-300">Анализ данных...</div>;
-    
+
     const { expiringDocs } = issues || {};
 
     if (!expiringDocs || expiringDocs.length === 0) {
@@ -81,9 +81,9 @@ const IssuesContent: React.FC<{ vehicleId: string }> = ({ vehicleId }) => {
             <div>
                 <h4 className="font-semibold text-yellow-600 dark:text-yellow-500 mb-2">Истекающие документы (в теч. 30 дней)</h4>
                 <ul className="list-disc list-inside space-y-2 text-gray-700 dark:text-gray-300">
-                    {expiringDocs.sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime()).map((doc, index) => (
+                    {expiringDocs.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()).map((doc, index) => (
                         <li key={index}>
-                           <span className="font-semibold">{doc.type}</span> ({doc.name}): истекает {new Date(doc.date).toLocaleDateString()}
+                            <span className="font-semibold">{doc.type}</span> ({doc.name}): истекает {new Date(doc.date).toLocaleDateString()}
                         </li>
                     ))}
                 </ul>
@@ -92,7 +92,7 @@ const IssuesContent: React.FC<{ vehicleId: string }> = ({ vehicleId }) => {
     );
 };
 
-const KpiCard = ({ title, value, icon, color, unit = '', onClick }: { title: string, value: string | number | React.ReactNode, icon: React.ReactElement, color: string, unit?: string, onClick?: () => void }) => (
+const KpiCard = React.memo<{ title: string, value: string | number | React.ReactNode, icon: React.ReactElement, color: string, unit?: string, onClick?: () => void }>(({ title, value, icon, color, unit = '', onClick }) => (
     <div
         onClick={onClick}
         className={`bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-lg flex items-center transition-transform transform hover:scale-105 ${onClick ? 'cursor-pointer' : ''}`}
@@ -109,21 +109,21 @@ const KpiCard = ({ title, value, icon, color, unit = '', onClick }: { title: str
             <div className="text-xl font-bold text-gray-800 dark:text-white">{value}{unit && <span className="text-sm font-normal ml-1">{unit}</span>}</div>
         </div>
     </div>
-);
+));
 
 interface ChartCardProps {
     title: string;
     children: React.ReactNode;
 }
 
-const ChartCard: React.FC<ChartCardProps> = ({ title, children }) => (
+const ChartCard = React.memo<ChartCardProps>(({ title, children }) => (
     <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-lg">
         <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">{title}</h3>
         <div style={{ width: '100%', height: 300 }}>
             {children}
         </div>
     </div>
-);
+));
 
 const Dashboard: React.FC<DashboardProps> = ({ onNavigateToWaybill }) => {
     const [kpi, setKpi] = useState<KpiData | null>(null);
@@ -131,7 +131,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigateToWaybill }) => {
     const [medicalExamsByMonth, setMedicalExamsByMonth] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [modalContent, setModalContent] = useState<{ title: string; content: React.ReactNode } | null>(null);
-    
+
     const [filters, setFilters] = useState({ vehicleId: '', dateFrom: '', dateTo: '' });
     const [vehicles, setVehicles] = useState<Vehicle[]>([]);
 
@@ -151,8 +151,8 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigateToWaybill }) => {
 
             // Adjust for timezone offset to ensure YYYY-MM-DD format matches local date
             const offset = startQ.getTimezoneOffset();
-            const startDateStr = new Date(startQ.getTime() - (offset*60*1000)).toISOString().split('T')[0];
-            const endDateStr = new Date(endQ.getTime() - (offset*60*1000)).toISOString().split('T')[0];
+            const startDateStr = new Date(startQ.getTime() - (offset * 60 * 1000)).toISOString().split('T')[0];
+            const endDateStr = new Date(endQ.getTime() - (offset * 60 * 1000)).toISOString().split('T')[0];
 
             // --- 2. Default Vehicle ---
             let targetVehicleId = '';
@@ -166,16 +166,16 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigateToWaybill }) => {
                 targetVehicleId = vehiclesData[0].id;
             }
 
-            const initialFilters = { 
-                vehicleId: targetVehicleId, 
-                dateFrom: startDateStr, 
-                dateTo: endDateStr 
+            const initialFilters = {
+                vehicleId: targetVehicleId,
+                dateFrom: startDateStr,
+                dateTo: endDateStr
             };
-            
+
             setFilters(initialFilters);
             fetchData(initialFilters);
         };
-        
+
         init();
     }, []);
 
@@ -201,17 +201,17 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigateToWaybill }) => {
         }
     };
 
-    const handleFilterChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const handleFilterChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         setFilters(prev => ({ ...prev, [e.target.name]: e.target.value }));
-    };
+    }, []);
 
-    const handleGenerate = () => {
+    const handleGenerate = useCallback(() => {
         fetchData(filters);
-    };
-    
-    const handleModalClose = () => {
-      setModalContent(null);
-    };
+    }, [filters]);
+
+    const handleModalClose = useCallback(() => {
+        setModalContent(null);
+    }, []);
 
     // Helper to format triple stats
     const formatTriple = (m: number | undefined, q: number | undefined, y: number | undefined) => {
@@ -226,6 +226,25 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigateToWaybill }) => {
             </span>
         );
     };
+
+    // Формирование названия периода для графиков
+    const getPeriodLabel = useCallback(() => {
+        if (!filters.dateFrom || !filters.dateTo) return '';
+
+        const start = new Date(filters.dateFrom);
+        const end = new Date(filters.dateTo);
+
+        const startMonth = start.toLocaleString('ru-RU', { month: 'short', year: 'numeric' });
+        const endMonth = end.toLocaleString('ru-RU', { month: 'short', year: 'numeric' });
+
+        // Форматируем: "Янв 2025 - Мар 2025" или "Янв - Мар 2025" если год один
+        if (start.getFullYear() === end.getFullYear()) {
+            const startShort = start.toLocaleString('ru-RU', { month: 'short' });
+            return `${startShort.charAt(0).toUpperCase() + startShort.slice(1)} - ${endMonth.charAt(0).toUpperCase() + endMonth.slice(1)}`;
+        }
+
+        return `${startMonth.charAt(0).toUpperCase() + startMonth.slice(1)} - ${endMonth.charAt(0).toUpperCase() + endMonth.slice(1)}`;
+    }, [filters.dateFrom, filters.dateTo]);
 
     if (loading && !kpi) {
         return <div className="text-center p-10 text-gray-600 dark:text-gray-300">Загрузка панели управления...</div>;
@@ -246,36 +265,36 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigateToWaybill }) => {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4 gap-6">
-                <KpiCard 
-                    title="Пробег (км)" 
-                    value={formatTriple(kpi?.mileageMonth, kpi?.mileageQuarter, kpi?.mileageYear)} 
-                    icon={<TruckIcon className="h-6 w-6 text-white" />} 
-                    color="bg-green-500" 
+                <KpiCard
+                    title="Пробег (км)"
+                    value={formatTriple(kpi?.mileageMonth, kpi?.mileageQuarter, kpi?.mileageYear)}
+                    icon={<TruckIcon className="h-6 w-6 text-white" />}
+                    color="bg-green-500"
                 />
-                <KpiCard 
-                    title="Расход топлива (л)" 
-                    value={formatTriple(kpi?.fuelMonth, kpi?.fuelQuarter, kpi?.fuelYear)} 
-                    icon={<UserGroupIcon className="h-6 w-6 text-white" />} 
-                    color="bg-purple-500" 
+                <KpiCard
+                    title="Расход топлива (л)"
+                    value={formatTriple(kpi?.fuelMonth, kpi?.fuelQuarter, kpi?.fuelYear)}
+                    icon={<UserGroupIcon className="h-6 w-6 text-white" />}
+                    color="bg-purple-500"
                 />
-                <KpiCard 
-                    title="Остаток топлива" 
-                    value={kpi?.totalFuelBalance.toFixed(1) ?? '0.0'} 
-                    icon={<BanknotesIcon className="h-6 w-6 text-white" />} 
-                    color="bg-blue-500" 
-                    unit="л" 
+                <KpiCard
+                    title="Остаток топлива"
+                    value={kpi?.totalFuelBalance.toFixed(1) ?? '0.0'}
+                    icon={<BanknotesIcon className="h-6 w-6 text-white" />}
+                    color="bg-blue-500"
+                    unit="л"
                 />
-                <KpiCard 
-                    title="Проблемы" 
-                    value={kpi?.issues ?? 0} 
-                    icon={<CogIcon className="h-6 w-6 text-white" />} 
-                    color="bg-red-500" 
+                <KpiCard
+                    title="Проблемы"
+                    value={kpi?.issues ?? 0}
+                    icon={<CogIcon className="h-6 w-6 text-white" />}
+                    color="bg-red-500"
                     onClick={() => setModalContent({ title: 'Зарегистрированные проблемы', content: <IssuesContent vehicleId={filters.vehicleId} /> })}
                 />
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <ChartCard title="Расход топлива (12 мес.)">
+                <ChartCard title={`Расход топлива (${getPeriodLabel()})`}>
                     <ResponsiveContainer>
                         <BarChart data={fuelConsumptionByMonth} margin={{ top: 20, right: 0, left: 0, bottom: 0 }}>
                             <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.2} />
@@ -284,18 +303,18 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigateToWaybill }) => {
                             <Tooltip contentStyle={{ backgroundColor: 'rgba(31, 41, 55, 0.8)', border: 'none', borderRadius: '0.5rem' }} />
                             <Legend />
                             <Bar dataKey="Факт" fill="#82ca9d" name="Факт (л)">
-                                <LabelList 
-                                    dataKey="Факт" 
-                                    position="top" 
-                                    fontWeight="bold" 
-                                    fill="rgb(156 163 175)" 
-                                    fontSize={12} 
+                                <LabelList
+                                    dataKey="Факт"
+                                    position="top"
+                                    fontWeight="bold"
+                                    fill="rgb(156 163 175)"
+                                    fontSize={12}
                                 />
                             </Bar>
                         </BarChart>
                     </ResponsiveContainer>
                 </ChartCard>
-                <ChartCard title="Предрейсовые осмотры (12 мес.)">
+                <ChartCard title={`Предрейсовые осмотры (${getPeriodLabel()})`}>
                     <ResponsiveContainer>
                         <BarChart data={medicalExamsByMonth} margin={{ top: 20, right: 0, left: 0, bottom: 0 }}>
                             <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.2} />
@@ -304,12 +323,12 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigateToWaybill }) => {
                             <Tooltip contentStyle={{ backgroundColor: 'rgba(31, 41, 55, 0.8)', border: 'none', borderRadius: '0.5rem' }} />
                             <Legend />
                             <Bar dataKey="Осмотры" fill="#ffc658" name="Кол-во осмотров">
-                                <LabelList 
-                                    dataKey="Осмотры" 
-                                    position="top" 
-                                    fontWeight="bold" 
-                                    fill="rgb(156 163 175)" 
-                                    fontSize={12} 
+                                <LabelList
+                                    dataKey="Осмотры"
+                                    position="top"
+                                    fontWeight="bold"
+                                    fill="rgb(156 163 175)"
+                                    fontSize={12}
                                 />
                             </Bar>
                         </BarChart>
@@ -318,7 +337,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigateToWaybill }) => {
             </div>
             {modalContent && (
                 <Modal title={modalContent.title} onClose={handleModalClose}>
-                  {modalContent.content}
+                    {modalContent.content}
                 </Modal>
             )}
         </div>

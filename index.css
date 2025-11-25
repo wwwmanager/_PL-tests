@@ -1,43 +1,84 @@
 /* Global styles for the application */
 
+/* CSS Reset and Base Styles */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-size: 16px;
+  /* Базовый размер шрифта */
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  font-size: 1rem;
+  /* 16px */
+}
+
+#root {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Global styles for the application */
+
 /* Required field indicator */
 .required-field {
-  background-color: #fff7ed; /* Light orange background for light mode */
+  background-color: #fff7ed;
+  /* Light orange background for light mode */
 }
 
 .dark .required-field {
-  background-color: #7c2d12; /* Dark orange background for dark mode */
-  background-color: rgba(124, 45, 18, 0.2); /* Semi-transparent for better visibility */
+  background-color: #7c2d12;
+  /* Dark orange background for dark mode */
+  background-color: rgba(124, 45, 18, 0.2);
+  /* Semi-transparent for better visibility */
 }
 
 /* Optional: Add a subtle border to required fields */
 .required-field {
-  border-left: 3px solid #fb923c; /* Orange left border */
+  border-left: 3px solid #fb923c;
+  /* Orange left border */
 }
 
 .dark .required-field {
-  border-left-color: #f97316; /* Brighter orange for dark mode */
+  border-left-color: #f97316;
+  /* Brighter orange for dark mode */
 }
 
 /* Ensure the required field styling doesn't conflict with error states */
 input.required-field:focus,
 select.required-field:focus,
 textarea.required-field:focus {
-  outline: none;
-  ring: 2px;
-  ring-color: #3b82f6; /* Blue ring on focus */
+  outline: 2px solid #3b82f6;
+  /* Blue outline on focus */
+  outline-offset: 2px;
 }
 
 /* Error state should override required field styling */
 input.border-red-500,
 select.border-red-500,
 textarea.border-red-500 {
-  background-color: #fef2f2 !important; /* Light red background */
+  background-color: #fef2f2 !important;
+  /* Light red background */
   border-color: #ef4444 !important;
 }
 
 .dark input.border-red-500,
 .dark select.border-red-500,
-.dark textarea.border-red-500{
+.dark textarea.border-red-500 {
   background-color: rgba(239, 68, 68, 0.1) !important;
 }

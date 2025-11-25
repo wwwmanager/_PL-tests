@@ -23,6 +23,7 @@ import {
   WaybillBlank,
   BlankStatus,
   AppMode,
+  SavedRoute,
 } from '../types';
 import { loadJSON, saveJSON } from './storage';
 import { broadcast } from './bus';
@@ -1193,15 +1194,28 @@ export const getDashboardData = async (filters: { vehicleId: string; dateFrom: s
   const issuesData = await getIssues({ vehicleId: filters.vehicleId });
   const issuesCount = issuesData.expiringDocs.length;
 
-  // --- Calculate Chart Data (last 12 months) ---
-  // This part still respects the filtered vehicle, but we'll compute the last 12 months rolling
+  // --- Calculate Chart Data (за выбранный период по месяцам) ---
+  // Определяем диапазон месяцев на основе фильтров
+  const startDate = new Date(filters.dateFrom);
+  const endDate = new Date(filters.dateTo);
+
   const medicalExamsByMonth: { month: string; Осмотры: number }[] = [];
   const fuelConsumptionByMonth: { month: string; Факт: number }[] = [];
 
-  for (let i = 11; i >= 0; i--) {
-    const targetDate = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    const year = targetDate.getFullYear();
-    const month = targetDate.getMonth();
+  // Собираем все уникальные месяцы в выбранном периоде
+  const monthsInRange: Date[] = [];
+  const current = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
+  const end = new Date(endDate.getFullYear(), endDate.getMonth(), 1);
+
+  while (current <= end) {
+    monthsInRange.push(new Date(current));
+    current.setMonth(current.getMonth() + 1);
+  }
+
+  // Для каждого месяца в диапазоне собираем данные
+  for (const monthDate of monthsInRange) {
+    const year = monthDate.getFullYear();
+    const month = monthDate.getMonth();
 
     const waybillsInMonth = relevantWaybills.filter(w => {
       const waybillDate = new Date(w.date);
@@ -1214,8 +1228,17 @@ export const getDashboardData = async (filters: { vehicleId: string; dateFrom: s
       return sum + (consumption > 0 ? consumption : 0);
     }, 0);
 
-    const monthName = targetDate.toLocaleString('ru-RU', { month: 'short' });
-    const label = monthName.charAt(0).toUpperCase() + monthName.slice(1).replace('.', '');
+    // Формат метки: "Янв 2025" или просто "Янв" если все месяцы одного года
+    const isSingleYear = monthsInRange.every(d => d.getFullYear() === monthsInRange[0].getFullYear());
+    let label: string;
+
+    if (isSingleYear) {
+      const monthName = monthDate.toLocaleString('ru-RU', { month: 'short' });
+      label = monthName.charAt(0).toUpperCase() + monthName.slice(1).replace('.', '');
+    } else {
+      const monthName = monthDate.toLocaleString('ru-RU', { month: 'short', year: 'numeric' });
+      label = monthName.charAt(0).toUpperCase() + monthName.slice(1).replace('.', '');
+    }
 
     medicalExamsByMonth.push({ month: label, Осмотры: examCount });
     fuelConsumptionByMonth.push({ month: label, Факт: Number(fuelConsumed.toFixed(0)) });
@@ -1415,8 +1438,26 @@ export default mockApi;
 // --- Other missing exports ---
 
 export const getFuelTypes = async (): Promise<FuelType[]> => { await initFromStorage(); return simulateNetwork(clone(fuelTypes)); };
-export const getSavedRoutes = async (): Promise<any[]> => { await initFromStorage(); return simulateNetwork([]); };
 export const getSeasonSettings = async (): Promise<SeasonSettings> => { await initFromStorage(); return (await loadJSON(DB_KEYS.SEASON_SETTINGS, { type: 'recurring', summerDay: 1, summerMonth: 4, winterDay: 1, winterMonth: 11 })); };
+export const getAvailableFuelExpenses = async (driverId: string, waybillId: string | null): Promise<StockTransaction[]> => { await initFromStorage(); return simulateNetwork(stockTransactions.filter(tx => tx.driverId === driverId && (!tx.waybillId || tx.waybillId === waybillId))); };
+export const updateStockTransaction = async (tx: StockTransaction): Promise<StockTransaction> => {
+  await initFromStorage();
+  const index = stockTransactions.findIndex(t => t.id === tx.id);
+  if (index > -1) stockTransactions[index] = tx;
+  await commit(['stock']);
+  return simulateNetwork(tx);
+};
+export const getStockTransactions = async (): Promise<StockTransaction[]> => { await initFromStorage(); return simulateNetwork(clone(stockTransactions)); };
+export const getGarageStockItems = async (): Promise<GarageStockItem[]> => { await initFromStorage(); return simulateNetwork(clone(garageStockItems)); };
+export const addVehicle = async (v: Omit<Vehicle, 'id'>): Promise<Vehicle> => { await initFromStorage(); const newV = { ...v, id: generateId('veh') }; vehicles.push(newV); await commit(['vehicles']); return simulateNetwork(newV); };
+export const updateVehicle = async (v: Vehicle): Promise<Vehicle> => { await initFromStorage(); const i = vehicles.findIndex(x => x.id === v.id); if (i > -1) vehicles[i] = v; await commit(['vehicles']); return simulateNetwork(v); };
+export const deleteVehicle = async (id: string): Promise<void> => { await initFromStorage(); vehicles = vehicles.filter(v => v.id !== id); await commit(['vehicles']); return simulateNetwork(undefined); };
+export const addFuelType = async (ft: Omit<FuelType, 'id'>): Promise<FuelType> => { await initFromStorage(); const newFt = { ...ft, id: generateId('ft') }; fuelTypes.push(newFt); await commit(['settings']); return simulateNetwork(newFt); };
+export const updateFuelType = async (ft: FuelType): Promise<FuelType> => { await initFromStorage(); const i = fuelTypes.findIndex(x => x.id === ft.id); if (i > -1) fuelTypes[i] = ft; await commit(['settings']); return simulateNetwork(ft); };
+export const deleteFuelType = async (id: string): Promise<void> => { await initFromStorage(); fuelTypes = fuelTypes.filter(f => f.id !== id); await commit(['settings']); return simulateNetwork(undefined); };
+export const addOrganization = async (o: Omit<Organization, 'id'>): Promise<Organization> => { await initFromStorage(); const newO = { ...o, id: generateId('org') }; organizations.push(newO); await commit(['organizations']); return simulateNetwork(newO); };
+export const updateOrganization = async (o: Organization): Promise<Organization> => { await initFromStorage(); const i = organizations.findIndex(x => x.id === o.id); if (i > -1) organizations[i] = o; await commit(['organizations']); return simulateNetwork(o); };
+export const deleteOrganization = async (id: string): Promise<void> => { await initFromStorage(); organizations = organizations.filter(o => o.id !== id); await commit(['organizations']); return simulateNetwork(undefined); };
 export const isWinterDate = (date: string, settings: SeasonSettings): boolean => {
   const d = new Date(date);
   if (settings.type === 'manual') {
@@ -1557,29 +1598,188 @@ export const spoilBlankLegacy = async (organizationId: string, series: string, n
 
 export const getAppSettings = async (): Promise<AppSettings> => { await initFromStorage(); return (await loadJSON(DB_KEYS.APP_SETTINGS, { isParserEnabled: true, blanks: { driverCanAddBatches: false } })); };
 export const saveAppSettings = async (settings: AppSettings): Promise<void> => { await initFromStorage(); await saveJSON(DB_KEYS.APP_SETTINGS, settings); await commit(['settings']); };
-export const addSavedRoutesFromWaybill = async (routes: Route[]): Promise<void> => { await initFromStorage(); /* ... logic ... */ };
-export const getAvailableFuelExpenses = async (driverId: string, waybillId: string | null): Promise<StockTransaction[]> => { await initFromStorage(); return simulateNetwork(stockTransactions.filter(tx => tx.driverId === driverId && (!tx.waybillId || tx.waybillId === waybillId))); };
-export const updateStockTransaction = async (tx: StockTransaction): Promise<StockTransaction> => {
+// ===== SAVED ROUTES MANAGEMENT =====
+
+export const getSavedRoutes = async (): Promise<SavedRoute[]> => {
   await initFromStorage();
-  const index = stockTransactions.findIndex(t => t.id === tx.id);
-  if (index > -1) stockTransactions[index] = tx;
-  await commit(['stock']);
-  return simulateNetwork(tx);
+  const routes = await loadJSON<SavedRoute[]>(DB_KEYS.SAVED_ROUTES, []);
+  return simulateNetwork(clone(routes));
 };
-export const getStockTransactions = async (): Promise<StockTransaction[]> => { await initFromStorage(); return simulateNetwork(clone(stockTransactions)); };
-export const getGarageStockItems = async (): Promise<GarageStockItem[]> => { await initFromStorage(); return simulateNetwork(clone(garageStockItems)); };
-export const addVehicle = async (v: Omit<Vehicle, 'id'>): Promise<Vehicle> => { await initFromStorage(); const newV = { ...v, id: generateId('veh') }; vehicles.push(newV); await commit(['vehicles']); return simulateNetwork(newV); };
-export const updateVehicle = async (v: Vehicle): Promise<Vehicle> => { await initFromStorage(); const i = vehicles.findIndex(x => x.id === v.id); if (i > -1) vehicles[i] = v; await commit(['vehicles']); return simulateNetwork(v); };
-export const deleteVehicle = async (id: string): Promise<void> => { await initFromStorage(); vehicles = vehicles.filter(v => v.id !== id); await commit(['vehicles']); return simulateNetwork(undefined); };
-export const addFuelType = async (ft: Omit<FuelType, 'id'>): Promise<FuelType> => { await initFromStorage(); const newFt = { ...ft, id: generateId('ft') }; fuelTypes.push(newFt); await commit(['settings']); return simulateNetwork(newFt); };
-export const updateFuelType = async (ft: FuelType): Promise<FuelType> => { await initFromStorage(); const i = fuelTypes.findIndex(x => x.id === ft.id); if (i > -1) fuelTypes[i] = ft; await commit(['settings']); return simulateNetwork(ft); };
-export const deleteFuelType = async (id: string): Promise<void> => { await initFromStorage(); fuelTypes = fuelTypes.filter(f => f.id !== id); await commit(['settings']); return simulateNetwork(undefined); };
-export const addOrganization = async (o: Omit<Organization, 'id'>): Promise<Organization> => { await initFromStorage(); const newO = { ...o, id: generateId('org') }; organizations.push(newO); await commit(['organizations']); return simulateNetwork(newO); };
-export const updateOrganization = async (o: Organization): Promise<Organization> => { await initFromStorage(); const i = organizations.findIndex(x => x.id === o.id); if (i > -1) organizations[i] = o; await commit(['organizations']); return simulateNetwork(o); };
-export const deleteOrganization = async (id: string): Promise<void> => { await initFromStorage(); organizations = organizations.filter(o => o.id !== id); await commit(['organizations']); return simulateNetwork(undefined); };
-export const addSavedRoute = async (r: Omit<any, 'id'>): Promise<any> => { await initFromStorage(); /* ... */ };
-export const updateSavedRoute = async (r: any): Promise<any> => { await initFromStorage(); /* ... */ };
-export const deleteSavedRoute = async (id: string): Promise<void> => { await initFromStorage(); /* ... */ };
+
+export const addSavedRoutesFromWaybill = async (routes: Route[]): Promise<void> => {
+  await initFromStorage();
+
+  const currentRoutes = await loadJSON<SavedRoute[]>(DB_KEYS.SAVED_ROUTES, []);
+
+  // Создаем индекс существующих маршрутов (from|to → route)
+  const existingIndex = new Map<string, SavedRoute>();
+  for (const route of currentRoutes) {
+    const key = `${route.from.trim().toLowerCase()}|${route.to.trim().toLowerCase()}`;
+    existingIndex.set(key, route);
+  }
+
+  let hasChanges = false;
+
+  for (const route of routes) {
+    // Пропускаем пустые маршруты
+    if (!route.from?.trim() || !route.to?.trim() || !route.distanceKm) continue;
+
+    const from = route.from.trim();
+    const to = route.to.trim();
+    const key = `${from.toLowerCase()}|${to.toLowerCase()}`;
+
+    const existing = existingIndex.get(key);
+
+    if (existing) {
+      // Маршрут существует - обновляем среднее расстояние
+      if (existing.distanceKm !== route.distanceKm) {
+        // Среднее значение для более точного расстояния
+        const newDistance = Math.round((existing.distanceKm + route.distanceKm) / 2);
+        if (newDistance !== existing.distanceKm) {
+          existing.distanceKm = newDistance;
+          hasChanges = true;
+        }
+      }
+    } else {
+      // Новый маршрут - добавляем
+      const newRoute: SavedRoute = {
+        id: generateId('route'),
+        from,
+        to,
+        distanceKm: route.distanceKm,
+      };
+      currentRoutes.push(newRoute);
+      existingIndex.set(key, newRoute);
+      hasChanges = true;
+    }
+  }
+
+  if (hasChanges) {
+    await saveJSON(DB_KEYS.SAVED_ROUTES, currentRoutes);
+    broadcast('routes');
+  }
+};
+
+/**
+ * Поиск локаций для autocomplete
+ * @param query - поисковый запрос (минимум 2 символа)
+ * @returns Массив уникальных локаций, отсортированных по релевантности
+ */
+export const searchSavedLocations = async (query: string): Promise<string[]> => {
+  await initFromStorage();
+
+  const trimmedQuery = query.trim();
+  if (trimmedQuery.length < 2) {
+    return [];
+  }
+
+  const routes = await loadJSON<SavedRoute[]>(DB_KEYS.SAVED_ROUTES, []);
+  const normalizedQuery = trimmedQuery.toLowerCase();
+
+  // Собираем все уникальные локации с метаданными
+  const locationScores = new Map<string, { location: string; score: number }>();
+
+  for (const route of routes) {
+    // Проверяем "from"
+    if (route.from) {
+      const normalizedFrom = route.from.toLowerCase();
+      if (normalizedFrom.includes(normalizedQuery)) {
+        const score = getRelevanceScore(normalizedFrom, normalizedQuery);
+        const existing = locationScores.get(route.from);
+        if (!existing || score > existing.score) {
+          locationScores.set(route.from, { location: route.from, score });
+        }
+      }
+    }
+
+    // Проверяем "to"
+    if (route.to) {
+      const normalizedTo = route.to.toLowerCase();
+      if (normalizedTo.includes(normalizedQuery)) {
+        const score = getRelevanceScore(normalizedTo, normalizedQuery);
+        const existing = locationScores.get(route.to);
+        if (!existing || score > existing.score) {
+          locationScores.set(route.to, { location: route.to, score });
+        }
+      }
+    }
+  }
+
+  // Сортируем по релевантности и возвращаем топ-10
+  return Array.from(locationScores.values())
+    .sort((a, b) => {
+      // Сначала по score (выше = лучше)
+      if (b.score !== a.score) return b.score - a.score;
+      // Затем по алфавиту
+      return a.location.localeCompare(b.location, 'ru');
+    })
+    .slice(0, 10)
+    .map(item => item.location);
+};
+
+/**
+ * Рассчитывает score релевантности (чем выше, тем релевантнее)
+ * - Начинается с query: +100
+ * - Содержит query: +50
+ * - Позиция в строке (чем раньше, тем лучше): +10..0
+ */
+function getRelevanceScore(text: string, query: string): number {
+  let score = 0;
+
+  // Начинается с query - самый высокий приоритет
+  if (text.startsWith(query)) {
+    score += 100;
+  }
+
+  // Содержит query
+  const position = text.indexOf(query);
+  if (position !== -1) {
+    score += 50;
+    // Чем раньше встречается, тем лучше
+    score += Math.max(0, 10 - position);
+  }
+
+  return score;
+}
+
+export const addSavedRoute = async (r: Omit<SavedRoute, 'id'>): Promise<SavedRoute> => {
+  await initFromStorage();
+  const routes = await loadJSON<SavedRoute[]>(DB_KEYS.SAVED_ROUTES, []);
+
+  const newRoute: SavedRoute = {
+    ...r,
+    id: generateId('route'),
+  };
+
+  routes.push(newRoute);
+  await saveJSON(DB_KEYS.SAVED_ROUTES, routes);
+  broadcast('routes');
+
+  return simulateNetwork(newRoute);
+};
+
+export const updateSavedRoute = async (r: SavedRoute): Promise<SavedRoute> => {
+  await initFromStorage();
+  const routes = await loadJSON<SavedRoute[]>(DB_KEYS.SAVED_ROUTES, []);
+  const index = routes.findIndex(x => x.id === r.id);
+
+  if (index > -1) {
+    routes[index] = r;
+    await saveJSON(DB_KEYS.SAVED_ROUTES, routes);
+    broadcast('routes');
+  }
+
+  return simulateNetwork(r);
+};
+
+export const deleteSavedRoute = async (id: string): Promise<void> => {
+  await initFromStorage();
+  let routes = await loadJSON<SavedRoute[]>(DB_KEYS.SAVED_ROUTES, []);
+  routes = routes.filter(r => r.id !== id);
+  await saveJSON(DB_KEYS.SAVED_ROUTES, routes);
+  broadcast('routes');
+  return simulateNetwork(undefined);
+};
 export const addEmployee = async (e: Omit<Employee, 'id'>): Promise<Employee> => { await initFromStorage(); const newE = { ...e, id: generateId('emp') }; drivers.push(newE); await commit(['employees']); return simulateNetwork(newE); };
 export const updateEmployee = async (e: Employee): Promise<Employee> => { await initFromStorage(); const i = drivers.findIndex(x => x.id === e.id); if (i > -1) drivers[i] = e; await commit(['employees']); return simulateNetwork(e); };
 export const deleteEmployee = async (id: string): Promise<void> => { await initFromStorage(); drivers = drivers.filter(d => d.id !== id); await commit(['employees']); return simulateNetwork(undefined); };

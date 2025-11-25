@@ -1,6 +1,8 @@
-import React from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import type { Route, Vehicle } from '../../types';
 import { TrashIcon } from '../Icons';
+import { AutocompleteInput } from '../shared/AutocompleteInput';
+import { searchSavedLocations } from '../../services/mockApi';
 
 // Re-defining FormField locally to avoid circular dependencies or complex imports if it's not exported
 const FormField: React.FC<{ label: string; children: React.ReactNode }> = ({ label, children }) => (
@@ -18,6 +20,17 @@ interface RouteRowProps {
     onRemove: (id: string) => void;
 }
 
+/**
+ * Debounce helper
+ */
+function debounce<T extends (...args: any[]) => any>(func: T, wait: number): (...args: Parameters<T>) => void {
+    let timeout: NodeJS.Timeout | null = null;
+    return (...args: Parameters<T>) => {
+        if (timeout) clearTimeout(timeout);
+        timeout = setTimeout(() => func(...args), wait);
+    };
+}
+
 const RouteRowComponent: React.FC<RouteRowProps> = ({
     route,
     dayMode,
@@ -25,11 +38,58 @@ const RouteRowComponent: React.FC<RouteRowProps> = ({
     onChange,
     onRemove,
 }) => {
+    const [fromSuggestions, setFromSuggestions] = useState<string[]>([]);
+    const [toSuggestions, setToSuggestions] = useState<string[]>([]);
+
+    // Debounced search for "from" field
+    const debouncedSearchFrom = useMemo(
+        () => debounce(async (query: string) => {
+            if (query.trim().length < 2) {
+                setFromSuggestions([]);
+                return;
+            }
+            try {
+                const results = await searchSavedLocations(query);
+                setFromSuggestions(results);
+            } catch (error) {
+                console.error('Search failed:', error);
+                setFromSuggestions([]);
+            }
+        }, 300),
+        []
+    );
+
+    // Debounced search for "to" field
+    const debouncedSearchTo = useMemo(
+        () => debounce(async (query: string) => {
+            if (query.trim().length < 2) {
+                setToSuggestions([]);
+                return;
+            }
+            try {
+                const results = await searchSavedLocations(query);
+                setToSuggestions(results);
+            } catch (error) {
+                console.error('Search failed:', error);
+                setToSuggestions([]);
+            }
+        }, 300),
+        []
+    );
+
+    const handleFromChange = useCallback((value: string) => {
+        onChange(route.id, 'from', value);
+    }, [route.id, onChange]);
+
+    const handleToChange = useCallback((value: string) => {
+        onChange(route.id, 'to', value);
+    }, [route.id, onChange]);
+
     return (
         <div
             className={`grid grid-cols-1 ${dayMode === 'multi'
-                    ? 'md:grid-cols-[auto,1fr,1fr,100px,auto,auto]'
-                    : 'md:grid-cols-[1fr,1fr,100px,auto,auto]'
+                ? 'md:grid-cols-[auto,1fr,1fr,100px,auto,auto]'
+                : 'md:grid-cols-[1fr,1fr,100px,auto,auto]'
                 } gap-2 items-end`}
         >
             {dayMode === 'multi' && (
@@ -44,21 +104,21 @@ const RouteRowComponent: React.FC<RouteRowProps> = ({
                 </FormField>
             )}
             <FormField label="Откуда">
-                <input
-                    list="locations"
-                    name="from"
+                <AutocompleteInput
                     value={route.from}
-                    onChange={(e) => onChange(route.id, 'from', e.target.value)}
-                    className="w-full bg-gray-50 dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded-md p-2"
+                    onChange={handleFromChange}
+                    suggestions={fromSuggestions}
+                    onSearch={debouncedSearchFrom}
+                    placeholder="Начните вводить..."
                 />
             </FormField>
             <FormField label="Куда">
-                <input
-                    list="locations"
-                    name="to"
+                <AutocompleteInput
                     value={route.to}
-                    onChange={(e) => onChange(route.id, 'to', e.target.value)}
-                    className="w-full bg-gray-50 dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded-md p-2"
+                    onChange={handleToChange}
+                    suggestions={toSuggestions}
+                    onSearch={debouncedSearchTo}
+                    placeholder="Начните вводить..."
                 />
             </FormField>
             <FormField label="Пробег, км">
