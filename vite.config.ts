@@ -6,7 +6,7 @@ import { fileURLToPath, URL } from 'url';
 export default defineConfig({
   // Базовый URL для развертывания на GitHub Pages.
   // Замените 'PL' на имя вашего репозитория, если оно отличается.
-  base: '/PL/',
+  base: '/_PL-tests/',
 
   // --- Плагины ---
   plugins: [
