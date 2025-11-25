@@ -1,0 +1,43 @@
+/* Global styles for the application */
+
+/* Required field indicator */
+.required-field {
+  background-color: #fff7ed; /* Light orange background for light mode */
+}
+
+.dark .required-field {
+  background-color: #7c2d12; /* Dark orange background for dark mode */
+  background-color: rgba(124, 45, 18, 0.2); /* Semi-transparent for better visibility */
+}
+
+/* Optional: Add a subtle border to required fields */
+.required-field {
+  border-left: 3px solid #fb923c; /* Orange left border */
+}
+
+.dark .required-field {
+  border-left-color: #f97316; /* Brighter orange for dark mode */
+}
+
+/* Ensure the required field styling doesn't conflict with error states */
+input.required-field:focus,
+select.required-field:focus,
+textarea.required-field:focus {
+  outline: none;
+  ring: 2px;
+  ring-color: #3b82f6; /* Blue ring on focus */
+}
+
+/* Error state should override required field styling */
+input.border-red-500,
+select.border-red-500,
+textarea.border-red-500 {
+  background-color: #fef2f2 !important; /* Light red background */
+  border-color: #ef4444 !important;
+}
+
+.dark input.border-red-500,
+.dark select.border-red-500,
+.dark textarea.border-red-500{
+  background-color: rgba(239, 68, 68, 0.1) !important;
+}
