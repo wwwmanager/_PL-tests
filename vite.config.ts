@@ -5,8 +5,8 @@ import { fileURLToPath, URL } from 'url';
 // https://vitejs.dev/config/
 export default defineConfig({
   // Базовый URL для развертывания на GitHub Pages.
-  // Замените 'PL' на имя вашего репозитория, если оно отличается.
-  base: '/PL/',
+  // Имя репозитория: _PL-tests
+  base: '/_PL-tests/',
 
   // --- Плагины ---
   plugins: [
