@@ -32,7 +32,7 @@ type AuthContextValue = {
 
 const CURRENT_USER_KEY = '__current_user__';
 const TOKEN_KEY = '__auth_token__';
-const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api';
+const API_BASE = 'http://localhost:4000/api'; // import.meta.env.VITE_API_BASE_URL || '/api';
 
 // ---------- API helpers ----------
 

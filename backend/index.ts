@@ -14,7 +14,7 @@ const TOKEN_TTL = '1h'; // срок жизни access token
 // Разрешаем фронтенд на Vite (по умолчанию http://localhost:3000)
 app.use(
     cors({
-        origin: ['http://localhost:3000', 'http://localhost:5173'],
+        origin: ['http://localhost:3000', 'http://localhost:5173', 'http://localhost:4173'],
         credentials: false, // мы используем Bearer-токен, а не cookies
     }),
 );
