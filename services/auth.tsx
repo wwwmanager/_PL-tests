@@ -170,6 +170,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode; defaultRole?: R
       }
 
       // DEV: создаём dev-пользователя
+      // ВРЕМЕННО ОТКЛЮЧЕНО ДЛЯ ТЕСТИРОВАНИЯ LOGIN
+      /*
       if (import.meta.env.DEV) {
         const dev: User = {
           id: 'dev-admin',
@@ -182,6 +184,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode; defaultRole?: R
         // PROD: без авто-логина
         setCurrentUser(null);
       }
+      */
+      // Всегда требуем login для тестирования
+      setCurrentUser(null);
     })();
 
     const unsubscribe = subscribe((msg) => {
