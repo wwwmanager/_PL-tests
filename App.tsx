@@ -2,9 +2,10 @@ import React, { useState, lazy, Suspense, useEffect } from 'react';
 import { DashboardIcon, DocumentTextIcon, ChartBarIcon, CogIcon, TruckIcon, MenuIcon, XIcon, BookOpenIcon, InformationCircleIcon, QuestionMarkCircleIcon, ArrowDownIcon, ArrowUpIcon, ArchiveBoxIcon, CodeBracketIcon, BeakerIcon, ShieldCheckIcon } from './components/Icons';
 import { View, DictionaryType, AppSettings } from './types';
 import { ToastProvider } from './contexts/ToastContext';
-import { AuthProvider, useAuth } from './services/auth';
+import { AuthProvider, useAuth, RequireCapability } from './services/auth';
 import { DevRoleSwitcher } from './services/auth';
 import { getAppSettings } from './services/mockApi';
+import Login from './components/auth/Login';
 
 const Dashboard = lazy(() => import('./components/dashboard/Dashboard'));
 const WaybillList = lazy(() => import('./components/waybills/WaybillList'));
@@ -53,7 +54,12 @@ const AppContent: React.FC = () => {
   const [dictionarySubView, setDictionarySubView] = useState<DictionaryType | null>(null);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [appSettings, setAppSettings] = useState<AppSettings | null>(null);
-  const { hasRole } = useAuth();
+  const { hasRole, currentUser } = useAuth();
+
+  // Если пользователь не авторизован — показываем экран входа
+  if (!currentUser) {
+    return <Login />;
+  }
 
   useEffect(() => {
     getAppSettings().then(setAppSettings);
@@ -93,7 +99,20 @@ const AppContent: React.FC = () => {
       case 'REPORTS':
         return <Reports />;
       case 'ADMIN':
-        return <Admin />;
+        return (
+          <RequireCapability
+            cap="admin.panel"
+            fallback={
+              <div className="p-4 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 rounded">
+                <p className="text-sm text-red-700 dark:text-red-300">
+                  У вас нет прав для доступа к разделу «Настройки». Обратитесь к администратору.
+                </p>
+              </div>
+            }
+          >
+            <Admin />
+          </RequireCapability>
+        );
       case 'BLANKS':
         return <BlankManagement />;
       case 'ABOUT':
@@ -179,7 +198,11 @@ const AppContent: React.FC = () => {
             <NavItem view="DICTIONARIES" icon={<BookOpenIcon />} label="Справочники" />
             <NavItem view="WAREHOUSE" icon={<ArchiveBoxIcon />} label="Номенклатура и Склад" />
             <NavItem view="REPORTS" icon={<ChartBarIcon />} label="Отчеты" />
-            <NavItem view="ADMIN" icon={<CogIcon />} label="Настройки" />
+
+            <RequireCapability cap="admin.panel">
+              <NavItem view="ADMIN" icon={<CogIcon />} label="Настройки" />
+            </RequireCapability>
+
             <HelpMenu />
           </ul>
         </nav>
