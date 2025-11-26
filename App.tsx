@@ -56,14 +56,14 @@ const AppContent: React.FC = () => {
   const [appSettings, setAppSettings] = useState<AppSettings | null>(null);
   const { hasRole, currentUser } = useAuth();
 
+  useEffect(() => {
+    getAppSettings().then(setAppSettings);
+  }, []);
+
   // Если пользователь не авторизован — показываем экран входа
   if (!currentUser) {
     return <Login />;
   }
-
-  useEffect(() => {
-    getAppSettings().then(setAppSettings);
-  }, []);
 
   const handleNavigate = (view: View, subView?: string) => {
     if (view === 'DICTIONARIES' && subView) {
