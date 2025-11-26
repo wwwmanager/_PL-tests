@@ -121,8 +121,8 @@ const AppContent: React.FC = () => {
     <li
       onClick={() => handleNavigate(view)}
       className={`flex items-center p-3 my-1 rounded-lg cursor-pointer transition-colors ${currentView === view
-          ? 'bg-blue-600 text-white shadow-lg'
-          : 'text-gray-600 dark:text-gray-300 hover:bg-blue-100 dark:hover:bg-gray-700'
+        ? 'bg-blue-600 text-white shadow-lg'
+        : 'text-gray-600 dark:text-gray-300 hover:bg-blue-100 dark:hover:bg-gray-700'
         }`}
     >
       <span className="w-6 h-6">{icon}</span>
