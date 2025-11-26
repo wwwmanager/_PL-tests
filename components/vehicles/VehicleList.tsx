@@ -277,8 +277,8 @@ export const VehicleList: React.FC = () => {
                     <CollapsibleSection title="Топливо и пробег" isCollapsed={collapsedSections.fuel || false} onToggle={() => toggleSection('fuel')}>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
                             <FormField label="Тип топлива" error={errors.fuelTypeId?.message} required><FormSelect {...register("fuelTypeId")}><option value="">-</option>{fuelTypes.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}</FormSelect></FormField>
-                            <FormField label="Объем бака, л"><FormInput type="number" {...register("fuelTankCapacity", { valueAsNumber: true, setValueAs: v => v || null })} /></FormField>
-                            <FormField label="Текущий остаток, л"><FormInput type="number" {...register("currentFuel", { valueAsNumber: true, setValueAs: v => v || null })} /></FormField>
+                            <FormField label="Объем бака, л"><FormInput type="number" step="0.01" {...register("fuelTankCapacity", { valueAsNumber: true, setValueAs: v => v || null })} /></FormField>
+                            <FormField label="Текущий остаток, л"><FormInput type="number" step="0.01" {...register("currentFuel", { valueAsNumber: true, setValueAs: v => v || null })} /></FormField>
                             <FormField label="Пробег, км" error={errors.mileage?.message} required><FormInput type="number" {...register("mileage", { valueAsNumber: true })} /></FormField>
 
                             <div className="md:col-span-3 grid grid-cols-2 gap-4">
