@@ -160,33 +160,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode; defaultRole?: R
         }
       }
 
-      // Если нет токена / не удалось получить пользователя — пробуем локальное хранилище
-      const saved = await loadJSON<User | null>(CURRENT_USER_KEY, null);
-      if (!alive) return;
-
-      if (saved) {
-        setCurrentUser(saved);
-        return;
-      }
-
-      // DEV: создаём dev-пользователя
-      // ВРЕМЕННО ОТКЛЮЧЕНО ДЛЯ ТЕСТИРОВАНИЯ LOGIN
-      /*
+      // Если нет токена - проверяем режим
+      // DEV: создаём dev-пользователя для удобства разработки
       if (import.meta.env.DEV) {
         const dev: User = {
           id: 'dev-admin',
           role: defaultRole,
-          displayName: 'Admin',
+          displayName: 'Admin (DEV)',
         };
         setCurrentUser(dev);
         await saveJSON(CURRENT_USER_KEY, dev);
       } else {
-        // PROD: без авто-логина
+        // PROD: требуем login
         setCurrentUser(null);
       }
-      */
-      // Всегда требуем login для тестирования
-      setCurrentUser(null);
     })();
 
     const unsubscribe = subscribe((msg) => {
