@@ -1,0 +1,110 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum WaybillStatus {
+  DRAFT
+  APPROVED
+  ISSUED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+model Organization {
+  id        String     @id @default(uuid())
+  name      String
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @default(now())
+
+  users     User[]
+  employees Employee[]
+  vehicles  Vehicle[]
+  waybills  Waybill[]
+}
+
+model User {
+  id             String       @id @default(uuid())
+  organizationId String
+  email          String       @unique
+  passwordHash   String
+  fullName       String
+  role           String       // "admin", "dispatcher", "driver" и т.п.
+  isActive       Boolean      @default(true)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @default(now())
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+}
+
+model Employee {
+  id              String        @id @default(uuid())
+  organizationId  String
+  fullName        String
+  position        String?
+  phone           String?
+  isActive        Boolean       @default(true)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @default(now())
+
+  organization    Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  driver          Driver?
+}
+
+model Driver {
+  id             String     @id @default(uuid())
+  employeeId     String     @unique
+  licenseNumber  String
+  licenseCategory String?
+  licenseValidTo DateTime?
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @default(now())
+
+  employee       Employee   @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  waybills       Waybill[]
+}
+
+model Vehicle {
+  id              String        @id @default(uuid())
+  organizationId  String
+  code            String?
+  registrationNumber String
+  brand           String?
+  model           String?
+  fuelType        String?
+  isActive        Boolean       @default(true)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @default(now())
+
+  organization    Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  waybills        Waybill[]
+}
+
+model Waybill {
+  id              String         @id @default(uuid())
+  organizationId  String
+  number          String
+  date            DateTime
+  vehicleId       String
+  driverId        String
+  status          WaybillStatus  @default(DRAFT)
+
+  odometerStart   Float?
+  odometerEnd     Float?
+  plannedRoute    String?
+  notes           String?
+
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @default(now())
+
+  organization    Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  vehicle         Vehicle        @relation(fields: [vehicleId], references: [id])
+  driver          Driver         @relation(fields: [driverId], references: [id])
+
+  @@unique([organizationId, number, date])
+}
