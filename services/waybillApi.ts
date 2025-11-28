@@ -1,144 +1,75 @@
 /**
- * API для работы с путевыми листами
+ * Waybill API Facade
+ * 
+ * Provides unified API for waybills that can switch between mockApi and real backend
+ * based on VITE_USE_REAL_API environment variable
  */
 
-import { http } from './httpClient';
+import * as mockApi from './mockApi';
+import * as realApi from './api/realWaybillApi';
 
-export type WaybillStatus = 'DRAFT' | 'SUBMITTED' | 'POSTED' | 'CANCELLED';
+// Feature flag to switch between mockApi and real backend
+const USE_REAL_API = import.meta.env.VITE_USE_REAL_API === 'true';
 
-export interface WaybillDto {
-    id: string;
-    organizationId: string;
-    departmentId: string | null;
-    number: string;
-    date: string; // ISO 8601
-    vehicleId: string;
-    driverId: string;
-    blankId: string | null;
-    status: WaybillStatus;
-    odometerStart: number | null;
-    odometerEnd: number | null;
-    plannedRoute: string | null;
-    notes: string | null;
-    createdAt: string;
-    updatedAt: string;
-    // Связанные данные (если backend отдает include)
-    vehicle?: {
-        id: string;
-        code: string;
-        registrationNumber: string;
-        brand: string;
-        model: string;
+// Log which API is being used (only in development)
+if (import.meta.env.DEV) {
+    console.log(`🔗 Waybill API: Using ${USE_REAL_API ? 'REAL BACKEND' : 'MOCK API'}`);
+}
+
+/**
+ * Get all waybills
+ */
+export const getWaybills = USE_REAL_API
+    ? realApi.getWaybills
+    : mockApi.getWaybills;
+
+/**
+ * Get waybill by ID
+ */
+export const getWaybillById = USE_REAL_API
+    ? realApi.getWaybillById
+    : async (id: string) => {
+        const waybills = await mockApi.getWaybills();
+        const found = waybills.find(w => w.id === id);
+        if (!found) throw new Error(`Waybill ${id} not found`);
+        return found;
     };
-    driver?: {
-        id: string;
-        employee: {
-            fullName: string;
-        };
-        licenseNumber: string;
-    };
-}
-
-export interface WaybillRouteDto {
-    id: string;
-    waybillId: string;
-    legOrder: number;
-    fromPoint: string;
-    toPoint: string;
-    distanceKm: number;
-    notes: string | null;
-}
-
-export interface WaybillFuelDto {
-    id: string;
-    waybillId: string;
-    stockItemId: string;
-    fuelStart: number;
-    fuelReceived: number;
-    fuelConsumed: number;
-    fuelEnd: number;
-    stockItem?: {
-        name: string;
-        code: string;
-    };
-}
-
-export interface CreateWaybillInput {
-    number: string;
-    date: string; // 'YYYY-MM-DD' or ISO string
-    vehicleId: string;
-    driverId: string;
-    blankId?: string;
-    odometerStart?: number;
-    plannedRoute?: string;
-    notes?: string;
-}
-
-export interface UpdateWaybillInput {
-    number?: string;
-    date?: string;
-    vehicleId?: string;
-    driverId?: string;
-    blankId?: string;
-    odometerStart?: number;
-    odometerEnd?: number;
-    plannedRoute?: string;
-    notes?: string;
-    status?: WaybillStatus;
-}
 
 /**
- * Получить список всех путевых листов
+ * Create new waybill
  */
-export async function listWaybills(): Promise<WaybillDto[]> {
-    return http.get<WaybillDto[]>('/waybills');
-}
+export const addWaybill = USE_REAL_API
+    ? realApi.addWaybill
+    : mockApi.addWaybill;
 
 /**
- * Получить путевой лист по ID
+ * Update waybill
  */
-export async function getWaybill(id: string): Promise<WaybillDto> {
-    return http.get<WaybillDto>(`/waybills/${id}`);
-}
+export const updateWaybill = USE_REAL_API
+    ? realApi.updateWaybill
+    : mockApi.updateWaybill;
 
 /**
- * Создать новый путевой лист
+ * Delete waybill
  */
-export async function createWaybill(input: CreateWaybillInput): Promise<WaybillDto> {
-    return http.post<WaybillDto>('/waybills', input);
-}
+export const deleteWaybill = USE_REAL_API
+    ? realApi.deleteWaybill
+    : mockApi.deleteWaybill;
 
 /**
- * Обновить путевой лист
+ * Update waybill status
  */
-export async function updateWaybill(id: string, input: UpdateWaybillInput): Promise<WaybillDto> {
-    return http.put<WaybillDto>(`/waybills/${id}`, input);
-}
+export const updateWaybillStatus = USE_REAL_API
+    ? realApi.updateWaybillStatus
+    : mockApi.updateWaybillStatus;
 
 /**
- * Удалить путевой лист
+ * Change waybill status with context
  */
-export async function deleteWaybill(id: string): Promise<void> {
-    return http.delete<void>(`/waybills/${id}`);
-}
+export const changeWaybillStatus = USE_REAL_API
+    ? realApi.changeWaybillStatus
+    : mockApi.changeWaybillStatus;
 
-/**
- * Изменить статус путевого листа
- */
-export async function updateWaybillStatus(id: string, status: WaybillStatus): Promise<WaybillDto> {
-    return http.patch<WaybillDto>(`/waybills/${id}/status`, { status });
-}
-
-/**
- * Получить маршруты путевого листа
- */
-export async function getWaybillRoutes(waybillId: string): Promise<WaybillRouteDto[]> {
-    return http.get<WaybillRouteDto[]>(`/waybills/${waybillId}/routes`);
-}
-
-/**
- * Получить данные о топливе путевого листа
- */
-export async function getWaybillFuel(waybillId: string): Promise<WaybillFuelDto[]> {
-    return http.get<WaybillFuelDto[]>(`/waybills/${waybillId}/fuel`);
-}
+// Re-export other mockApi functions that are not yet implemented in realApi
+export const fetchWaybills = mockApi.fetchWaybills;
+export const getLatestWaybill = mockApi.getLatestWaybill;
