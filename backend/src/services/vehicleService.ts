@@ -1,53 +1,54 @@
-import { prisma } from '../db/prisma';
+// vehicleService - TypeORM version
+import { AppDataSource } from '../db/data-source';
+import { Vehicle } from '../entities/Vehicle';
+import { NotFoundError } from '../utils/errors';
+
+const vehicleRepo = () => AppDataSource.getRepository(Vehicle);
 
 export async function listVehicles(organizationId: string) {
-    return prisma.vehicle.findMany({
+    return vehicleRepo().find({
         where: { organizationId },
-        orderBy: { registrationNumber: 'asc' }
+        relations: { organization: true, department: true },
+        order: { registrationNumber: 'ASC' }
     });
 }
 
 export async function getVehicleById(organizationId: string, id: string) {
-    return prisma.vehicle.findFirst({
+    return vehicleRepo().findOne({
+        where: { id, organizationId },
+        relations: { organization: true, department: true }
+    });
+}
+
+export async function createVehicle(organizationId: string, data: any) {
+    const vehicle = vehicleRepo().create({
+        ...data,
+        organizationId
+    });
+    return vehicleRepo().save(vehicle);
+}
+
+export async function updateVehicle(organizationId: string, id: string, data: any) {
+    const vehicle = await vehicleRepo().findOne({
         where: { id, organizationId }
     });
-}
 
-interface CreateVehicleInput {
-    code?: string;
-    registrationNumber: string;
-    brand?: string;
-    model?: string;
-    fuelType?: string;
-}
+    if (!vehicle) {
+        throw new NotFoundError('Транспортное средство не найдено');
+    }
 
-export async function createVehicle(organizationId: string, input: CreateVehicleInput) {
-    return prisma.vehicle.create({
-        data: {
-            organizationId,
-            ...input
-        }
-    });
-}
-
-interface UpdateVehicleInput {
-    code?: string;
-    registrationNumber?: string;
-    brand?: string;
-    model?: string;
-    fuelType?: string;
-    isActive?: boolean;
-}
-
-export async function updateVehicle(organizationId: string, id: string, input: UpdateVehicleInput) {
-    return prisma.vehicle.updateMany({
-        where: { id, organizationId },
-        data: input
-    });
+    Object.assign(vehicle, data);
+    return vehicleRepo().save(vehicle);
 }
 
 export async function deleteVehicle(organizationId: string, id: string) {
-    return prisma.vehicle.deleteMany({
+    const vehicle = await vehicleRepo().findOne({
         where: { id, organizationId }
     });
+
+    if (!vehicle) {
+        throw new NotFoundError('Транспортное средство не найдено');
+    }
+
+    return vehicleRepo().remove(vehicle);
 }

@@ -1,38 +1,36 @@
-import { prisma } from '../db/prisma';
-import { comparePassword } from '../utils/password';
-import { signAccessToken } from '../utils/jwt';
-import { UnauthorizedError } from '../utils/errors';
+// authService - TypeORM version
+import { AppDataSource } from '../db/data-source';
+import { User } from '../entities/User';
+import bcrypt from 'bcrypt';
+import { BadRequestError } from '../utils/errors';
+
+const userRepo = () => AppDataSource.getRepository(User);
 
 export async function login(email: string, password: string) {
-    const user = await prisma.user.findUnique({
+    const user = await userRepo().findOne({
         where: { email },
-        include: { organization: true }
+        relations: { organization: true, department: true }
     });
 
-    if (!user || !user.isActive) {
-        throw new UnauthorizedError('Неверный логин или пароль');
+    if (!user) {
+        throw new BadRequestError('Неверный email или пароль');
     }
 
-    const ok = await comparePassword(password, user.passwordHash);
-    if (!ok) {
-        throw new UnauthorizedError('Неверный логин или пароль');
+    const isValid = await bcrypt.compare(password, user.passwordHash);
+    if (!isValid) {
+        throw new BadRequestError('Неверный email или пароль');
     }
 
-    const accessToken = signAccessToken({
-        id: user.id,
-        organizationId: user.organizationId,
-        role: user.role
+    if (!user.isActive) {
+        throw new BadRequestError('Пользователь неактивен');
+    }
+
+    return user;
+}
+
+export async function findUserById(id: string) {
+    return userRepo().findOne({
+        where: { id },
+        relations: { organization: true, department: true }
     });
-
-    return {
-        accessToken,
-        user: {
-            id: user.id,
-            email: user.email,
-            fullName: user.fullName,
-            organizationId: user.organizationId,
-            organizationName: user.organization.name,
-            role: user.role
-        }
-    };
 }

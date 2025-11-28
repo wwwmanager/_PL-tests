@@ -1,6 +1,14 @@
-import { prisma } from '../db/prisma';
+// TypeORM version of waybillService
+import { AppDataSource } from '../db/data-source';
+import { Waybill } from '../entities/Waybill';
+import { Vehicle } from '../entities/Vehicle';
+import { Driver } from '../entities/Driver';
 import { BadRequestError, NotFoundError } from '../utils/errors';
-import { WaybillStatus } from '@prisma/client';
+import { WaybillStatus } from '../entities/enums';
+
+const waybillRepo = () => AppDataSource.getRepository(Waybill);
+const vehicleRepo = () => AppDataSource.getRepository(Vehicle);
+const driverRepo = () => AppDataSource.getRepository(Driver);
 
 interface CreateWaybillInput {
     number: string;
@@ -19,35 +27,41 @@ export async function listWaybills(organizationId: string, filters?: {
     driverId?: string;
     status?: WaybillStatus;
 }) {
-    const where: any = { organizationId };
+    const qb = waybillRepo().createQueryBuilder('waybill')
+        .leftJoinAndSelect('waybill.vehicle', 'vehicle')
+        .leftJoinAndSelect('waybill.driver', 'driver')
+        .leftJoinAndSelect('driver.employee', 'employee')
+        .where('waybill.organizationId = :organizationId', { organizationId });
 
     if (filters) {
-        if (filters.startDate || filters.endDate) {
-            where.date = {};
-            if (filters.startDate) where.date.gte = new Date(filters.startDate);
-            if (filters.endDate) where.date.lte = new Date(filters.endDate);
+        if (filters.startDate) {
+            qb.andWhere('waybill.date >= :startDate', { startDate: filters.startDate });
         }
-        if (filters.vehicleId) where.vehicleId = filters.vehicleId;
-        if (filters.driverId) where.driverId = filters.driverId;
-        if (filters.status) where.status = filters.status;
+        if (filters.endDate) {
+            qb.andWhere('waybill.date <= :endDate', { endDate: filters.endDate });
+        }
+        if (filters.vehicleId) {
+            qb.andWhere('waybill.vehicleId = :vehicleId', { vehicleId: filters.vehicleId });
+        }
+        if (filters.driverId) {
+            qb.andWhere('waybill.driverId = :driverId', { driverId: filters.driverId });
+        }
+        if (filters.status) {
+            qb.andWhere('waybill.status = :status', { status: filters.status });
+        }
     }
 
-    return prisma.waybill.findMany({
-        where,
-        include: {
-            vehicle: true,
-            driver: { include: { employee: true } }
-        },
-        orderBy: { date: 'desc' }
-    });
+    qb.orderBy('waybill.date', 'DESC');
+
+    return qb.getMany();
 }
 
 export async function getWaybillById(organizationId: string, id: string) {
-    return prisma.waybill.findFirst({
+    return waybillRepo().findOne({
         where: { id, organizationId },
-        include: {
+        relations: {
             vehicle: true,
-            driver: { include: { employee: true } }
+            driver: { employee: true }
         }
     });
 }
@@ -59,37 +73,40 @@ export async function createWaybill(organizationId: string, input: CreateWaybill
     }
 
     // Проверяем, что vehicle и driver принадлежат этой организации
-    const vehicle = await prisma.vehicle.findFirst({
+    const vehicle = await vehicleRepo().findOne({
         where: { id: input.vehicleId, organizationId }
     });
     if (!vehicle) {
         throw new BadRequestError('Транспортное средство не найдено');
     }
 
-    const driver = await prisma.driver.findFirst({
-        where: {
-            id: input.driverId,
-            employee: { organizationId }
-        }
+    const driver = await driverRepo().findOne({
+        where: { id: input.driverId },
+        relations: { employee: true }
     });
-    if (!driver) {
+    if (!driver || driver.employee.organizationId !== organizationId) {
         throw new BadRequestError('Водитель не найден');
     }
 
-    return prisma.waybill.create({
-        data: {
-            organizationId,
-            number: input.number,
-            date,
-            vehicleId: input.vehicleId,
-            driverId: input.driverId,
-            odometerStart: input.odometerStart,
-            plannedRoute: input.plannedRoute,
-            notes: input.notes
-        },
-        include: {
+    const waybill = waybillRepo().create({
+        organizationId,
+        number: input.number,
+        date: input.date,
+        vehicleId: input.vehicleId,
+        driverId: input.driverId,
+        odometerStart: input.odometerStart?.toString(),
+        plannedRoute: input.plannedRoute || null,
+        notes: input.notes || null,
+        status: WaybillStatus.DRAFT,
+    });
+
+    const saved = await waybillRepo().save(waybill);
+
+    return waybillRepo().findOne({
+        where: { id: saved.id },
+        relations: {
             vehicle: true,
-            driver: { include: { employee: true } }
+            driver: { employee: true }
         }
     });
 }
@@ -107,7 +124,7 @@ interface UpdateWaybillInput {
 }
 
 export async function updateWaybill(organizationId: string, id: string, input: UpdateWaybillInput) {
-    const existing = await prisma.waybill.findFirst({
+    const existing = await waybillRepo().findOne({
         where: { id, organizationId }
     });
 
@@ -115,30 +132,29 @@ export async function updateWaybill(organizationId: string, id: string, input: U
         throw new NotFoundError('Путевой лист не найден');
     }
 
-    const updateData: any = {};
+    if (input.number !== undefined) existing.number = input.number;
+    if (input.date) existing.date = input.date;
+    if (input.vehicleId !== undefined) existing.vehicleId = input.vehicleId;
+    if (input.driverId !== undefined) existing.driverId = input.driverId;
+    if (input.status !== undefined) existing.status = input.status;
+    if (input.odometerStart !== undefined) existing.odometerStart = input.odometerStart.toString();
+    if (input.odometerEnd !== undefined) existing.odometerEnd = input.odometerEnd.toString();
+    if (input.plannedRoute !== undefined) existing.plannedRoute = input.plannedRoute;
+    if (input.notes !== undefined) existing.notes = input.notes;
 
-    if (input.number !== undefined) updateData.number = input.number;
-    if (input.date) updateData.date = new Date(input.date);
-    if (input.vehicleId !== undefined) updateData.vehicleId = input.vehicleId;
-    if (input.driverId !== undefined) updateData.driverId = input.driverId;
-    if (input.status !== undefined) updateData.status = input.status;
-    if (input.odometerStart !== undefined) updateData.odometerStart = input.odometerStart;
-    if (input.odometerEnd !== undefined) updateData.odometerEnd = input.odometerEnd;
-    if (input.plannedRoute !== undefined) updateData.plannedRoute = input.plannedRoute;
-    if (input.notes !== undefined) updateData.notes = input.notes;
+    await waybillRepo().save(existing);
 
-    return prisma.waybill.update({
+    return waybillRepo().findOne({
         where: { id },
-        data: updateData,
-        include: {
+        relations: {
             vehicle: true,
-            driver: { include: { employee: true } }
+            driver: { employee: true }
         }
     });
 }
 
 export async function deleteWaybill(organizationId: string, id: string) {
-    const waybill = await prisma.waybill.findFirst({
+    const waybill = await waybillRepo().findOne({
         where: { id, organizationId }
     });
 
@@ -146,14 +162,12 @@ export async function deleteWaybill(organizationId: string, id: string) {
         throw new NotFoundError('Путевой лист не найден');
     }
 
-    return prisma.waybill.delete({
-        where: { id }
-    });
+    return waybillRepo().remove(waybill);
 }
 
 // Метод для изменения статуса
 export async function changeWaybillStatus(organizationId: string, id: string, status: WaybillStatus) {
-    const waybill = await prisma.waybill.findFirst({
+    const waybill = await waybillRepo().findOne({
         where: { id, organizationId }
     });
 
@@ -162,14 +176,16 @@ export async function changeWaybillStatus(organizationId: string, id: string, st
     }
 
     // Здесь можно добавить валидацию переходов статусов (state machine)
-    // например, из DRAFT можно перейти только в APPROVED и т.д.
+    // например, из DRAFT можно перейти только в SUBMITTED и т.д.
 
-    return prisma.waybill.update({
+    waybill.status = status;
+    await waybillRepo().save(waybill);
+
+    return waybillRepo().findOne({
         where: { id },
-        data: { status },
-        include: {
+        relations: {
             vehicle: true,
-            driver: { include: { employee: true } }
+            driver: { employee: true }
         }
     });
 }

@@ -1,103 +1,71 @@
-import { prisma } from '../db/prisma';
+// driverService - TypeORM version
+import { AppDataSource } from '../db/data-source';
+import { Driver } from '../entities/Driver';
+import { Employee } from '../entities/Employee';
+import { NotFoundError } from '../utils/errors';
+
+const driverRepo = () => AppDataSource.getRepository(Driver);
+const employeeRepo = () => AppDataSource.getRepository(Employee);
 
 export async function listDrivers(organizationId: string) {
-    return prisma.driver.findMany({
-        where: { employee: { organizationId } },
-        include: { employee: true },
-        orderBy: { employee: { fullName: 'asc' } }
-    });
+    return driverRepo()
+        .createQueryBuilder('driver')
+        .leftJoinAndSelect('driver.employee', 'employee')
+        .where('employee.organizationId = :organizationId', { organizationId })
+        .orderBy('employee.fullName', 'ASC')
+        .getMany();
 }
 
 export async function getDriverById(organizationId: string, id: string) {
-    return prisma.driver.findFirst({
-        where: {
-            id,
-            employee: { organizationId }
-        },
-        include: { employee: true }
+    return driverRepo().findOne({
+        where: { id },
+        relations: { employee: { organization: true, department: true } }
     });
 }
 
-interface CreateDriverInput {
-    fullName: string;
-    position?: string;
-    phone?: string;
-    licenseNumber: string;
-    licenseCategory?: string;
-    licenseValidTo?: string;
-}
-
-export async function createDriver(organizationId: string, input: CreateDriverInput) {
-    const { fullName, position, phone, licenseNumber, licenseCategory, licenseValidTo } = input;
-
-    // Создаём сначала Employee, затем Driver
-    return prisma.employee.create({
-        data: {
-            organizationId,
-            fullName,
-            position,
-            phone,
-            driver: {
-                create: {
-                    licenseNumber,
-                    licenseCategory,
-                    licenseValidTo: licenseValidTo ? new Date(licenseValidTo) : undefined
-                }
-            }
-        },
-        include: { driver: true }
-    });
-}
-
-interface UpdateDriverInput {
-    fullName?: string;
-    position?: string;
-    phone?: string;
-    licenseNumber?: string;
-    licenseCategory?: string;
-    licenseValidTo?: string;
-    isActive?: boolean;
-}
-
-export async function updateDriver(organizationId: string, id: string, input: UpdateDriverInput) {
-    const { fullName, position, phone, licenseNumber, licenseCategory, licenseValidTo, isActive } = input;
-
-    const driver = await prisma.driver.findFirst({
-        where: { id, employee: { organizationId } },
-        include: { employee: true }
+export async function createDriver(organizationId: string, data: any) {
+    // First create employee if needed or get existing
+    const employee = await employeeRepo().findOne({
+        where: { id: data.employeeId, organizationId }
     });
 
-    if (!driver) return null;
+    if (!employee) {
+        throw new NotFoundError('Сотрудник не найден');
+    }
 
-    // Обновляем Employee и Driver
-    return prisma.employee.update({
-        where: { id: driver.employeeId },
-        data: {
-            fullName,
-            position,
-            phone,
-            isActive,
-            driver: {
-                update: {
-                    licenseNumber,
-                    licenseCategory,
-                    licenseValidTo: licenseValidTo ? new Date(licenseValidTo) : undefined
-                }
-            }
-        },
-        include: { driver: true }
+    const driver = driverRepo().create({
+        employeeId: data.employeeId,
+        licenseNumber: data.licenseNumber,
+        licenseCategory: data.licenseCategory || null,
+        licenseValidTo: data.licenseValidTo || null
     });
+
+    return driverRepo().save(driver);
+}
+
+export async function updateDriver(organizationId: string, id: string, data: any) {
+    const driver = await driverRepo().findOne({
+        where: { id },
+        relations: { employee: true }
+    });
+
+    if (!driver || driver.employee.organizationId !== organizationId) {
+        throw new NotFoundError('Водитель не найден');
+    }
+
+    Object.assign(driver, data);
+    return driverRepo().save(driver);
 }
 
 export async function deleteDriver(organizationId: string, id: string) {
-    const driver = await prisma.driver.findFirst({
-        where: { id, employee: { organizationId } }
+    const driver = await driverRepo().findOne({
+        where: { id },
+        relations: { employee: true }
     });
 
-    if (!driver) return null;
+    if (!driver || driver.employee.organizationId !== organizationId) {
+        throw new NotFoundError('Водитель не найден');
+    }
 
-    // Удаляем Employee (каскадно удалится Driver)
-    return prisma.employee.delete({
-        where: { id: driver.employeeId }
-    });
+    return driverRepo().remove(driver);
 }

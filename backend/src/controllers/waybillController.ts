@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import * as waybillService from '../services/waybillService';
-import { WaybillStatus } from '@prisma/client';
+import { WaybillStatus } from '../entities/enums';
 
 export async function listWaybills(req: Request, res: Response, next: NextFunction) {
     try {

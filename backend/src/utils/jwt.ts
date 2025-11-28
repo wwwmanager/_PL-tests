@@ -13,7 +13,7 @@ export function signAccessToken(user: { id: string; organizationId: string; role
         organizationId: user.organizationId,
         role: user.role
     };
-    return jwt.sign(payload, env.JWT_SECRET, { expiresIn: env.JWT_EXPIRES_IN });
+    return jwt.sign(payload, env.JWT_SECRET, { expiresIn: '15m' });
 }
 
 export function verifyAccessToken(token: string): AccessTokenPayload {
