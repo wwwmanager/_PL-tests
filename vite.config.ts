@@ -1,24 +1,25 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { fileURLToPath, URL } from 'url';
+import { readFileSync } from 'fs';
 
 // https://vitejs.dev/config/
 export default defineConfig({
   // Базовый URL для развертывания на GitHub Pages.
-  // Замените '_PL-tests' на имя вашего репозитория, если оно отличается.
   base: '/_PL-tests/',
 
   // --- Плагины ---
   plugins: [
-    // Основной плагин для поддержки React
-    // Обеспечивает HMR (Hot Module Replacement) и преобразование JSX/TSX
     react(),
     // Плагин для импорта .md файлов как строк
     {
       name: 'vite-plugin-md-raw',
       transform(code, id) {
         if (id.endsWith('.md?raw')) {
-          const content = code;
+          // Убираем ?raw из пути к файлу
+          const filePath = id.replace(/\?raw$/, '');
+          // Читаем содержимое файла
+          const content = readFileSync(filePath, 'utf-8');
           return {
             code: `export default ${JSON.stringify(content)}`,
             map: null,
@@ -28,25 +29,36 @@ export default defineConfig({
     },
   ],
 
-  // --- Настройки сервера разработки (npm run dev) ---
+  // --- Настройки сервера разработки ---
   server: {
-    port: 3000,       // Указываем порт (по умолчанию 5173, но 3000 привычнее)
-    open: true,       // Автоматически открывать браузер при запуске
-    host: true,       // Делает сервер доступным по вашему IP в локальной сети
+    port: 3000,
+    open: true,
+    host: true,
   },
 
-  // --- Настройка абсолютных импортов (Path Aliases) ---
-  // Позволяет использовать импорты вида: import App from '@/App'
+  // --- Path Aliases ---
   resolve: {
     alias: {
-      // Настраиваем алиас '@/'
       '@/': fileURLToPath(new URL('./', import.meta.url)),
     },
   },
 
-  // --- Настройки сборки (npm run build) ---
+  // --- Настройки сборки ---
   build: {
-    outDir: 'dist',     // Куда будет собираться production-сборка
-    sourcemap: true,    // Генерировать source maps для отладки в production
+    outDir: 'dist',
+    sourcemap: true,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'react-vendor': ['react', 'react-dom'],
+          'markdown-vendor': ['react-markdown', 'remark-gfm'],
+        },
+      },
+    },
+  },
+
+  // --- Оптимизация зависимостей ---
+  optimizeDeps: {
+    include: ['react-markdown', 'remark-gfm'],
   },
 });

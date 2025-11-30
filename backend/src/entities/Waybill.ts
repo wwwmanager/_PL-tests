@@ -35,6 +35,9 @@ export class Waybill {
     @Column({ type: 'uuid' })
     driverId!: string;
 
+    @Column({ type: 'uuid', nullable: true })
+    blankId!: string | null;
+
     @Column({
         type: 'enum',
         enum: WaybillStatus,

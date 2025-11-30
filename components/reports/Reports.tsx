@@ -1,10 +1,10 @@
 
-
 import React, { useState, useEffect } from 'react';
 // FIX: Replaced non-existent/un-exported function imports with correct ones.
 import { fetchVehicles, fetchWaybills, getMedicalExamsCount } from '../../services/mockApi';
 import { Vehicle, Waybill, WaybillStatus } from '../../types';
 import { useToast } from '../../hooks/useToast';
+import PreTripInspectionReport from './PreTripInspectionReport';
 
 interface ReportRow {
     type: 'month' | 'quarter' | 'year';
@@ -34,7 +34,7 @@ const VehicleSummaryReport = () => {
     useEffect(() => {
         const loadVehicles = async () => {
             // FIX: Use fetchVehicles and extract data from response.
-            const vehiclesData = await fetchVehicles({perPage: 1000});
+            const vehiclesData = await fetchVehicles({ perPage: 1000 });
             setVehicles(vehiclesData.data as Vehicle[]);
             if (vehiclesData.data.length === 1) {
                 setFilters(prev => ({ ...prev, vehicleId: vehiclesData.data[0].id }));
@@ -58,10 +58,10 @@ const VehicleSummaryReport = () => {
         setReportData(null);
 
         // FIX: Use fetchWaybills and extract data from response.
-        const allWaybills = (await fetchWaybills({perPage: 10000})).data as Waybill[];
-        
+        const allWaybills = (await fetchWaybills({ perPage: 10000 })).data as Waybill[];
+
         const filteredWaybills = allWaybills
-            .filter(w => 
+            .filter(w =>
                 w.vehicleId === filters.vehicleId &&
                 w.date >= filters.dateFrom &&
                 w.date <= filters.dateTo &&
@@ -92,7 +92,7 @@ const VehicleSummaryReport = () => {
             const refueled = monthWaybills.reduce((sum, w) => sum + (w.fuelFilled || 0), 0);
             const fuelActual = monthWaybills.reduce((sum, w) => sum + ((w.fuelAtStart || 0) + (w.fuelFilled || 0) - (w.fuelAtEnd || 0)), 0);
             const medicalExams = monthWaybills.reduce((sum, w) => sum + getMedicalExamsCount(w), 0);
-            
+
             const mileageStart = firstWaybill.odometerStart;
             const mileageEnd = lastWaybill.odometerEnd || 0;
             const mileageTotal = mileageEnd - mileageStart;
@@ -109,7 +109,7 @@ const VehicleSummaryReport = () => {
                 _month: parseInt(month), _year: parseInt(year),
             });
         }
-        
+
         processedMonths.sort((a, b) => a._year! - b._year! || a._month! - b._month!);
 
         const finalReportData: ReportRow[] = [];
@@ -149,11 +149,11 @@ const VehicleSummaryReport = () => {
 
         if (quarterData) finalReportData.push(quarterData);
         if (yearData) finalReportData.push(yearData);
-        
+
         setReportData(finalReportData);
         setIsLoading(false);
     };
-    
+
     const formatNumber = (num?: number) => typeof num === 'number' ? new Intl.NumberFormat('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(num) : '0,00';
     const formatInt = (num?: number) => typeof num === 'number' ? new Intl.NumberFormat('ru-RU').format(num) : '0';
 
@@ -162,7 +162,7 @@ const VehicleSummaryReport = () => {
         "Период", "Заправлено, л", "Расход (факт), л", "Начальный пробег, км",
         "Конечный пробег, км", "Суммарный пробег, км", "Остаток на начало, л", "Остаток на конец, л", "Мед. осмотров"
     ];
-    
+
     const handleExport = () => {
         if (!reportData) {
             showToast('Сначала сформируйте отчёт.', 'error');
@@ -215,66 +215,84 @@ const VehicleSummaryReport = () => {
                     {isLoading ? 'Загрузка...' : 'Сформировать'}
                 </button>
             </div>
-            
+
             {error && <p className="text-center p-4 text-red-500">{error}</p>}
-            
+
             {reportData && (
                 <>
-                <div className="overflow-x-auto shadow-md rounded-lg">
-                     <table className="w-full text-sm text-left text-gray-500 dark:text-gray-400">
-                        <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
-                            <tr>
-                                {tableHeaders.map(header => (
-                                    <th key={header} scope="col" className="px-6 py-3 whitespace-nowrap">
-                                        {header}
-                                    </th>
-                                ))}
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {reportData.map((row, index) => {
-                                const isSummary = row.type === 'quarter' || row.type === 'year';
-                                const rowClass = isSummary
-                                    ? 'bg-gray-100 dark:bg-gray-700 font-semibold text-gray-900 dark:text-white'
-                                    : 'bg-white dark:bg-gray-800 border-b dark:border-gray-700';
+                    <div className="overflow-x-auto shadow-md rounded-lg">
+                        <table className="w-full text-sm text-left text-gray-500 dark:text-gray-400">
+                            <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
+                                <tr>
+                                    {tableHeaders.map(header => (
+                                        <th key={header} scope="col" className="px-6 py-3 whitespace-nowrap">
+                                            {header}
+                                        </th>
+                                    ))}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {reportData.map((row, index) => {
+                                    const isSummary = row.type === 'quarter' || row.type === 'year';
+                                    const rowClass = isSummary
+                                        ? 'bg-gray-100 dark:bg-gray-700 font-semibold text-gray-900 dark:text-white'
+                                        : 'bg-white dark:bg-gray-800 border-b dark:border-gray-700';
 
-                                return (
-                                    <tr key={index} className={rowClass}>
-                                        <td className="px-6 py-4">{row.period}</td>
-                                        <td className="px-6 py-4 text-right">{formatInt(row.refueled)}</td>
-                                        <td className="px-6 py-4 text-right">{formatNumber(row.fuelActual)}</td>
-                                        <td className="px-6 py-4 text-right">{formatInt(row.mileageStart)}</td>
-                                        <td className="px-6 py-4 text-right">{formatInt(row.mileageEnd)}</td>
-                                        <td className="px-6 py-4 text-right">{formatInt(row.mileageTotal)}</td>
-                                        <td className="px-6 py-4 text-right">{formatNumber(row.fuelStart)}</td>
-                                        <td className="px-6 py-4 text-right">{formatNumber(row.fuelEnd)}</td>
-                                        <td className="px-6 py-4 text-right">{formatInt(row.medicalExams)}</td>
-                                    </tr>
-                                );
-                            })}
-                        </tbody>
-                    </table>
-                </div>
-                <div className="flex justify-end items-center gap-4 mt-6">
-                    <select value={exportFormat} onChange={e => setExportFormat(e.target.value as 'xlsx' | 'pdf')} className="bg-white dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded-md p-2">
-                        <option value="xlsx">Excel (.xlsx)</option>
-                        <option value="pdf">PDF (.pdf)</option>
-                    </select>
-                    <button onClick={handleExport} className="bg-green-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md hover:bg-green-700 transition-colors">Экспорт</button>
-                </div>
+                                    return (
+                                        <tr key={index} className={rowClass}>
+                                            <td className="px-6 py-4">{row.period}</td>
+                                            <td className="px-6 py-4 text-right">{formatInt(row.refueled)}</td>
+                                            <td className="px-6 py-4 text-right">{formatNumber(row.fuelActual)}</td>
+                                            <td className="px-6 py-4 text-right">{formatInt(row.mileageStart)}</td>
+                                            <td className="px-6 py-4 text-right">{formatInt(row.mileageEnd)}</td>
+                                            <td className="px-6 py-4 text-right">{formatInt(row.mileageTotal)}</td>
+                                            <td className="px-6 py-4 text-right">{formatNumber(row.fuelStart)}</td>
+                                            <td className="px-6 py-4 text-right">{formatNumber(row.fuelEnd)}</td>
+                                            <td className="px-6 py-4 text-right">{formatInt(row.medicalExams)}</td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
+                    <div className="flex justify-end items-center gap-4 mt-6">
+                        <select value={exportFormat} onChange={e => setExportFormat(e.target.value as 'xlsx' | 'pdf')} className="bg-white dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded-md p-2">
+                            <option value="xlsx">Excel (.xlsx)</option>
+                            <option value="pdf">PDF (.pdf)</option>
+                        </select>
+                        <button onClick={handleExport} className="bg-green-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md hover:bg-green-700 transition-colors">Экспорт</button>
+                    </div>
                 </>
             )}
         </div>
     );
 };
 
-
 const Reports: React.FC = () => {
+    const [activeReport, setActiveReport] = useState<'vehicle-summary' | 'pre-trip-inspection'>('vehicle-summary');
+
     const ReportHeader = () => (
-         <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
+        <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
             <h2 className="text-2xl font-bold text-gray-800 dark:text-white">Отчёты</h2>
-            <div className="flex items-center gap-4">
-                <span className="text-lg font-semibold text-gray-800 dark:text-white">Сводный отчёт по ТС</span>
+            <div className="flex gap-2">
+                <button
+                    onClick={() => setActiveReport('vehicle-summary')}
+                    className={`px-4 py-2 rounded-lg font-semibold transition-colors ${activeReport === 'vehicle-summary'
+                            ? 'bg-blue-600 text-white shadow-md'
+                            : 'bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-500'
+                        }`}
+                >
+                    Сводный отчёт по ТС
+                </button>
+                <button
+                    onClick={() => setActiveReport('pre-trip-inspection')}
+                    className={`px-4 py-2 rounded-lg font-semibold transition-colors ${activeReport === 'pre-trip-inspection'
+                            ? 'bg-blue-600 text-white shadow-md'
+                            : 'bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-500'
+                        }`}
+                >
+                    Отчёт по предрейсовым осмотрам
+                </button>
             </div>
         </div>
     );
@@ -283,7 +301,8 @@ const Reports: React.FC = () => {
         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6">
             <ReportHeader />
             <div className="mt-4">
-               <VehicleSummaryReport />
+                {activeReport === 'vehicle-summary' && <VehicleSummaryReport />}
+                {activeReport === 'pre-trip-inspection' && <PreTripInspectionReport />}
             </div>
         </div>
     );

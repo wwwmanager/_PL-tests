@@ -5,7 +5,8 @@
 
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { deleteWaybill, getWaybills, updateWaybill, getLatestWaybill, getVehicles } from '../../services/mockApi';
+import { deleteWaybill, getWaybills, updateWaybill, getLatestWaybill } from '../../services/api/waybillApi';
+import { getVehicles } from '../../services/api/vehicleApi';
 import { Waybill, WaybillStatus, Vehicle } from '../../types';
 import { WAYBILL_STATUS_COLORS, WAYBILL_STATUS_TRANSLATIONS } from '../../constants';
 import { PlusIcon, PencilIcon, TrashIcon, ArrowUpIcon, ArrowDownIcon, StatusCompletedIcon, CalendarDaysIcon } from '../Icons';
@@ -18,7 +19,7 @@ import SeasonSettingsModal from './SeasonSettingsModal';
 import { subscribe } from '../../services/bus';
 
 
-type EnrichedWaybill = Awaited<ReturnType<typeof getWaybills>>[0] & { mileage?: number; rowNumber?: number; };
+type EnrichedWaybill = Waybill & { mileage?: number; rowNumber?: number; };
 
 interface WaybillListProps {
   waybillToOpen: string | null;
@@ -73,7 +74,7 @@ const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpene
       getWaybills(),
       getVehicles()
     ]);
-    setWaybills(waybillsData);
+    setWaybills(waybillsData.waybills);
     setVehicles(vehiclesData);
     setLoading(false);
   };
@@ -193,7 +194,7 @@ const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpene
 
   const handleConfirmDelete = async (waybillId: string, markAsSpoiled: boolean) => {
     try {
-      await deleteWaybill(waybillId, markAsSpoiled);
+      await deleteWaybill(waybillId);
       showToast('Путевой лист удален.', 'info');
       fetchData();
     } catch (error) {

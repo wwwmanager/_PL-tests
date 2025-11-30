@@ -3,7 +3,9 @@ import { Vehicle, FuelType, Employee, VehicleStatus, MaintenanceRecord, Organiza
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { getVehicles, addVehicle, updateVehicle, deleteVehicle, getFuelTypes, getEmployees, generateId, getOrganizations } from '../../services/mockApi';
+import { getVehicles, createVehicle as addVehicle, updateVehicle, deleteVehicle } from '../../services/api/vehicleApi';
+import { getEmployees } from '../../services/api/employeeApi';
+import { getFuelTypes, generateId, getOrganizations } from '../../services/mockApi';
 import { validation } from '../../services/faker';
 import { PencilIcon, TrashIcon, PlusIcon, ArrowUpIcon, ArrowDownIcon, ArchiveBoxIcon, ArrowUpTrayIcon } from '../Icons';
 import useTable from '../../hooks/useTable';

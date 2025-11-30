@@ -9,7 +9,7 @@ export async function listVehicles(organizationId: string) {
     return vehicleRepo().find({
         where: { organizationId },
         relations: { organization: true, department: true },
-        order: { registrationNumber: 'ASC' }
+        order: { plateNumber: 'ASC' }
     });
 }
 

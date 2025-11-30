@@ -13,6 +13,11 @@ import { Vehicle } from '../entities/Vehicle';
 import { Waybill } from '../entities/Waybill';
 import { WaybillRoute } from '../entities/WaybillRoute';
 import { WaybillFuel } from '../entities/WaybillFuel';
+import { AuditLog } from '../entities/AuditLog';
+import { Blank } from '../entities/Blank';
+import { FuelCard } from '../entities/FuelCard';
+import { StockItem } from '../entities/StockItem';
+import { StockMovement } from '../entities/StockMovement';
 
 // TODO: Add remaining entities as they are created
 // import { Role } from '../entities/Role';
@@ -43,11 +48,22 @@ export const AppDataSource = new DataSource({
         Waybill,
         WaybillRoute,
         WaybillFuel,
+        AuditLog,
+        Blank,
+        FuelCard,
+        StockItem,
+        StockMovement,
     ],
 
-    // Development mode: auto-create tables
-    synchronize: true,  // TODO: Set to false in production
+    // Migrations
+    migrations: ['src/db/migrations/**/*.ts'],
+    migrationsTableName: 'migrations',
+
+    // Development mode: use migrations instead of auto-sync
+    // NOTE: synchronize=true auto-creates/updates tables but is NOT safe for production
+    // For production, always use migrations
+    synchronize: true,  // Keep true for dev convenience, but use migrations for controlled schema changes
 
     // Logging
-    logging: false,  // Set to true for debugging
+    logging: true,  // Enabled for debugging
 });

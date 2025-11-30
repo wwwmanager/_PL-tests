@@ -15,7 +15,9 @@ interface CreateWaybillInput {
     date: string;
     vehicleId: string;
     driverId: string;
+    blankId?: string | null;
     odometerStart?: number;
+    odometerEnd?: number;
     plannedRoute?: string;
     notes?: string;
 }
@@ -67,40 +69,84 @@ export async function getWaybillById(organizationId: string, id: string) {
 }
 
 export async function createWaybill(organizationId: string, input: CreateWaybillInput) {
+    // 🔍 DEBUG: Log input
+    console.log('📝 createWaybill service called');
+    console.log('  Input:', {
+        organizationId,
+        number: input.number,
+        date: input.date,
+        vehicleId: input.vehicleId,
+        driverId: input.driverId,
+        blankId: input.blankId ?? null,
+        odometerStart: input.odometerStart,
+        odometerEnd: input.odometerEnd
+    });
+
     const date = new Date(input.date);
     if (Number.isNaN(date.getTime())) {
+        console.error('❌ Invalid date format:', input.date);
         throw new BadRequestError('Некорректная дата');
     }
 
     // Проверяем, что vehicle и driver принадлежат этой организации
+    console.log('🔍 Looking up vehicle:', input.vehicleId);
     const vehicle = await vehicleRepo().findOne({
         where: { id: input.vehicleId, organizationId }
     });
     if (!vehicle) {
+        console.error('❌ Vehicle not found:', input.vehicleId);
         throw new BadRequestError('Транспортное средство не найдено');
     }
+    console.log('  ✓ Vehicle found:', {
+        id: vehicle.id,
+        registrationNumber: vehicle.plateNumber,
+        brand: vehicle.brand,
+        model: vehicle.model
+    });
 
+    console.log('🔍 Looking up driver:', input.driverId);
     const driver = await driverRepo().findOne({
         where: { id: input.driverId },
         relations: { employee: true }
     });
     if (!driver || driver.employee.organizationId !== organizationId) {
+        console.error('❌ Driver not found or wrong organization:', input.driverId);
         throw new BadRequestError('Водитель не найден');
     }
+    console.log('  ✓ Driver found:', {
+        id: driver.id,
+        employeeName: driver.employee.fullName,
+        licenseNumber: driver.licenseNumber
+    });
 
+    console.log('💾 Creating waybill entity...');
     const waybill = waybillRepo().create({
         organizationId,
         number: input.number,
         date: input.date,
         vehicleId: input.vehicleId,
         driverId: input.driverId,
+        blankId: input.blankId || null,
         odometerStart: input.odometerStart?.toString(),
+        odometerEnd: input.odometerEnd?.toString(),
         plannedRoute: input.plannedRoute || null,
         notes: input.notes || null,
         status: WaybillStatus.DRAFT,
     });
 
+    console.log('  Entity prepared:', {
+        organizationId: waybill.organizationId,
+        number: waybill.number,
+        date: waybill.date,
+        vehicleId: waybill.vehicleId,
+        driverId: waybill.driverId,
+        blankId: waybill.blankId,
+        status: waybill.status
+    });
+
+    console.log('💾 Saving to database...');
     const saved = await waybillRepo().save(waybill);
+    console.log('  ✅ Saved with ID:', saved.id);
 
     return waybillRepo().findOne({
         where: { id: saved.id },

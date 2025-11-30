@@ -9,11 +9,14 @@ import * as mockApi from './mockApi';
 import * as realApi from './api/realWaybillApi';
 
 // Feature flag to switch between mockApi and real backend
-const USE_REAL_API = import.meta.env.VITE_USE_REAL_API === 'true';
+// TEMPORARY: Hardcoded for testing - remove after verification
+const USE_REAL_API = true; // import.meta.env.VITE_USE_REAL_API === 'true';
 
 // Log which API is being used (only in development)
 if (import.meta.env.DEV) {
     console.log(`🔗 Waybill API: Using ${USE_REAL_API ? 'REAL BACKEND' : 'MOCK API'}`);
+    console.log(`   VITE_USE_REAL_API env var: ${import.meta.env.VITE_USE_REAL_API}`);
+    console.log(`   VITE_API_URL: ${import.meta.env.VITE_API_URL}`);
 }
 
 /**

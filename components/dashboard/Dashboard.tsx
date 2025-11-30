@@ -1,7 +1,10 @@
 
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { ResponsiveContainer, XAxis, YAxis, CartesianGrid, Tooltip, Legend, BarChart, Bar, LabelList } from 'recharts';
-import { getDashboardData, getIssues, getVehicles } from '../../services/mockApi';
+// TODO: getDashboardData использует getWaybills внутри - нужно будет создать dashboardApi
+// Временно оставляем mockApi для dashboard aggregations, но waybills теперь идут через waybillApi
+import { getDashboardData, getIssues } from '../../services/api/dashboardApi';
+import { getVehicles } from '../../services/api/vehicleApi';
 import { TruckIcon, UserGroupIcon, CogIcon, XIcon, BanknotesIcon } from '../Icons';
 import { KpiData, Vehicle } from '../../types';
 

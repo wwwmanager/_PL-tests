@@ -83,12 +83,26 @@ export function mapFrontWaybillToBackendCreate(waybill: Omit<FrontWaybill, 'id'>
     plannedRoute?: string | null;
     notes?: string | null;
 } {
+    // 🔍 DEBUG: Log input data
+    if (import.meta.env.DEV) {
+        console.group('🔄 Mapping frontend → backend (CREATE)');
+        console.log('Input (frontend waybill):', {
+            number: waybill.number,
+            date: waybill.date,
+            vehicleId: waybill.vehicleId,
+            driverId: waybill.driverId,
+            blankId: waybill.blankId,
+            odometerStart: waybill.odometerStart,
+            routes: waybill.routes?.length || 0
+        });
+    }
+
     // Собираем plannedRoute из маршрутов
     const plannedRoute = waybill.routes && waybill.routes.length > 0
         ? waybill.routes.map((r: any) => `${r.from} → ${r.to}`).join(', ')
         : null;
 
-    return {
+    const result = {
         number: waybill.number,
         date: waybill.date,
         vehicleId: waybill.vehicleId,
@@ -99,6 +113,14 @@ export function mapFrontWaybillToBackendCreate(waybill: Omit<FrontWaybill, 'id'>
         plannedRoute,
         notes: waybill.notes ?? null,
     };
+
+    // 🔍 DEBUG: Log output data
+    if (import.meta.env.DEV) {
+        console.log('Output (backend DTO):', result);
+        console.groupEnd();
+    }
+
+    return result;
 }
 
 /**

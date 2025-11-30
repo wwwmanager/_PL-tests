@@ -35,9 +35,31 @@ export async function createWaybill(req: Request, res: Response, next: NextFunct
     try {
         const orgId = req.user!.organizationId;
         const data = req.body;
+
+        // 🔍 DEBUG: Log incoming request
+        console.log('\n📥 POST /api/waybills - Request received');
+        console.log('  👤 User:', {
+            id: req.user!.id,
+            organizationId: req.user!.organizationId,
+            role: req.user!.role
+        });
+        console.log('  📦 Body:', JSON.stringify(data, null, 2));
+
+        // Create waybill
+        console.log('🔄 Creating waybill...');
         const waybill = await waybillService.createWaybill(orgId, data);
+
+        if (waybill) {
+            console.log('✅ Waybill created successfully:', {
+                id: waybill.id,
+                number: waybill.number,
+                blankId: waybill.blankId
+            });
+        }
+
         res.status(201).json(waybill);
     } catch (err) {
+        console.error('❌ Error creating waybill:', err);
         next(err);
     }
 }

@@ -1,5 +1,5 @@
 import React, { useState, lazy, Suspense, useEffect } from 'react';
-import { DashboardIcon, DocumentTextIcon, ChartBarIcon, CogIcon, TruckIcon, MenuIcon, XIcon, BookOpenIcon, InformationCircleIcon, QuestionMarkCircleIcon, ArrowDownIcon, ArrowUpIcon, ArchiveBoxIcon, CodeBracketIcon, BeakerIcon, ShieldCheckIcon } from './components/Icons';
+import { DashboardIcon, DocumentTextIcon, ChartBarIcon, CogIcon, TruckIcon, MenuIcon, XIcon, BookOpenIcon, InformationCircleIcon, QuestionMarkCircleIcon, ArrowDownIcon, ArrowUpIcon, ArchiveBoxIcon, CodeBracketIcon, BeakerIcon, ShieldCheckIcon, LogoutIcon } from './components/Icons';
 import { View, DictionaryType, AppSettings } from './types';
 import { ToastProvider } from './contexts/ToastContext';
 import { AuthProvider, useAuth, RequireCapability } from './services/auth';
@@ -54,8 +54,8 @@ const AppContent: React.FC = () => {
   const [dictionarySubView, setDictionarySubView] = useState<DictionaryType | null>(null);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [appSettings, setAppSettings] = useState<AppSettings | null>(null);
-  const { hasRole, currentUser } = useAuth();
-
+  //const { hasRole, currentUser } = useAuth();
+  const { hasRole, currentUser, logout } = useAuth();
   useEffect(() => {
     getAppSettings().then(setAppSettings);
   }, []);
@@ -217,7 +217,18 @@ const AppContent: React.FC = () => {
             {isSidebarOpen ? <XIcon className="h-6 w-6" /> : <MenuIcon className="h-6 w-6" />}
           </button>
           <h1 className="text-xl font-semibold text-gray-800 dark:text-white">{viewTitles[currentView]}</h1>
-          <div className="w-16"></div>
+          <button
+            onClick={async () => {
+              if (confirm('Вы уверены, что хотите выйти?')) {
+                await logout();
+              }
+            }}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-red-500 hover:bg-red-600 text-white transition-colors shadow-md hover:shadow-lg"
+            title="Выход из системы"
+          >
+            <LogoutIcon className="w-5 h-5" />
+            <span className="font-medium text-sm">Выход</span>
+          </button>
         </header>
         <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-100 dark:bg-gray-900 p-4 sm:p-6 lg:p-8">
           <Suspense fallback={<LoadingSpinner />}>

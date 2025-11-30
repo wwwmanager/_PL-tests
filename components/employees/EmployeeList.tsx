@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Employee, Organization, EmployeeType, EMPLOYEE_TYPE_TRANSLATIONS, WaybillBlankBatch } from '../../types';
-import { getEmployees, addEmployee, updateEmployee, deleteEmployee, getOrganizations, generateId } from '../../services/mockApi';
+import { getEmployees, createEmployee, updateEmployee, deleteEmployee } from '../../services/api/employeeApi';
+import { getOrganizations } from '../../services/mockApi';
 import { PencilIcon, TrashIcon, PlusIcon, ArrowUpIcon, ArrowDownIcon, XIcon } from '../Icons';
 import useTable from '../../hooks/useTable';
 import Modal from '../shared/Modal';
@@ -282,9 +283,9 @@ const EmployeeList: React.FC = () => {
 
         try {
             if ('id' in currentItem! && currentItem.id) {
-                await updateEmployee(currentItem as Employee);
+                await updateEmployee(currentItem.id!, currentItem as Employee);
             } else {
-                await addEmployee(currentItem as Omit<Employee, 'id'>);
+                await createEmployee(currentItem as Omit<Employee, 'id'>);
             }
             showToast("Изменения сохранены");
             setCurrentItem(null);

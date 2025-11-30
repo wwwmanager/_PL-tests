@@ -32,7 +32,7 @@ type AuthContextValue = {
 
 const CURRENT_USER_KEY = '__current_user__';
 const TOKEN_KEY = '__auth_token__';
-const API_BASE = 'http://localhost:4000/api'; // import.meta.env.VITE_API_BASE_URL || '/api';
+const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:3001/api';
 
 // ---------- API helpers ----------
 
@@ -160,18 +160,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode; defaultRole?: R
         }
       }
 
-      // Если нет токена - проверяем режим
-      // DEV: создаём dev-пользователя для удобства разработки
-      if (import.meta.env.DEV) {
+      // Если нет токена - проверяем режим приложения
+      const settings = await getAppSettings().catch(() => null);
+      const isCentralMode = settings?.appMode === 'central';
+
+      if (import.meta.env.DEV && !isCentralMode) {
         const dev: User = {
-          id: 'dev-admin',
-          role: defaultRole,
-          displayName: 'Admin (DEV)',
+          id: 'dev-driver',
+          role: 'driver',
+          displayName: 'Driver (DEV)',
         };
         setCurrentUser(dev);
         await saveJSON(CURRENT_USER_KEY, dev);
       } else {
-        // PROD: требуем login
         setCurrentUser(null);
       }
     })();

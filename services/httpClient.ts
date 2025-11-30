@@ -15,9 +15,9 @@ export function setAccessToken(token: string | null) {
 
     // Сохранить токен в localStorage для персистентности
     if (token) {
-        localStorage.setItem('accessToken', token);
+        localStorage.setItem('__auth_token__', token);
     } else {
-        localStorage.removeItem('accessToken');
+        localStorage.removeItem('__auth_token__');
     }
 }
 
@@ -27,7 +27,7 @@ export function setAccessToken(token: string | null) {
 export function getAccessToken(): string | null {
     if (!accessToken) {
         // Попробовать восстановить из localStorage
-        accessToken = localStorage.getItem('accessToken');
+        accessToken = localStorage.getItem('__auth_token__');
     }
     return accessToken;
 }
@@ -52,18 +52,37 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     }
 
     try {
+        // 🔍 DEBUG: Log request details
+        if (options.method === 'POST' || options.method === 'PUT') {
+            console.group(`🌐 ${options.method} ${API_URL}${path}`);
+            console.log('📤 Request Headers:', headers);
+            if (options.body) {
+                console.log('📦 Request Payload:', JSON.parse(options.body as string));
+            }
+            console.groupEnd();
+        }
+
         const res = await fetch(`${API_URL}${path}`, { ...options, headers });
 
         if (!res.ok) {
             // Обработка ошибок
             let errorMessage = `API error ${res.status}`;
+            let errorData: any = null;
 
             try {
-                const errorData = await res.json();
+                errorData = await res.json();
                 errorMessage = errorData.message || errorData.error || errorMessage;
             } catch {
                 errorMessage = await res.text() || errorMessage;
             }
+
+            // 🔍 DEBUG: Log error response
+            console.group(`❌ ${options.method || 'GET'} ${path} - Status ${res.status}`);
+            console.log('Error Message:', errorMessage);
+            if (errorData) {
+                console.log('Error Data:', errorData);
+            }
+            console.groupEnd();
 
             // Если 401 - сбросить токен
             if (res.status === 401) {
@@ -76,7 +95,16 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
         // Обработка пустого ответа
         const contentType = res.headers.get('content-type');
         if (contentType && contentType.includes('application/json')) {
-            return res.json();
+            const jsonResponse = await res.json();
+
+            // 🔍 DEBUG: Log success response
+            if (options.method === 'POST' || options.method === 'PUT') {
+                console.group(`✅ ${options.method} ${path} - Status ${res.status}`);
+                console.log('📥 Response:', jsonResponse);
+                console.groupEnd();
+            }
+
+            return jsonResponse;
         }
 
         return res.text() as unknown as T;
@@ -115,3 +143,4 @@ export const http = {
     delete: <T>(path: string) =>
         request<T>(path, { method: 'DELETE' }),
 };
+export const httpClient = http;
