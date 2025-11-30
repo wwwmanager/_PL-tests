@@ -50,11 +50,13 @@ if (import.meta.env.DEV) {
 - [x] **Добавить кнопку Logout** (добавлено + импорт LogoutIcon исправлен) ✅
 - [ ] **TEST:** Logout возвращает на login screen
 
-### Phase 2: Verify API Usage
-- [ ] Проверить Dashboard использует waybillApi
-- [ ] Проверить WaybillList использует waybillApi
-- [ ] Проверить Reports использует правильные API
-- [ ] Найти прямые импорты mockApi в компонентах
+### Phase 2: Verify API Usage ✅ COMPLETED
+- [x] Проверить Dashboard использует waybillApi ✅ (используется dashboardApi + vehicleApi)
+- [x] Проверить WaybillList использует waybillApi ✅ (используется waybillApi + vehicleApi)
+- [x] Проверить Reports использует правильные API ✅ (FIXED: заменён на vehicleApi + waybillApi)
+- [x] Найти прямые импорты mockApi в компонентах ✅ (найдено 22 компонента)
+- [x] **FIX Reports.tsx** ✅ (заменён mockApi на API фасады)
+- [x] **FIX Pre TripInspectionReport.tsx** ✅ (заменён mockApi на API фасады)
 
 ### Phase 3: Configure Modes
 - [ ] Определить, где хранится режим Central/Driver

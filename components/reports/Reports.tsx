@@ -1,7 +1,9 @@
 
 import React, { useState, useEffect } from 'react';
-// FIX: Replaced non-existent/un-exported function imports with correct ones.
-import { fetchVehicles, fetchWaybills, getMedicalExamsCount } from '../../services/mockApi';
+// FIX: Use API facades instead of mockApi
+import { getVehicles } from '../../services/api/vehicleApi';
+import { getWaybills } from '../../services/api/waybillApi';
+import { getMedicalExamsCount } from '../../services/mockApi'; // Still needed for utility function
 import { Vehicle, Waybill, WaybillStatus } from '../../types';
 import { useToast } from '../../hooks/useToast';
 import PreTripInspectionReport from './PreTripInspectionReport';
@@ -33,11 +35,11 @@ const VehicleSummaryReport = () => {
 
     useEffect(() => {
         const loadVehicles = async () => {
-            // FIX: Use fetchVehicles and extract data from response.
-            const vehiclesData = await fetchVehicles({ perPage: 1000 });
-            setVehicles(vehiclesData.data as Vehicle[]);
-            if (vehiclesData.data.length === 1) {
-                setFilters(prev => ({ ...prev, vehicleId: vehiclesData.data[0].id }));
+            // Use getVehicles from vehicleApi
+            const vehiclesData = await getVehicles();
+            setVehicles(vehiclesData);
+            if (vehiclesData.length === 1) {
+                setFilters(prev => ({ ...prev, vehicleId: vehiclesData[0].id }));
             }
         };
         loadVehicles();
@@ -57,8 +59,8 @@ const VehicleSummaryReport = () => {
         setError(null);
         setReportData(null);
 
-        // FIX: Use fetchWaybills and extract data from response.
-        const allWaybills = (await fetchWaybills({ perPage: 10000 })).data as Waybill[];
+        // Use getWaybills from waybillApi
+        const { waybills: allWaybills } = await getWaybills();
 
         const filteredWaybills = allWaybills
             .filter(w =>
@@ -278,8 +280,8 @@ const Reports: React.FC = () => {
                 <button
                     onClick={() => setActiveReport('vehicle-summary')}
                     className={`px-4 py-2 rounded-lg font-semibold transition-colors ${activeReport === 'vehicle-summary'
-                            ? 'bg-blue-600 text-white shadow-md'
-                            : 'bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-500'
+                        ? 'bg-blue-600 text-white shadow-md'
+                        : 'bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-500'
                         }`}
                 >
                     Сводный отчёт по ТС
@@ -287,8 +289,8 @@ const Reports: React.FC = () => {
                 <button
                     onClick={() => setActiveReport('pre-trip-inspection')}
                     className={`px-4 py-2 rounded-lg font-semibold transition-colors ${activeReport === 'pre-trip-inspection'
-                            ? 'bg-blue-600 text-white shadow-md'
-                            : 'bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-500'
+                        ? 'bg-blue-600 text-white shadow-md'
+                        : 'bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-500'
                         }`}
                 >
                     Отчёт по предрейсовым осмотрам

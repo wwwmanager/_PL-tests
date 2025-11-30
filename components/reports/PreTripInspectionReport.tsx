@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { fetchWaybills, fetchDrivers, fetchVehicles, getMedicalExamsCount } from '../../services/mockApi';
+import { getWaybills } from '../../services/api/waybillApi';
+import { getVehicles } from '../../services/api/vehicleApi';
+import { getEmployees } from '../../services/mockApi'; // TODO: Create employeeApi facade
+import { getMedicalExamsCount } from '../../services/mockApi'; // Utility function
 import { Waybill, WaybillStatus, Employee, Vehicle } from '../../types';
 import { useToast } from '../../hooks/useToast';
 
@@ -41,10 +44,10 @@ const PreTripInspectionReport: React.FC = () => {
 
     useEffect(() => {
         const loadData = async () => {
-            const driversData = await fetchDrivers({ perPage: 1000 });
-            const vehiclesData = await fetchVehicles({ perPage: 1000 });
-            setDrivers(driversData.data as Employee[]);
-            setVehicles(vehiclesData.data as Vehicle[]);
+            const driversData = await getEmployees(); // TODO: filter by employeeType=driver
+            const vehiclesData = await getVehicles();
+            setDrivers(driversData.filter(e => e.employeeType === 'driver'));
+            setVehicles(vehiclesData);
         };
         loadData();
     }, []);
@@ -67,7 +70,7 @@ const PreTripInspectionReport: React.FC = () => {
         setSummaryData(null);
 
         try {
-            const allWaybills = (await fetchWaybills({ perPage: 10000 })).data as Waybill[];
+            const { waybills: allWaybills } = await getWaybills();
 
             // Фильтруем путевые листы
             let filteredWaybills = allWaybills.filter(w =>
@@ -278,8 +281,8 @@ const PreTripInspectionReport: React.FC = () => {
                             <button
                                 onClick={() => setViewMode('summary')}
                                 className={`px-4 py-2 rounded-lg font-semibold transition-colors ${viewMode === 'summary'
-                                        ? 'bg-blue-600 text-white'
-                                        : 'bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-500'
+                                    ? 'bg-blue-600 text-white'
+                                    : 'bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-500'
                                     }`}
                             >
                                 Сводный отчет
@@ -287,8 +290,8 @@ const PreTripInspectionReport: React.FC = () => {
                             <button
                                 onClick={() => setViewMode('detailed')}
                                 className={`px-4 py-2 rounded-lg font-semibold transition-colors ${viewMode === 'detailed'
-                                        ? 'bg-blue-600 text-white'
-                                        : 'bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-500'
+                                    ? 'bg-blue-600 text-white'
+                                    : 'bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-500'
                                     }`}
                             >
                                 Детальный отчет
