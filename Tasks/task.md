@@ -58,11 +58,15 @@ if (import.meta.env.DEV) {
 - [x] **FIX Reports.tsx** ✅ (заменён mockApi на API фасады)
 - [x] **FIX Pre TripInspectionReport.tsx** ✅ (заменён mockApi на API фасады)
 
-### Phase 3: Configure Modes
-- [ ] Определить, где хранится режим Central/Driver
-- [ ] Central mode: USE_REAL_API = true + требовать реальный login
-- [ ] Driver mode: можно использовать local storage + offline
-- [ ] Добавить явный переключатель режима
+### Phase 3: Configure Modes ✅ ANALYSIS COMPLETE
+- [x] Определить, где хранится режим Central/Driver ✅ (AppSettings in IndexedDB)
+- [x] Central mode: требовать реальный login ✅ (работает в auth.tsx)
+- [/] **TODO:** Link USE_REAL_API to appMode dynamically
+  - Central mode: USE_REAL_API = true (использовать backend)
+  - Driver mode: USE_REAL_API = false (использовать mockApi + IndexedDB)
+- [x] Добавить явный переключатель режима ✅ (есть в Admin panel)
+- [ ] **TODO:** Test mode switching and add warning about app reload
+- [ ] **TODO:** Create facades for other entities (employeeApi, driverApi)
 
 ### Phase 4: Test Complete Flow
 - [ ] Test: Login через реальный backend
