@@ -26,6 +26,7 @@ const AppContent: React.FC = () => {
   const { currentUser, logout, appSettings } = useAuth();
   const [currentPage, setCurrentPage] = React.useState<Page>('dashboard');
   const [selectedWaybillId, setSelectedWaybillId] = React.useState<string | null>(null);
+  const [isSidebarOpen, setIsSidebarOpen] = React.useState(true);
 
   // Если нет пользователя - показываем Login
   if (!currentUser) {
@@ -68,97 +69,46 @@ const AppContent: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Navigation */}
-      <nav className="bg-white shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16">
-            <div className="flex">
-              <div className="flex-shrink-0 flex items-center">
-                <h1 className="text-xl font-bold text-gray-900">
-                  Waybill Management
-                  {isDriverMode && <span className="ml-2 text-sm text-gray-500">(Driver Mode)</span>}
-                  {!isDriverMode && <span className="ml-2 text-sm text-blue-600">(Central Mode)</span>}
-                </h1>
-              </div>
-              <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
-                <button
-                  onClick={() => setCurrentPage('dashboard')}
-                  className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium ${currentPage === 'dashboard'
-                    ? 'border-blue-500 text-gray-900'
-                    : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
-                    }`}
-                >
-                  Панель управления
-                </button>
-                <button
-                  onClick={() => setCurrentPage('waybills')}
-                  className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium ${currentPage === 'waybills' || currentPage === 'waybill-detail'
-                    ? 'border-blue-500 text-gray-900'
-                    : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
-                    }`}
-                >
-                  Путевые листы
-                </button>
-                <button
-                  onClick={() => setCurrentPage('vehicles')}
-                  className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium ${currentPage === 'vehicles'
-                    ? 'border-blue-500 text-gray-900'
-                    : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
-                    }`}
-                >
-                  Транспорт
-                </button>
-                <button
-                  onClick={() => setCurrentPage('employees')}
-                  className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium ${currentPage === 'employees'
-                    ? 'border-blue-500 text-gray-900'
-                    : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
-                    }`}
-                >
-                  Сотрудники
-                </button>
-                <button
-                  onClick={() => setCurrentPage('reports')}
-                  className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium ${currentPage === 'reports'
-                    ? 'border-blue-500 text-gray-900'
-                    : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
-                    }`}
-                >
-                  Отчёты
-                </button>
-                <button
-                  onClick={() => setCurrentPage('admin')}
-                  className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium ${currentPage === 'admin'
-                    ? 'border-blue-500 text-gray-900'
-                    : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
-                    }`}
-                >
-                  Настройки
-                </button>
-              </div>
-            </div>
-            <div className="flex items-center">
-              <span className="text-sm text-gray-700 mr-4">
-                {currentUser.displayName} ({currentUser.role})
-              </span>
-              <button
-                onClick={logout}
-                className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-              >
-                Выйти
-              </button>
-            </div>
-          </div>
+    <div className="flex h-screen bg-gray-100 dark:bg-gray-900 font-sans">
+      {/* Sidebar */}
+      <aside className={`bg-white dark:bg-gray-800 text-gray-800 dark:text-white transition-all duration-300 ease-in-out shadow-xl z-20 ${isSidebarOpen ? 'w-64' : 'w-0'} overflow-hidden`}>
+        <div className="flex items-center justify-center h-20 border-b dark:border-gray-700">
+          <h1 className="text-xl font-bold">Путевые листы</h1>
         </div>
-      </nav>
+        <nav className="mt-4">
+          <ul>
+            <li><button onClick={() => setCurrentPage('dashboard')} className={`w-full text-left px-6 py-3 hover:bg-gray-100 dark:hover:bg-gray-700 ${currentPage === 'dashboard' ? 'bg-blue-50 dark:bg-blue-900 border-r-4 border-blue-500' : ''}`}>Панель управления</button></li>
+            <li><button onClick={() => setCurrentPage('waybills')} className={`w-full text-left px-6 py-3 hover:bg-gray-100 dark:hover:bg-gray-700 ${currentPage === 'waybills' ? 'bg-blue-50 dark:bg-blue-900 border-r-4 border-blue-500' : ''}`}>Путевые листы</button></li>
+            <li><button onClick={() => setCurrentPage('vehicles')} className={`w-full text-left px-6 py-3 hover:bg-gray-100 dark:hover:bg-gray-700 ${currentPage === 'vehicles' ? 'bg-blue-50 dark:bg-blue-900 border-r-4 border-blue-500' : ''}`}>Транспорт</button></li>
+            <li><button onClick={() => setCurrentPage('employees')} className={`w-full text-left px-6 py-3 hover:bg-gray-100 dark:hover:bg-gray-700 ${currentPage === 'employees' ? 'bg-blue-50 dark:bg-blue-900 border-r-4 border-blue-500' : ''}`}>Сотрудники</button></li>
+            <li><button onClick={() => setCurrentPage('reports')} className={`w-full text-left px-6 py-3 hover:bg-gray-100 dark:hover:bg-gray-700 ${currentPage === 'reports' ? 'bg-blue-50 dark:bg-blue-900 border-r-4 border-blue-500' : ''}`}>Отчеты</button></li>
+            <li><button onClick={() => setCurrentPage('admin')} className={`w-full text-left px-6 py-3 hover:bg-gray-100 dark:hover:bg-gray-700 ${currentPage === 'admin' ? 'bg-blue-50 dark:bg-blue-900 border-r-4 border-blue-500' : ''}`}>Настройки</button></li>
+          </ul>
+        </nav>
+        <div className="p-4 border-t dark:border-gray-700">
+          <button onClick={logout} className="w-full px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600">Выйти</button>
+        </div>
+      </aside>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-        <Suspense fallback={<LoadingSpinner />}>
-          {renderPage()}
-        </Suspense>
-      </main>
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <header className="flex items-center justify-between p-4 bg-white dark:bg-gray-800 border-b dark:border-gray-700 shadow-md">
+          <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="text-gray-600 dark:text-gray-300 focus:outline-none">
+            {isSidebarOpen ? '✕' : '☰'}
+          </button>
+          <h1 className="text-xl font-semibold text-gray-800 dark:text-white">
+            Waybill Management {!isDriverMode && <span className="ml-2 text-sm text-blue-600">(Central Mode)</span>}
+          </h1>
+          <div className="text-sm text-gray-600">
+            {currentUser.displayName} ({currentUser.role})
+          </div>
+        </header>
+        <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-100 dark:bg-gray-900 p-4 sm:p-6 lg:p-8">
+          <Suspense fallback={<LoadingSpinner />}>
+            {renderPage()}
+          </Suspense>
+        </main>
+      </div>
     </div>
   );
 };
@@ -175,4 +125,4 @@ const App: React.FC = () => {
   );
 };
 
-export default App;
+export default App; 
