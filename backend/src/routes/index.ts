@@ -5,6 +5,7 @@ import { router as waybillRoutes } from './waybillRoutes';
 import { router as auditRoutes } from './auditRoutes';
 import { router as employeeRoutes } from './employeeRoutes';
 import { router as departmentRoutes } from './departmentRoutes';
+import { router as blankRoutes } from './blankRoutes';
 
 export const router = Router();
 
@@ -14,6 +15,7 @@ router.use('/waybills', waybillRoutes);
 router.use('/audit', auditRoutes);
 router.use('/employees', employeeRoutes);
 router.use('/departments', departmentRoutes);
+router.use('/blanks', blankRoutes);
 
 // Health check endpoint
 router.get('/health', (req, res) => {
