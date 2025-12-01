@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Waybill, Route, Vehicle, Employee, WaybillStatus, Organization, SavedRoute, FuelType, SeasonSettings, Attachment, AppSettings, StockTransaction, GarageStockItem } from '../../types';
 import {
-  getVehicles, getEmployees, getOrganizations, addWaybill, updateWaybill, addSavedRoutesFromWaybill, getSavedRoutes,
+  getOrganizations, addWaybill, updateWaybill, addSavedRoutesFromWaybill, getSavedRoutes,
   getFuelTypes, getSeasonSettings, isWinterDate, getLastWaybillForVehicle, getAppSettings, generateId,
   getAvailableFuelExpenses, updateStockTransaction, getStockTransactions, getGarageStockItems,
   getNextBlankForDriver, useBlankForWaybill, getNextWaybillNumber, changeWaybillStatus, getFuelCardBalance
 } from '../../services/mockApi';
+import { getVehicles } from '../../services/vehicleApiFacade';
+import { getEmployees } from '../../services/employeeApiFacade';
 import { generateRouteFromPrompt } from '../../services/geminiService';
 import { TrashIcon, SparklesIcon, PrinterIcon, PaperClipIcon, ChatBubbleLeftRightIcon, UploadIcon, BanknotesIcon, PaperAirplaneIcon, CheckCircleIcon, ArrowUturnLeftIcon, XIcon, PencilIcon } from '../Icons';
 import { WAYBILL_STATUS_TRANSLATIONS, WAYBILL_STATUS_COLORS } from '../../constants';

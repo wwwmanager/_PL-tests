@@ -30,7 +30,8 @@ export async function getEmployees(filters: EmployeeFilters = {}): Promise<Emplo
         `/employees?${params.toString()}`
     );
 
-    return response.data.data.employees;
+    // Backend returns { success: true, data: { employees: [...], total, page, ... } }
+    return response.data?.data?.employees || response.data?.employees || [];
 }
 
 export async function getEmployeeById(id: string): Promise<Employee> {

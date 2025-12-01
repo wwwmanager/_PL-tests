@@ -48,7 +48,9 @@ if (import.meta.env.DEV) {
 - [x] Создать тестового пользователя (admin@example.com) ✅
 - [x] Login screen появляется в Central mode ✅
 - [x] **Добавить кнопку Logout** (добавлено + импорт LogoutIcon исправлен) ✅
-- [ ] **TEST:** Logout возвращает на login screen
+- [x] **Добавить backend endpoint /logout** (authController.ts + authRoutes.ts) ✅
+- [x] **Исправить пароль в Login.tsx** (password вместо Admin123!) ✅
+- [x] **TEST:** Logout возвращает на login screen ✅
 
 ### Phase 2: Verify API Usage ✅ COMPLETED
 - [x] Проверить Dashboard использует waybillApi ✅ (используется dashboardApi + vehicleApi)
@@ -70,10 +72,13 @@ if (import.meta.env.DEV) {
 - [ ] **TODO:** Create facades for other entities (employeeApi, driverApi)
 
 ### Phase 4: Test Complete Flow
-- [ ] Test: Login через реальный backend
+- [x] Test: Login через реальный backend ✅ (admin@example.com / password)
 - [ ] Test: Создание ПЛ в одном браузере
 - [ ] Test: Проверка ПЛ виден в другом браузере
-- [ ] Test: Logout корректно работает
+- [x] Test: Logout корректно работает ✅
+  - Токен удаляется из localStorage
+  - Возврат на экран входа
+  - Backend endpoint /logout возвращает 200 OK
 
 ## Key Files to Modify
 
@@ -103,7 +108,8 @@ if (import.meta.env.DEV) {
 - [x] Тестовый пользователь создан ✅
 - [x] Login экран показывается в Central mode ✅
 - [x] Успешный вход с admin@example.com / password ✅
-- [/] **Logout button:** Кнопка выхода в sidebar (инструкция готова)
-- [ ] **TEST:** Logout успешно возвращает на login screen
+- [x] **Logout button:** Кнопка выхода работает ✅
+- [x] **TEST:** Logout успешно возвращает на login screen ✅
+- [x] **TEST:** Токен очищается из localStorage при logout ✅
 - [ ] **TEST:** Driver mode работает с DEV autologin
 - [ ] **TEST:** Token persists across page refresh

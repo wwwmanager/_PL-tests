@@ -78,7 +78,7 @@ async function apiMe(token: string): Promise<User> {
     headers: { Authorization: `Bearer ${token}` },
   });
 
-  let json: ApiResponse<{ user: User }>;  // ← Изменили тип!
+  let json: ApiResponse<User>;
   try {
     json = await res.json();
   } catch {
@@ -90,7 +90,7 @@ async function apiMe(token: string): Promise<User> {
     throw new Error(error.error?.message || 'Не удалось получить данные пользователя');
   }
 
-  return json.data.user;  // ← ИСПРАВЛЕНО!
+  return json.data;
 }
 
 async function apiLogout(token: string | null): Promise<void> {
@@ -109,15 +109,14 @@ async function apiLogout(token: string | null): Promise<void> {
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
+export const AuthProvider: React.FC<{ children: React.ReactNode; defaultRole?: Role }> = ({
   children,
+  defaultRole = 'admin' as Role,
 }) => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [appSettings, setAppSettings] = useState<AppSettings | null>(null);
   const [rolePolicies, setRolePolicies] =
     useState<Record<Role, Capability[]>>(DEFAULT_ROLE_POLICIES);
-
-  //console.log('🔍 rolePolicies initialized:', DEFAULT_ROLE_POLICIES.admin);
 
   const [token, setToken] = useState<string | null>(() => {
     if (typeof window === 'undefined') return null;
@@ -141,7 +140,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         .catch(() => { });
 
       // Политики ролей
-      //fetchPolicies().catch(() => { });
+      fetchPolicies().catch(() => { });
 
       // Пытаемся загрузить пользователя по токену с backend
       if (token) {
@@ -180,7 +179,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
     const unsubscribe = subscribe((msg) => {
       if (msg.topic === 'policies') {
-        //fetchPolicies();
+        fetchPolicies();
       }
     });
 
@@ -188,22 +187,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       alive = false;
       unsubscribe();
     };
-  }, [fetchPolicies, token]);
+  }, [defaultRole, fetchPolicies, token]);
 
   const roleCaps = useMemo(() => {
     const role = currentUser?.role || 'user';
-    const caps = rolePolicies[role] || [];
-    // console.log('🔍 roleCaps computed:', { role, capsCount: caps.length, hasAdminPanel: caps.includes('admin.panel') });
-    return caps;
+    return rolePolicies[role] || [];
   }, [currentUser?.role, rolePolicies]);
 
   const can = useCallback(
     (cap: Capability | Capability[]) => {
       const list = Array.isArray(cap) ? cap : [cap];
       const extras = currentUser?.extraCaps || [];
-      const result = list.every((c) => roleCaps.includes(c) || extras.includes(c));
-      // console.log('🔍 can() check:', { cap, roleCaps: roleCaps.slice(0, 5) + '...', result });
-      return result;
+      return list.every((c) => roleCaps.includes(c) || extras.includes(c));
     },
     [roleCaps, currentUser?.extraCaps],
   );
@@ -216,9 +211,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     [currentUser],
   );
 
+  // Реальный login через backend
   const login = useCallback(async (email: string, password: string) => {
     const { token, user } = await apiLogin(email, password);
-    // console.log('🔐 Login response:', { user, role: user.role, token: token.substring(0, 20) + '...' });
     setCurrentUser(user);
     setToken(token);
     await saveJSON(CURRENT_USER_KEY, user);

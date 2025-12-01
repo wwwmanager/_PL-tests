@@ -2,13 +2,13 @@
 import { AppDataSource } from '../db/data-source';
 import { Waybill } from '../entities/Waybill';
 import { Vehicle } from '../entities/Vehicle';
-import { Driver } from '../entities/Driver';
+import { Employee } from '../entities/Employee';
 import { BadRequestError, NotFoundError } from '../utils/errors';
 import { WaybillStatus } from '../entities/enums';
 
 const waybillRepo = () => AppDataSource.getRepository(Waybill);
 const vehicleRepo = () => AppDataSource.getRepository(Vehicle);
-const driverRepo = () => AppDataSource.getRepository(Driver);
+const employeeRepo = () => AppDataSource.getRepository(Employee);
 
 interface CreateWaybillInput {
     number: string;
@@ -32,7 +32,6 @@ export async function listWaybills(organizationId: string, filters?: {
     const qb = waybillRepo().createQueryBuilder('waybill')
         .leftJoinAndSelect('waybill.vehicle', 'vehicle')
         .leftJoinAndSelect('waybill.driver', 'driver')
-        .leftJoinAndSelect('driver.employee', 'employee')
         .where('waybill.organizationId = :organizationId', { organizationId });
 
     if (filters) {
@@ -63,7 +62,7 @@ export async function getWaybillById(organizationId: string, id: string) {
         where: { id, organizationId },
         relations: {
             vehicle: true,
-            driver: { employee: true }
+            driver: true
         }
     });
 }
@@ -105,18 +104,22 @@ export async function createWaybill(organizationId: string, input: CreateWaybill
     });
 
     console.log('🔍 Looking up driver:', input.driverId);
-    const driver = await driverRepo().findOne({
-        where: { id: input.driverId },
-        relations: { employee: true }
+    const driver = await employeeRepo().findOne({
+        where: {
+            id: input.driverId,
+            organizationId,
+            employeeType: 'driver'
+        }
     });
-    if (!driver || driver.employee.organizationId !== organizationId) {
+
+    if (!driver) {
         console.error('❌ Driver not found or wrong organization:', input.driverId);
         throw new BadRequestError('Водитель не найден');
     }
     console.log('  ✓ Driver found:', {
         id: driver.id,
-        employeeName: driver.employee.fullName,
-        licenseNumber: driver.licenseNumber
+        employeeName: driver.fullName,
+        licenseCategory: driver.licenseCategory
     });
 
     console.log('💾 Creating waybill entity...');
@@ -127,8 +130,8 @@ export async function createWaybill(organizationId: string, input: CreateWaybill
         vehicleId: input.vehicleId,
         driverId: input.driverId,
         blankId: input.blankId || null,
-        odometerStart: input.odometerStart?.toString(),
-        odometerEnd: input.odometerEnd?.toString(),
+        odometerStart: input.odometerStart,
+        odometerEnd: input.odometerEnd,
         plannedRoute: input.plannedRoute || null,
         notes: input.notes || null,
         status: WaybillStatus.DRAFT,
@@ -152,7 +155,7 @@ export async function createWaybill(organizationId: string, input: CreateWaybill
         where: { id: saved.id },
         relations: {
             vehicle: true,
-            driver: { employee: true }
+            driver: true
         }
     });
 }
@@ -183,8 +186,8 @@ export async function updateWaybill(organizationId: string, id: string, input: U
     if (input.vehicleId !== undefined) existing.vehicleId = input.vehicleId;
     if (input.driverId !== undefined) existing.driverId = input.driverId;
     if (input.status !== undefined) existing.status = input.status;
-    if (input.odometerStart !== undefined) existing.odometerStart = input.odometerStart.toString();
-    if (input.odometerEnd !== undefined) existing.odometerEnd = input.odometerEnd.toString();
+    if (input.odometerStart !== undefined) existing.odometerStart = input.odometerStart;
+    if (input.odometerEnd !== undefined) existing.odometerEnd = input.odometerEnd;
     if (input.plannedRoute !== undefined) existing.plannedRoute = input.plannedRoute;
     if (input.notes !== undefined) existing.notes = input.notes;
 
@@ -194,7 +197,7 @@ export async function updateWaybill(organizationId: string, id: string, input: U
         where: { id },
         relations: {
             vehicle: true,
-            driver: { employee: true }
+            driver: true
         }
     });
 }
@@ -231,7 +234,7 @@ export async function changeWaybillStatus(organizationId: string, id: string, st
         where: { id },
         relations: {
             vehicle: true,
-            driver: { employee: true }
+            driver: true
         }
     });
 }

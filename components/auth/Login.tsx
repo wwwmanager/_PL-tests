@@ -7,7 +7,7 @@ const Login: React.FC = () => {
   const { login } = useAuth();
   const { showToast } = useToast();
   const [email, setEmail] = useState('admin@example.com'); // для удобства dev
-  const [password, setPassword] = useState('Admin123!');
+  const [password, setPassword] = useState('password');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -78,7 +78,7 @@ const Login: React.FC = () => {
         </button>
 
         <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-          Для теста можно использовать admin@example.com / Admin123! (если так
+          Для теста можно использовать admin@example.com / password (если так
           настроен backend).
         </p>
       </form>

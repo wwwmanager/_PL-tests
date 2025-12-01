@@ -36,6 +36,9 @@ export class Vehicle {
     vin!: string | null;
 
     @Column({ type: 'text', nullable: true })
+    registrationCertificate!: string | null;
+
+    @Column({ type: 'text', nullable: true })
     fuelTypeId!: string | null;
 
     @Column({ type: 'numeric', precision: 10, scale: 2, nullable: true })
@@ -66,6 +69,17 @@ export class Vehicle {
 
     @Column({ type: 'text', nullable: true })
     notes!: string | null;
+
+    @Column({ type: 'jsonb', nullable: true })
+    maintenanceHistory!: Array<{
+        id: string;
+        date: string;
+        workType: string;
+        mileage: number;
+        description?: string;
+        performer?: string;
+        cost?: number;
+    }> | null;
 
     // PTS / EPTS
     @Column({ type: 'text', nullable: true })

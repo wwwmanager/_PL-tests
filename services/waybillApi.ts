@@ -105,6 +105,26 @@ export async function changeWaybillStatus(
     return useReal ? realApi.changeWaybillStatus(id, status as FrontWaybillStatus, ctx) : mockApi.changeWaybillStatus(id, status, ctx);
 }
 
+/**
+ * Get latest waybill (most recent by date)
+ */
+export async function getLatestWaybill(): Promise<Waybill | null> {
+    const useReal = await shouldUseRealApi();
+    if (useReal) {
+        // For real API: get all waybills and find the latest
+        const waybills = await realApi.getWaybills();
+        if (waybills.length === 0) return null;
+
+        // Sort by date descending and return first
+        const sorted = [...waybills].sort((a, b) =>
+            new Date(b.date).getTime() - new Date(a.date).getTime()
+        );
+        return sorted[0];
+    } else {
+        return mockApi.getLatestWaybill();
+    }
+}
+
 // Re-export other mockApi functions that are not yet implemented in realApi
 export const fetchWaybills = mockApi.fetchWaybills;
-export const getLatestWaybill = mockApi.getLatestWaybill;
+

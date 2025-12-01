@@ -42,7 +42,7 @@
      - `/api/health`
      - `/api/waybills` — CRUD путевых листов (сейчас: list + create стабильно работают)
      - `/api/vehicles` — CRUD транспорта
-     - `/api/drivers` — CRUD водителей
+     - `/api/employees` — CRUD сотрудников (включая водителей)
      - `/api/auth` — в процессе/частично (нужно унифицировать с фронтом)
 
 ---
@@ -75,7 +75,7 @@
 - **Основные сущности (на TypeORM):**
   - Organization, Department
   - User, Role, Permission, UserRole, RolePermission
-  - Employee, Driver
+  - Employee (с типом 'driver', 'dispatcher' и др.)
   - Vehicle, FuelCard
   - Waybill, WaybillRoute, WaybillFuel
   - BlankBatch, Blank
@@ -99,7 +99,7 @@
   - Все операции с ПЛ/ТС/водителями должны идти через API:
     - ПЛ: `/api/waybills`
     - ТС: `/api/vehicles`
-    - Водители: `/api/drivers`
+    - Водители: `/api/employees?type=driver`
   - **Нельзя** использовать IndexedDB как источник правды для ПЛ в Central mode.
   - Авторизация через реальный login (`/api/auth/login`), JWT хранится и используется httpClient'ом.
 
@@ -157,7 +157,7 @@
 ### 5.2. Vehicles и Drivers
 
 - Backend:
-  - `/api/vehicles` и `/api/drivers` реализованы и работают (TypeORM).
+  - `/api/vehicles` и `/api/employees` (включая водителей) реализованы и работают (TypeORM).
 - Frontend:
   - Есть mockApi‑реализация.
   - Требуется adapter‑слой по аналогии с ПЛ и переключение UI на этот фасад.
@@ -198,34 +198,6 @@
 
 - Разделение `mockApi.ts` на модули.
 - Виртуализация больших списков (WaybillList, Vehicles, Drivers).
-- Lazy loading тяжёлых экранов/модалок.
-- Toast notifications, skeleton loaders, улучшения UX.
-
-### Phase 3 — Расширение функционала и интеграции
-
-- Дополнительные отчёты (ТО/медосмотры, топливо, бланки, финансы).
-- Интеграции (1С, GPS, АЗС).
-- Расширенная аналитика и предиктивные сценарии.
-
----
-
-## 7. История важных изменений
-
-- 2025-11-29 — Введён adapter‑слой `realWaybillApi` + `waybillApi` для путевых листов; начата интеграция Central mode с backend (TypeORM на 3001).
-- 2025-11-29 — Определён план миграции Central mode: отключение DEV‑автологина, унификация auth и API URL на порт 3001, переход ПЛ/ТС/водителей на backend в режиме Central.
-
----
-
-## 8. Управление контекстом и планированием (для AI)
-
-### 8.1. Обязательные файлы контекста
-
-В директории `Tasks/` (или аналогичной) хранятся:
-
-1. **APPLICATION_CONTEXT.md** (этот файл) — общий контекст проекта, архитектура, правила.
-2. **implementation_plan.md** — текущий план действий/миграции.
-3. **task.md** — чек-листы конкретных задач.
-4. **walkthrough.md** (опционально) — детальные отчёты по выполненным работам.
 
 ### 8.2. Поведение при старте КАЖДОЙ новой сессии
 

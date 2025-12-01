@@ -1,241 +1,164 @@
-import React, { useState, lazy, Suspense, useEffect } from 'react';
-import { DashboardIcon, DocumentTextIcon, ChartBarIcon, CogIcon, TruckIcon, MenuIcon, XIcon, BookOpenIcon, InformationCircleIcon, QuestionMarkCircleIcon, ArrowDownIcon, ArrowUpIcon, ArchiveBoxIcon, CodeBracketIcon, BeakerIcon, ShieldCheckIcon, LogoutIcon } from './components/Icons';
-import { View, DictionaryType, AppSettings } from './types';
+// App.tsx
+import React, { Suspense, lazy } from 'react';
+import { AuthProvider, useAuth } from './services/auth';
 import { ToastProvider } from './contexts/ToastContext';
-import { AuthProvider, useAuth, RequireCapability } from './services/auth';
-import { DevRoleSwitcher } from './services/auth';
-import { getAppSettings } from './services/mockApi';
+import LoadingSpinner from './components/common/LoadingSpinner';
 import Login from './components/auth/Login';
 
 const Dashboard = lazy(() => import('./components/dashboard/Dashboard'));
 const WaybillList = lazy(() => import('./components/waybills/WaybillList'));
+const WaybillDetail = lazy(() => import('./components/waybills/WaybillDetail'));
+const VehicleList = lazy(() => import('./components/vehicles/VehicleList'));
+const EmployeeList = lazy(() => import('./components/employees/EmployeeList'));
 const Reports = lazy(() => import('./components/reports/Reports'));
 const Admin = lazy(() => import('./components/admin/Admin'));
-const Dictionaries = lazy(() => import('./components/dictionaries/Dictionaries'));
-const GarageManagement = lazy(() => import('./components/dictionaries/GarageManagement'));
-const About = lazy(() => import('./components/about/About'));
-const UserGuide = lazy(() => import('./components/help/UserGuide'));
-const AdminGuide = lazy(() => import('./components/help/AdminGuide'));
-const DeveloperGuide = lazy(() => import('./components/help/DeveloperGuide'));
-const TestingGuide = lazy(() => import('./components/help/TestingGuide'));
-const BusinessLogicGuide = lazy(() => import('./components/help/BusinessLogicGuide'));
-const CapabilitiesGuide = lazy(() => import('./components/help/CapabilitiesGuide'));
-const SystemDictionariesGuide = lazy(() => import('./components/help/SystemDictionariesGuide'));
-const BlankManagement = lazy(() => import('./components/admin/BlankManagement'));
 
-const viewTitles: { [key in View]: string } = {
-  DASHBOARD: 'Панель управления',
-  WAYBILLS: 'Путевые листы',
-  DICTIONARIES: 'Справочники',
-  WAREHOUSE: 'Номенклатура и Склад',
-  REPORTS: 'Отчеты',
-  ADMIN: 'Настройки',
-  ABOUT: 'О программе',
-  USER_GUIDE: 'Руководство пользователя',
-  ADMIN_GUIDE: 'Руководство администратора',
-  DEVELOPER_GUIDE: 'Документация для разработчика',
-  BLANKS: 'Бланки ПЛ',
-  TESTING_GUIDE: 'Руководство для тестировщика',
-  BUSINESS_LOGIC_GUIDE: 'Бизнес-логика приложения',
-  CAPABILITIES_GUIDE: 'Справочник прав (Capabilities)',
-  SYSTEM_DICTIONARIES_GUIDE: 'Системные справочники',
-};
-
-const LoadingSpinner = () => (
-  <div className="flex justify-center items-center h-full w-full">
-    <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-blue-500"></div>
-  </div>
-);
+type Page =
+  | 'dashboard'
+  | 'waybills'
+  | 'waybill-detail'
+  | 'vehicles'
+  | 'employees'
+  | 'reports'
+  | 'admin';
 
 const AppContent: React.FC = () => {
-  const [currentView, setCurrentView] = useState<View>('DASHBOARD');
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const [waybillToOpen, setWaybillToOpen] = useState<string | null>(null);
-  const [dictionarySubView, setDictionarySubView] = useState<DictionaryType | null>(null);
-  const [isHelpOpen, setIsHelpOpen] = useState(false);
-  const [appSettings, setAppSettings] = useState<AppSettings | null>(null);
-  //const { hasRole, currentUser } = useAuth();
-  const { hasRole, currentUser, logout } = useAuth();
-  useEffect(() => {
-    getAppSettings().then(setAppSettings);
-  }, []);
+  const { currentUser, logout, appSettings } = useAuth();
+  const [currentPage, setCurrentPage] = React.useState<Page>('dashboard');
+  const [selectedWaybillId, setSelectedWaybillId] = React.useState<string | null>(null);
 
-  // Если пользователь не авторизован — показываем экран входа
+  // Если нет пользователя - показываем Login
   if (!currentUser) {
     return <Login />;
   }
 
-  const handleNavigate = (view: View, subView?: string) => {
-    if (view === 'DICTIONARIES' && subView) {
-      setDictionarySubView(subView as DictionaryType);
-    } else {
-      setDictionarySubView(null);
-    }
-    setCurrentView(view);
-  };
-
-  const handleNavigateToWaybill = (waybillId: string) => {
-    setWaybillToOpen(waybillId);
-    setCurrentView('WAYBILLS');
-  };
-
-  const onWaybillOpened = () => {
-    setWaybillToOpen(null);
-  };
-
-  const renderView = () => {
-    switch (currentView) {
-      case 'DASHBOARD':
-        return <Dashboard onNavigateToWaybill={handleNavigateToWaybill} />;
-      case 'WAYBILLS':
-        return <WaybillList waybillToOpen={waybillToOpen} onWaybillOpened={onWaybillOpened} />;
-      case 'DICTIONARIES':
-        const subViewToOpen = dictionarySubView;
-        // Reset subview after passing it to prevent re-triggering
-        if (dictionarySubView) setDictionarySubView(null);
-        return <Dictionaries subViewToOpen={subViewToOpen} />;
-      case 'WAREHOUSE':
-        return <GarageManagement />;
-      case 'REPORTS':
-        return <Reports />;
-      case 'ADMIN':
-        return (
-          <RequireCapability
-            cap="admin.panel"
-            fallback={
-              <div className="p-4 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 rounded">
-                <p className="text-sm text-red-700 dark:text-red-300">
-                  У вас нет прав для доступа к разделу «Настройки». Обратитесь к администратору.
-                </p>
-              </div>
-            }
-          >
-            <Admin />
-          </RequireCapability>
-        );
-      case 'BLANKS':
-        return <BlankManagement />;
-      case 'ABOUT':
-        return <About />;
-      case 'USER_GUIDE':
-        return <UserGuide onNavigate={handleNavigate} />;
-      case 'ADMIN_GUIDE':
-        return <AdminGuide />;
-      case 'DEVELOPER_GUIDE':
-        return <DeveloperGuide />;
-      case 'TESTING_GUIDE':
-        return <TestingGuide />;
-      case 'BUSINESS_LOGIC_GUIDE':
-        return <BusinessLogicGuide />;
-      case 'CAPABILITIES_GUIDE':
-        return <CapabilitiesGuide />;
-      case 'SYSTEM_DICTIONARIES_GUIDE':
-        return <SystemDictionariesGuide />;
-      default:
-        return <Dashboard onNavigateToWaybill={handleNavigateToWaybill} />;
-    }
-  };
-
-  const NavItem = ({ view, icon, label }: { view: View; icon: React.ReactElement; label: string }) => (
-    <li
-      onClick={() => handleNavigate(view)}
-      className={`flex items-center p-3 my-1 rounded-lg cursor-pointer transition-colors ${currentView === view
-        ? 'bg-blue-600 text-white shadow-lg'
-        : 'text-gray-600 dark:text-gray-300 hover:bg-blue-100 dark:hover:bg-gray-700'
-        }`}
-    >
-      <span className="w-6 h-6">{icon}</span>
-      <span className="ml-4 font-medium">{label}</span>
-    </li>
-  );
-
-  const HelpMenu = () => (
-    <li>
-      <div
-        onClick={() => setIsHelpOpen(!isHelpOpen)}
-        className="flex items-center justify-between p-3 my-1 rounded-lg cursor-pointer text-gray-600 dark:text-gray-300 hover:bg-blue-100 dark:hover:bg-gray-700"
-      >
-        <div className="flex items-center">
-          <span className="w-6 h-6"><QuestionMarkCircleIcon /></span>
-          <span className="ml-4 font-medium">Справка</span>
-        </div>
-        {isHelpOpen ? <ArrowUpIcon className="w-5 h-5" /> : <ArrowDownIcon className="w-5 h-5" />}
-      </div>
-      {isHelpOpen && (
-        <ul className="pl-8 transition-all duration-300 ease-in-out">
-          <NavItem view="USER_GUIDE" icon={<BookOpenIcon />} label="Руководство" />
-          <NavItem view="ADMIN_GUIDE" icon={<CogIcon />} label="Администратору" />
-          <NavItem view="DEVELOPER_GUIDE" icon={<CodeBracketIcon />} label="Разработчику" />
-          <NavItem view="TESTING_GUIDE" icon={<BeakerIcon />} label="Тестировщику" />
-          <NavItem view="BUSINESS_LOGIC_GUIDE" icon={<BeakerIcon />} label="Бизнес-логика" />
-          <NavItem view="CAPABILITIES_GUIDE" icon={<ShieldCheckIcon />} label="Справочник прав" />
-          <NavItem view="SYSTEM_DICTIONARIES_GUIDE" icon={<BookOpenIcon />} label="Системные справочники" />
-          <NavItem view="ABOUT" icon={<InformationCircleIcon />} label="О программе" />
-        </ul>
-      )}
-    </li>
-  );
-
   const isDriverMode = appSettings?.appMode === 'driver' || !appSettings?.appMode;
 
-  return (
-    <div className="flex h-screen bg-gray-100 dark:bg-gray-900 font-sans">
-      <aside
-        className={`bg-white dark:bg-gray-800 text-gray-800 dark:text-white flex flex-col transition-all duration-300 ease-in-out shadow-xl z-20 ${isSidebarOpen ? 'w-64' : 'w-0'
-          } overflow-hidden`}
-      >
-        <div className="flex items-center justify-center h-20 border-b dark:border-gray-700">
-          <TruckIcon className="h-8 w-8 text-blue-500" />
-          <h1 className="text-2xl font-bold ml-2 text-gray-800 dark:text-white">Путевые листы</h1>
-        </div>
-        <nav className="flex-1 px-4 py-4">
-          <ul>
-            <NavItem view="DASHBOARD" icon={<DashboardIcon />} label="Панель управления" />
-            <NavItem view="WAYBILLS" icon={<DocumentTextIcon />} label="Путевые листы" />
-            {isDriverMode && hasRole('driver') && (
-              <NavItem view="BLANKS" icon={<ArchiveBoxIcon />} label="Бланки ПЛ" />
-            )}
-            <NavItem view="DICTIONARIES" icon={<BookOpenIcon />} label="Справочники" />
-            <NavItem view="WAREHOUSE" icon={<ArchiveBoxIcon />} label="Номенклатура и Склад" />
-            <NavItem view="REPORTS" icon={<ChartBarIcon />} label="Отчеты" />
-
-            <RequireCapability cap="admin.panel">
-              <NavItem view="ADMIN" icon={<CogIcon />} label="Настройки" />
-            </RequireCapability>
-
-            <HelpMenu />
-          </ul>
-        </nav>
-        <div className="p-4 border-t dark:border-gray-700">
-          <DevRoleSwitcher />
-        </div>
-      </aside>
-
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <header className="flex items-center justify-between p-4 bg-white dark:bg-gray-800 border-b dark:border-gray-700 shadow-md">
-          <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="text-gray-600 dark:text-gray-300 focus:outline-none">
-            {isSidebarOpen ? <XIcon className="h-6 w-6" /> : <MenuIcon className="h-6 w-6" />}
-          </button>
-          <h1 className="text-xl font-semibold text-gray-800 dark:text-white">{viewTitles[currentView]}</h1>
-          <button
-            onClick={async () => {
-              if (confirm('Вы уверены, что хотите выйти?')) {
-                await logout();
-              }
+  const renderPage = () => {
+    switch (currentPage) {
+      case 'dashboard':
+        return <Dashboard />;
+      case 'waybills':
+        return (
+          <WaybillList
+            onSelectWaybill={(id) => {
+              setSelectedWaybillId(id);
+              setCurrentPage('waybill-detail');
             }}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-red-500 hover:bg-red-600 text-white transition-colors shadow-md hover:shadow-lg"
-            title="Выход из системы"
-          >
-            <LogoutIcon className="w-5 h-5" />
-            <span className="font-medium text-sm">Выход</span>
-          </button>
-        </header>
-        <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-100 dark:bg-gray-900 p-4 sm:p-6 lg:p-8">
-          <Suspense fallback={<LoadingSpinner />}>
-            {renderView()}
-          </Suspense>
-        </main>
-      </div>
+          />
+        );
+      case 'waybill-detail':
+        return (
+          <WaybillDetail
+            waybillId={selectedWaybillId}
+            onBack={() => setCurrentPage('waybills')}
+          />
+        );
+      case 'vehicles':
+        return <VehicleList />;
+      case 'employees':
+        return <EmployeeList />;
+      case 'reports':
+        return <Reports />;
+      case 'admin':
+        return <Admin />;
+      default:
+        return <Dashboard />;
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {/* Navigation */}
+      <nav className="bg-white shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between h-16">
+            <div className="flex">
+              <div className="flex-shrink-0 flex items-center">
+                <h1 className="text-xl font-bold text-gray-900">
+                  Waybill Management
+                  {isDriverMode && <span className="ml-2 text-sm text-gray-500">(Driver Mode)</span>}
+                  {!isDriverMode && <span className="ml-2 text-sm text-blue-600">(Central Mode)</span>}
+                </h1>
+              </div>
+              <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
+                <button
+                  onClick={() => setCurrentPage('dashboard')}
+                  className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium ${currentPage === 'dashboard'
+                    ? 'border-blue-500 text-gray-900'
+                    : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
+                    }`}
+                >
+                  Панель управления
+                </button>
+                <button
+                  onClick={() => setCurrentPage('waybills')}
+                  className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium ${currentPage === 'waybills' || currentPage === 'waybill-detail'
+                    ? 'border-blue-500 text-gray-900'
+                    : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
+                    }`}
+                >
+                  Путевые листы
+                </button>
+                <button
+                  onClick={() => setCurrentPage('vehicles')}
+                  className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium ${currentPage === 'vehicles'
+                    ? 'border-blue-500 text-gray-900'
+                    : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
+                    }`}
+                >
+                  Транспорт
+                </button>
+                <button
+                  onClick={() => setCurrentPage('employees')}
+                  className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium ${currentPage === 'employees'
+                    ? 'border-blue-500 text-gray-900'
+                    : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
+                    }`}
+                >
+                  Сотрудники
+                </button>
+                <button
+                  onClick={() => setCurrentPage('reports')}
+                  className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium ${currentPage === 'reports'
+                    ? 'border-blue-500 text-gray-900'
+                    : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
+                    }`}
+                >
+                  Отчёты
+                </button>
+                <button
+                  onClick={() => setCurrentPage('admin')}
+                  className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium ${currentPage === 'admin'
+                    ? 'border-blue-500 text-gray-900'
+                    : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
+                    }`}
+                >
+                  Настройки
+                </button>
+              </div>
+            </div>
+            <div className="flex items-center">
+              <span className="text-sm text-gray-700 mr-4">
+                {currentUser.displayName} ({currentUser.role})
+              </span>
+              <button
+                onClick={logout}
+                className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              >
+                Выйти
+              </button>
+            </div>
+          </div>
+        </div>
+      </nav>
+
+      {/* Main Content */}
+      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+        <Suspense fallback={<LoadingSpinner />}>
+          {renderPage()}
+        </Suspense>
+      </main>
     </div>
   );
 };
@@ -243,7 +166,7 @@ const AppContent: React.FC = () => {
 const App: React.FC = () => {
   return (
     <ToastProvider>
-      <AuthProvider defaultRole="admin">
+      <AuthProvider>
         <Suspense fallback={<LoadingSpinner />}>
           <AppContent />
         </Suspense>

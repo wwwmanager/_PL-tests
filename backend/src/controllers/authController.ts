@@ -42,3 +42,19 @@ export async function getProfile(req: Request, res: Response, next: NextFunction
         next(err);
     }
 }
+
+export async function logout(req: Request, res: Response, next: NextFunction) {
+    try {
+        // В базовой реализации просто возвращаем успех
+        // В будущем здесь можно добавить:
+        // - Инвалидацию refresh token
+        // - Добавление токена в blacklist
+        // - Логирование события logout
+        res.json({
+            success: true,
+            data: { message: 'Logged out successfully' }
+        });
+    } catch (err) {
+        next(err);
+    }
+}

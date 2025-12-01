@@ -8,7 +8,6 @@ import { Organization } from '../entities/Organization';
 import { Department } from '../entities/Department';
 import { User } from '../entities/User';
 import { Employee } from '../entities/Employee';
-import { Driver } from '../entities/Driver';
 import { Vehicle } from '../entities/Vehicle';
 import { Waybill } from '../entities/Waybill';
 import { WaybillRoute } from '../entities/WaybillRoute';
@@ -43,7 +42,6 @@ export const AppDataSource = new DataSource({
         Department,
         User,
         Employee,
-        Driver,
         Vehicle,
         Waybill,
         WaybillRoute,

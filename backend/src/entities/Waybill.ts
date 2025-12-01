@@ -1,4 +1,4 @@
-// Waybill Entity
+// Waybill Entity - Aligned with Frontend Type
 import {
     Entity, PrimaryGeneratedColumn, Column,
     ManyToOne, OneToMany, CreateDateColumn, UpdateDateColumn,
@@ -6,7 +6,7 @@ import {
 import { Organization } from './Organization';
 import { Department } from './Department';
 import { Vehicle } from './Vehicle';
-import { Driver } from './Driver';
+import { Employee } from './Employee';
 import { User } from './User';
 import { WaybillRoute } from './WaybillRoute';
 import { WaybillFuel } from './WaybillFuel';
@@ -26,8 +26,27 @@ export class Waybill {
     @Column({ type: 'text' })
     number!: string;
 
+    // Blank info
+    @Column({ type: 'uuid', nullable: true })
+    blankId!: string | null;
+
+    @Column({ type: 'text', nullable: true })
+    blankSeries!: string | null;
+
+    @Column({ type: 'int', nullable: true })
+    blankNumber!: number | null;
+
+    @Column({ type: 'timestamptz', nullable: true })
+    reservedAt!: Date | null;
+
     @Column({ type: 'date' })
     date!: string;
+
+    @Column({ type: 'timestamptz', nullable: true })
+    validFrom!: Date | null;
+
+    @Column({ type: 'timestamptz', nullable: true })
+    validTo!: Date | null;
 
     @Column({ type: 'uuid' })
     vehicleId!: string;
@@ -36,7 +55,10 @@ export class Waybill {
     driverId!: string;
 
     @Column({ type: 'uuid', nullable: true })
-    blankId!: string | null;
+    dispatcherId!: string | null;
+
+    @Column({ type: 'uuid', nullable: true })
+    controllerId!: string | null;
 
     @Column({
         type: 'enum',
@@ -45,11 +67,25 @@ export class Waybill {
     })
     status!: WaybillStatus;
 
+    // Odometer
     @Column({ type: 'numeric', precision: 10, scale: 1, nullable: true })
-    odometerStart!: string | null;
+    odometerStart!: number | null;
 
     @Column({ type: 'numeric', precision: 10, scale: 1, nullable: true })
-    odometerEnd!: string | null;
+    odometerEnd!: number | null;
+
+    // Fuel
+    @Column({ type: 'numeric', precision: 10, scale: 2, nullable: true })
+    fuelPlanned!: number | null;
+
+    @Column({ type: 'numeric', precision: 10, scale: 2, nullable: true })
+    fuelAtStart!: number | null;
+
+    @Column({ type: 'numeric', precision: 10, scale: 2, nullable: true })
+    fuelFilled!: number | null;
+
+    @Column({ type: 'numeric', precision: 10, scale: 2, nullable: true })
+    fuelAtEnd!: number | null;
 
     @Column({ type: 'text', nullable: true })
     plannedRoute!: string | null;
@@ -57,11 +93,33 @@ export class Waybill {
     @Column({ type: 'text', nullable: true })
     notes!: string | null;
 
+    @Column({ type: 'text', nullable: true })
+    reviewerComment!: string | null;
+
+    @Column({ type: 'text', nullable: true })
+    deviationReason!: string | null;
+
+    // Audit
     @Column({ type: 'uuid', nullable: true })
     createdByUserId!: string | null;
 
     @Column({ type: 'uuid', nullable: true })
+    submittedBy!: string | null;
+
+    @Column({ type: 'uuid', nullable: true })
     approvedByUserId!: string | null;
+
+    @Column({ type: 'uuid', nullable: true })
+    postedBy!: string | null;
+
+    @Column({ type: 'timestamptz', nullable: true })
+    postedAt!: Date | null;
+
+    @Column({ type: 'uuid', nullable: true })
+    cancelledBy!: string | null;
+
+    @Column({ type: 'timestamptz', nullable: true })
+    cancelledAt!: Date | null;
 
     @Column({ type: 'uuid', nullable: true })
     completedByUserId!: string | null;
@@ -85,8 +143,14 @@ export class Waybill {
     @ManyToOne(() => Vehicle, (v) => v.waybills, { onDelete: 'RESTRICT' })
     vehicle!: Vehicle;
 
-    @ManyToOne(() => Driver, (d) => d.waybills, { onDelete: 'RESTRICT' })
-    driver!: Driver;
+    @ManyToOne(() => Employee, { onDelete: 'RESTRICT' })
+    driver!: Employee;
+
+    @ManyToOne(() => Employee, { nullable: true })
+    dispatcher!: Employee | null;
+
+    @ManyToOne(() => Employee, { nullable: true })
+    controller!: Employee | null;
 
     @ManyToOne(() => User, (u) => u.createdWaybills, {
         nullable: true,
