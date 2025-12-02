@@ -137,7 +137,7 @@ export async function storageKeys(): Promise<string[]> {
       // Handle cases where the storage adapter doesn't return an array.
       return [];
     }
-    
+
     const result: string[] = [];
     // FIX: Explicitly typing PREFIX as string prevents it from being narrowed to `never`
     // inside the conditional block, which was causing a compile-time error.

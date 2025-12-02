@@ -54,6 +54,12 @@ const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpene
   const [isExtendedView, setIsExtendedView] = useState(false);
   const [isSeasonModalOpen, setIsSeasonModalOpen] = useState(false);
 
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalRecords, setTotalRecords] = useState(0);
+  const [pageSize] = useState(50); // fixed page size
+
   const [isConfirmationModalOpen, setIsConfirmationModalOpen] = useState(false);
   const [modalProps, setModalProps] = useState({ title: '', message: '', confirmText: '', confirmButtonClass: '', onConfirm: () => { } });
 
@@ -70,11 +76,22 @@ const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpene
 
   const fetchData = async () => {
     setLoading(true);
-    const [waybillsData, vehiclesData] = await Promise.all([
-      getWaybills(),
+    const [waybillsResponse, vehiclesData] = await Promise.all([
+      getWaybills({
+        page: currentPage,
+        limit: pageSize,
+        status: topLevelFilter.status || undefined,
+        startDate: topLevelFilter.dateFrom || undefined,
+        endDate: topLevelFilter.dateTo || undefined,
+      }),
       getVehicles()
     ]);
-    setWaybills(waybillsData.waybills);
+
+    setWaybills(waybillsResponse.waybills);
+    if (waybillsResponse.pagination) {
+      setTotalPages(waybillsResponse.pagination.pages);
+      setTotalRecords(waybillsResponse.pagination.total);
+    }
     setVehicles(vehiclesData);
     setLoading(false);
   };
@@ -87,7 +104,7 @@ const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpene
       }
     });
     return unsubscribe;
-  }, []);
+  }, [currentPage, topLevelFilter.status, topLevelFilter.dateFrom, topLevelFilter.dateTo]);
 
   useEffect(() => {
     if (waybillToOpen) {
@@ -339,9 +356,9 @@ const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpene
                         <>
                           <td className="px-6 py-4 font-medium text-gray-900 dark:text-white">{w.number}</td>
                           <td className="px-6 py-4">{new Date(w.date).toLocaleDateString('ru-RU')}</td>
-                          <td className="px-6 py-4">{w.vehicle}</td>
-                          <td className="px-6 py-4">{w.driver}</td>
-                          <td className="px-6 py-4">{w.organization}</td>
+                          <td className="px-6 py-4">{w.vehicleId}</td>
+                          <td className="px-6 py-4">{w.driverId}</td>
+                          <td className="px-6 py-4">{w.organizationId}</td>
                           <td className="px-6 py-4">
                             <span className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium ${colors?.bg} ${colors?.text}`}>
                               {getStatusIcon(w.status)}
@@ -358,6 +375,31 @@ const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpene
             </tbody>
           </table>
         </div>
+
+        {/* Pagination Controls */}
+        {totalPages > 1 && (
+          <div className="mt-4 flex items-center justify-between">
+            <div className="text-sm text-gray-700 dark:text-gray-300">
+              Показано {waybills.length} из {totalRecords} записей (страница {currentPage} из {totalPages})
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="px-3 py-1 border rounded-md bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-gray-600"
+              >
+                ← Назад
+              </button>
+              <button
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+                className="px-3 py-1 border rounded-md bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-gray-600"
+              >
+                Вперед →
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </>
   );

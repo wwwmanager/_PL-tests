@@ -10,6 +10,7 @@ const WaybillList = lazy(() => import('./components/waybills/WaybillList'));
 const WaybillDetail = lazy(() => import('./components/waybills/WaybillDetail'));
 const VehicleList = lazy(() => import('./components/vehicles/VehicleList'));
 const EmployeeList = lazy(() => import('./components/employees/EmployeeList'));
+const Dictionaries = lazy(() => import('./components/dictionaries/Dictionaries'));
 const Reports = lazy(() => import('./components/reports/Reports'));
 const Admin = lazy(() => import('./components/admin/Admin'));
 
@@ -19,6 +20,7 @@ type Page =
   | 'waybill-detail'
   | 'vehicles'
   | 'employees'
+  | 'dictionaries'
   | 'reports'
   | 'admin';
 
@@ -59,6 +61,8 @@ const AppContent: React.FC = () => {
         return <VehicleList />;
       case 'employees':
         return <EmployeeList />;
+      case 'dictionaries':
+        return <Dictionaries />;
       case 'reports':
         return <Reports />;
       case 'admin':
@@ -81,6 +85,7 @@ const AppContent: React.FC = () => {
             <li><button onClick={() => setCurrentPage('waybills')} className={`w-full text-left px-6 py-3 hover:bg-gray-100 dark:hover:bg-gray-700 ${currentPage === 'waybills' ? 'bg-blue-50 dark:bg-blue-900 border-r-4 border-blue-500' : ''}`}>Путевые листы</button></li>
             <li><button onClick={() => setCurrentPage('vehicles')} className={`w-full text-left px-6 py-3 hover:bg-gray-100 dark:hover:bg-gray-700 ${currentPage === 'vehicles' ? 'bg-blue-50 dark:bg-blue-900 border-r-4 border-blue-500' : ''}`}>Транспорт</button></li>
             <li><button onClick={() => setCurrentPage('employees')} className={`w-full text-left px-6 py-3 hover:bg-gray-100 dark:hover:bg-gray-700 ${currentPage === 'employees' ? 'bg-blue-50 dark:bg-blue-900 border-r-4 border-blue-500' : ''}`}>Сотрудники</button></li>
+            <li><button onClick={() => setCurrentPage('dictionaries')} className={`w-full text-left px-6 py-3 hover:bg-gray-100 dark:hover:bg-gray-700 ${currentPage === 'dictionaries' ? 'bg-blue-50 dark:bg-blue-900 border-r-4 border-blue-500' : ''}`}>Справочники</button></li>
             <li><button onClick={() => setCurrentPage('reports')} className={`w-full text-left px-6 py-3 hover:bg-gray-100 dark:hover:bg-gray-700 ${currentPage === 'reports' ? 'bg-blue-50 dark:bg-blue-900 border-r-4 border-blue-500' : ''}`}>Отчеты</button></li>
             <li><button onClick={() => setCurrentPage('admin')} className={`w-full text-left px-6 py-3 hover:bg-gray-100 dark:hover:bg-gray-700 ${currentPage === 'admin' ? 'bg-blue-50 dark:bg-blue-900 border-r-4 border-blue-500' : ''}`}>Настройки</button></li>
           </ul>
@@ -125,4 +130,4 @@ const App: React.FC = () => {
   );
 };
 
-export default App; 
+export default App;

@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 
 import { Organization, OrganizationStatus } from '../../types';
-import { getOrganizations, addOrganization, updateOrganization, deleteOrganization } from '../../services/mockApi';
+import { getOrganizations, addOrganization, updateOrganization, deleteOrganization } from '../../services/organizationApi';
 import { validation } from '../../services/faker'; // Валидация все еще нужна для схемы
 import { PencilIcon, TrashIcon, PlusIcon, ArrowUpIcon, ArrowDownIcon, ArchiveBoxIcon, ArrowUpTrayIcon } from '../Icons';
 import useTable from '../../hooks/useTable';

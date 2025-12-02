@@ -19,6 +19,12 @@ export interface WaybillsResponse {
     page: number;
     limit: number;
     totalPages: number;
+    pagination?: {  // Added for compatibility with new paginated API
+        total: number;
+        page: number;
+        limit: number;
+        pages: number;
+    };
 }
 
 export async function getWaybills(filters: WaybillFilters = {}): Promise<WaybillsResponse> {

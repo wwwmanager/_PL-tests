@@ -1,54 +1,86 @@
-// vehicleService - TypeORM version
-import { AppDataSource } from '../db/data-source';
-import { Vehicle } from '../entities/Vehicle';
-import { NotFoundError } from '../utils/errors';
+import { PrismaClient } from '@prisma/client';
+import { BadRequestError, NotFoundError } from '../utils/errors';
 
-const vehicleRepo = () => AppDataSource.getRepository(Vehicle);
+const prisma = new PrismaClient();
 
 export async function listVehicles(organizationId: string) {
-    return vehicleRepo().find({
+    return prisma.vehicle.findMany({
         where: { organizationId },
-        relations: { organization: true, department: true },
-        order: { plateNumber: 'ASC' }
+        orderBy: { registrationNumber: 'asc' },
+        include: {
+            organization: true,
+            department: true,
+        },
     });
 }
 
 export async function getVehicleById(organizationId: string, id: string) {
-    return vehicleRepo().findOne({
+    return prisma.vehicle.findFirst({
         where: { id, organizationId },
-        relations: { organization: true, department: true }
+        include: {
+            organization: true,
+            department: true,
+        },
     });
 }
 
 export async function createVehicle(organizationId: string, data: any) {
-    const vehicle = vehicleRepo().create({
-        ...data,
-        organizationId
+    // Validate required fields
+    if (!data.registrationNumber) {
+        throw new BadRequestError('Номер регистрации обязателен');
+    }
+
+    return prisma.vehicle.create({
+        data: {
+            organizationId,
+            departmentId: data.departmentId || null,
+            code: data.code || null,
+            registrationNumber: data.registrationNumber,
+            brand: data.brand || null,
+            model: data.model || null,
+            vin: data.vin || null,
+            fuelType: data.fuelType || null,
+            fuelTankCapacity: data.fuelTankCapacity ? Number(data.fuelTankCapacity) : null,
+            isActive: data.isActive !== undefined ? data.isActive : true,
+        },
     });
-    return vehicleRepo().save(vehicle);
 }
 
 export async function updateVehicle(organizationId: string, id: string, data: any) {
-    const vehicle = await vehicleRepo().findOne({
-        where: { id, organizationId }
+    const vehicle = await prisma.vehicle.findFirst({
+        where: { id, organizationId },
     });
 
     if (!vehicle) {
         throw new NotFoundError('Транспортное средство не найдено');
     }
 
-    Object.assign(vehicle, data);
-    return vehicleRepo().save(vehicle);
+    return prisma.vehicle.update({
+        where: { id },
+        data: {
+            code: data.code,
+            registrationNumber: data.registrationNumber,
+            brand: data.brand,
+            model: data.model,
+            vin: data.vin,
+            fuelType: data.fuelType,
+            fuelTankCapacity: data.fuelTankCapacity ? Number(data.fuelTankCapacity) : undefined,
+            isActive: data.isActive,
+            departmentId: data.departmentId,
+        },
+    });
 }
 
 export async function deleteVehicle(organizationId: string, id: string) {
-    const vehicle = await vehicleRepo().findOne({
-        where: { id, organizationId }
+    const vehicle = await prisma.vehicle.findFirst({
+        where: { id, organizationId },
     });
 
     if (!vehicle) {
         throw new NotFoundError('Транспортное средство не найдено');
     }
 
-    return vehicleRepo().remove(vehicle);
+    return prisma.vehicle.delete({
+        where: { id },
+    });
 }

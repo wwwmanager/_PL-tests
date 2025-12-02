@@ -15,14 +15,26 @@ interface CreateWaybillInput {
     notes?: string;
 }
 
-export async function listWaybills(organizationId: string, filters?: {
+interface ListWaybillsFilters {
     startDate?: string;
     endDate?: string;
     vehicleId?: string;
     driverId?: string;
     status?: WaybillStatus;
-    departmentId?: string; // Added for isolation
-}) {
+    departmentId?: string;
+    search?: string; // поиск по номеру ПЛ
+}
+
+interface PaginationParams {
+    page?: number;
+    limit?: number;
+}
+
+export async function listWaybills(
+    organizationId: string,
+    filters?: ListWaybillsFilters,
+    pagination?: PaginationParams
+) {
     const where: any = {
         organizationId,
     };
@@ -46,11 +58,25 @@ export async function listWaybills(organizationId: string, filters?: {
         if (filters.departmentId) {
             where.departmentId = filters.departmentId;
         }
+        if (filters.search) {
+            where.number = { contains: filters.search, mode: 'insensitive' };
+        }
     }
 
-    return prisma.waybill.findMany({
+    // Pagination defaults
+    const page = pagination?.page ?? 1;
+    const limit = pagination?.limit ?? 50;
+    const skip = (page - 1) * limit;
+
+    // Get total count for pagination
+    const total = await prisma.waybill.count({ where });
+
+    // Get data
+    const data = await prisma.waybill.findMany({
         where,
         orderBy: { date: 'desc' },
+        skip,
+        take: limit,
         include: {
             vehicle: true,
             driver: {
@@ -60,6 +86,16 @@ export async function listWaybills(organizationId: string, filters?: {
             }
         }
     });
+
+    return {
+        data,
+        pagination: {
+            total,
+            page,
+            limit,
+            pages: Math.ceil(total / limit)
+        }
+    };
 }
 
 export async function getWaybillById(organizationId: string, id: string) {
@@ -141,14 +177,99 @@ export async function deleteWaybill(organizationId: string, id: string) {
     return prisma.waybill.delete({ where: { id } });
 }
 
-export async function changeWaybillStatus(organizationId: string, id: string, status: WaybillStatus) {
-    const waybill = await prisma.waybill.findFirst({ where: { id, organizationId } });
+export async function changeWaybillStatus(
+    organizationId: string,
+    id: string,
+    status: WaybillStatus,
+    userId: string
+) {
+    const waybill = await prisma.waybill.findFirst({
+        where: { id, organizationId },
+        include: {
+            fuelLines: {
+                include: {
+                    stockItem: true,
+                },
+            },
+            blank: true,
+        },
+    });
+
     if (!waybill) throw new NotFoundError('Путевой лист не найден');
 
-    // TODO: Add state machine validation here
+    // State machine validation (aligned with schema.prisma)
+    const allowedTransitions: Record<WaybillStatus, WaybillStatus[]> = {
+        [WaybillStatus.DRAFT]: [WaybillStatus.SUBMITTED, WaybillStatus.CANCELLED],
+        [WaybillStatus.SUBMITTED]: [WaybillStatus.POSTED, WaybillStatus.CANCELLED],
+        [WaybillStatus.POSTED]: [], // final state
+        [WaybillStatus.CANCELLED]: [], // final state
+    };
 
-    return prisma.waybill.update({
+    const currentStatus = waybill.status;
+    const allowed = allowedTransitions[currentStatus];
+
+    if (!allowed.includes(status)) {
+        throw new BadRequestError(
+            `Переход из статуса ${currentStatus} в ${status} недопустим`
+        );
+    }
+
+    // Business logic для перехода в POSTED (завершенный ПЛ)
+    if (status === WaybillStatus.POSTED) {
+        // 1. Создать движения расхода топлива
+        const { createExpenseMovement } = await import('./stockService');
+
+        for (const fuelLine of waybill.fuelLines) {
+            if (fuelLine.fuelConsumed && Number(fuelLine.fuelConsumed) > 0) {
+                await createExpenseMovement(
+                    organizationId,
+                    fuelLine.stockItemId,
+                    Number(fuelLine.fuelConsumed),
+                    'WAYBILL',
+                    waybill.id,
+                    userId,
+                    null, // warehouseId - можно доработать, если складов несколько
+                    `Расход по ПЛ №${waybill.number} от ${waybill.date.toISOString().slice(0, 10)}`
+                );
+            }
+        }
+
+        // 2. Обновить статус бланка (ISSUED → USED)
+        if (waybill.blankId && waybill.blank?.status === 'ISSUED') {
+            await prisma.blank.update({
+                where: { id: waybill.blankId },
+                data: {
+                    status: 'USED',
+                    usedAt: new Date(),
+                },
+            });
+        }
+    }
+
+    // Обновляем статус ПЛ
+    const updated = await prisma.waybill.update({
         where: { id },
-        data: { status }
+        data: {
+            status,
+            ...(status === WaybillStatus.POSTED && { completedByUserId: userId }),
+            ...(status === WaybillStatus.SUBMITTED && { approvedByUserId: userId }),
+        },
     });
+
+    // Логируем в audit
+    await prisma.auditLog.create({
+        data: {
+            organizationId,
+            userId,
+            actionType: 'STATUS_CHANGE',
+            entityType: 'WAYBILL',
+            entityId: id,
+            description: `Изменен статус ПЛ №${waybill.number} с ${currentStatus} на ${status}`,
+            oldValue: { status: currentStatus },
+            newValue: { status },
+        },
+    });
+
+    return updated;
 }
+

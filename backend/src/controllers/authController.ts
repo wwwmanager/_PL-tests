@@ -26,13 +26,16 @@ export async function getProfile(req: Request, res: Response, next: NextFunction
             return res.status(404).json({ success: false, error: 'User not found' });
         }
 
+        // Extract role from roles relation (use first role or fallback to 'user')
+        const primaryRole = user.roles[0]?.role.name || 'user';
+
         res.json({
             success: true,
             data: {
                 user: {
                     id: user.id,
                     email: user.email,
-                    role: user.role,
+                    role: primaryRole,
                     displayName: user.fullName,
                     organizationId: user.organizationId
                 }

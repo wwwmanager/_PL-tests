@@ -6,7 +6,7 @@ import { env } from '../config/env';
 // Import entities (will be added incrementally)
 import { Organization } from '../entities/Organization';
 import { Department } from '../entities/Department';
-import { User } from '../entities/User';
+// import { User } from '../entities/User'; // DISABLED: Using Prisma for User
 import { Employee } from '../entities/Employee';
 import { Vehicle } from '../entities/Vehicle';
 import { Waybill } from '../entities/Waybill';
@@ -40,7 +40,7 @@ export const AppDataSource = new DataSource({
     entities: [
         Organization,
         Department,
-        User,
+        // User, // DISABLED: Using Prisma for User authentication
         Employee,
         Vehicle,
         Waybill,
@@ -60,7 +60,8 @@ export const AppDataSource = new DataSource({
     // Development mode: use migrations instead of auto-sync
     // NOTE: synchronize=true auto-creates/updates tables but is NOT safe for production
     // For production, always use migrations
-    synchronize: true,  // Keep true for dev convenience, but use migrations for controlled schema changes
+    // DISABLED: We use Prisma for schema management now
+    synchronize: false,  // Disabled to avoid conflicts with Prisma migrations
 
     // Logging
     logging: true,  // Enabled for debugging

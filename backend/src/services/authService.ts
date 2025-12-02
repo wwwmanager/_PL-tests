@@ -1,16 +1,23 @@
-// authService - TypeORM version
-import { AppDataSource } from '../db/data-source';
-import { User } from '../entities/User';
+// authService - Prisma version
+import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcrypt';
 import { BadRequestError } from '../utils/errors';
 import { signAccessToken } from '../utils/jwt';
 
-const userRepo = () => AppDataSource.getRepository(User);
+const prisma = new PrismaClient();
 
 export async function login(email: string, password: string) {
-    const user = await userRepo().findOne({
+    const user = await prisma.user.findUnique({
         where: { email },
-        relations: { organization: true, department: true }
+        include: {
+            organization: true,
+            department: true,
+            roles: {
+                include: {
+                    role: true
+                }
+            }
+        }
     });
 
     if (!user) {
@@ -26,11 +33,14 @@ export async function login(email: string, password: string) {
         throw new BadRequestError('Пользователь неактивен');
     }
 
+    // Get role (use first role or fallback to 'user')
+    const primaryRole = user.roles[0]?.role.code || 'user';
+
     // Generate JWT token
     const token = signAccessToken({
         id: user.id,
         organizationId: user.organizationId,
-        role: user.role
+        role: primaryRole
     });
 
     // Return formatted response for frontend
@@ -41,7 +51,7 @@ export async function login(email: string, password: string) {
             user: {
                 id: user.id,
                 email: user.email,
-                role: user.role,
+                role: primaryRole,
                 displayName: user.fullName,
                 organizationId: user.organizationId
             }
@@ -50,8 +60,16 @@ export async function login(email: string, password: string) {
 }
 
 export async function findUserById(id: string) {
-    return userRepo().findOne({
+    return prisma.user.findUnique({
         where: { id },
-        relations: { organization: true, department: true }
+        include: {
+            organization: true,
+            department: true,
+            roles: {
+                include: {
+                    role: true
+                }
+            }
+        }
     });
 }

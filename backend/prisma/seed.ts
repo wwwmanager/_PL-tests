@@ -156,12 +156,12 @@ async function main() {
     // ============================================================================
     console.log('Creating users...');
 
-    const passwordHash = await bcrypt.hash('password123', 10);
+    const passwordHash = await bcrypt.hash('123', 10);
 
     const adminUser = await prisma.user.create({
         data: {
             organizationId: org.id,
-            email: 'admin@test.ru',
+            email: 'admin',
             passwordHash,
             fullName: 'Иванов Иван Иванович',
             isActive: true,
@@ -589,7 +589,7 @@ async function main() {
     console.log(`   - 2 waybills`);
     console.log('');
     console.log('🔑 Test credentials:');
-    console.log('   admin@test.ru / password123 (admin)');
+    console.log('   admin / 123 (admin)');
     console.log('   dispatcher@test.ru / password123 (dispatcher)');
     console.log('   mechanic@test.ru / password123 (mechanic)');
 }

@@ -1,19 +1,29 @@
 import { Request, Response, NextFunction } from 'express';
 import * as waybillService from '../services/waybillService';
-import { WaybillStatus } from '../entities/enums';
 
 export async function listWaybills(req: Request, res: Response, next: NextFunction) {
     try {
         const orgId = req.user!.organizationId;
+
+        // Extract filters from query params
         const filters = {
             startDate: req.query.startDate as string | undefined,
             endDate: req.query.endDate as string | undefined,
             vehicleId: req.query.vehicleId as string | undefined,
             driverId: req.query.driverId as string | undefined,
-            status: req.query.status as WaybillStatus | undefined
+            status: req.query.status as any,
+            departmentId: (req.query.departmentId as string) || undefined,
+            search: req.query.search as string | undefined,
         };
-        const waybills = await waybillService.listWaybills(orgId, filters);
-        res.json(waybills);
+
+        // Extract pagination params
+        const pagination = {
+            page: req.query.page ? parseInt(req.query.page as string, 10) : undefined,
+            limit: req.query.limit ? parseInt(req.query.limit as string, 10) : undefined,
+        };
+
+        const result = await waybillService.listWaybills(orgId, filters, pagination);
+        res.json(result);
     } catch (err) {
         next(err);
     }
@@ -90,9 +100,10 @@ export async function deleteWaybill(req: Request, res: Response, next: NextFunct
 export async function changeWaybillStatus(req: Request, res: Response, next: NextFunction) {
     try {
         const orgId = req.user!.organizationId;
+        const userId = req.user!.id;
         const { id } = req.params;
         const { status } = req.body;
-        const waybill = await waybillService.changeWaybillStatus(orgId, id, status);
+        const waybill = await waybillService.changeWaybillStatus(orgId, id, status, userId);
         res.json(waybill);
     } catch (err) {
         next(err);

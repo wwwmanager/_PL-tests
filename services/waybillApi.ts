@@ -37,11 +37,18 @@ async function shouldUseRealApi(): Promise<boolean> {
 }
 
 /**
- * Get all waybills
+ * Get all waybills with optional pagination
  */
-export async function getWaybills() {
+export async function getWaybills(params?: {
+    page?: number;
+    limit?: number;
+    search?: string;
+    status?: string;
+    startDate?: string;
+    endDate?: string;
+}) {
     const useReal = await shouldUseRealApi();
-    return useReal ? realApi.getWaybills() : mockApi.getWaybills();
+    return useReal ? realApi.getWaybills(params) : mockApi.getWaybills();
 }
 
 /**
@@ -112,7 +119,8 @@ export async function getLatestWaybill(): Promise<Waybill | null> {
     const useReal = await shouldUseRealApi();
     if (useReal) {
         // For real API: get all waybills and find the latest
-        const waybills = await realApi.getWaybills();
+        const response = await realApi.getWaybills();
+        const waybills = response.waybills;
         if (waybills.length === 0) return null;
 
         // Sort by date descending and return first

@@ -303,6 +303,34 @@ model Warehouse {
   @@map("warehouses")
 }
 
+model FuelType {
+  id          String   @id @default(uuid()) @db.Uuid
+  code        String   @unique @db.VarChar(20)  // AI-92, DT
+  name        String   @db.Text                  // Бензин АИ-92
+  density     Float?   @db.DoublePrecision       // плотность
+  createdAt   DateTime @default(now()) @db.Timestamp(6)
+  updatedAt   DateTime @updatedAt @db.Timestamp(6)
+  
+  waybillFuels WaybillFuel[]
+  
+  @@map("fuel_types")
+}
+
+model Route {
+  id              String   @id @default(uuid()) @db.Uuid
+  name            String   @db.Text              // "Москва - Санкт-Петербург"
+  startPoint      String?  @db.Text
+  endPoint        String?  @db.Text
+  distance        Float?   @db.DoublePrecision   // км
+  estimatedTime   Int?                           // минуты
+  createdAt       DateTime @default(now()) @db.Timestamp(6)
+  updatedAt       DateTime @updatedAt @db.Timestamp(6)
+  
+  waybillRoutes WaybillRoute[]
+  
+  @@map("routes")
+}
+
 model StockMovement {
   id              String            @id @default(uuid()) @db.Uuid
   organizationId  String            @db.Uuid
@@ -419,6 +447,7 @@ model Waybill {
 model WaybillRoute {
   id          String   @id @default(uuid()) @db.Uuid
   waybillId   String   @db.Uuid
+  routeId     String?  @db.Uuid
   legOrder    Int
   fromPoint   String?  @db.Text
   toPoint     String?  @db.Text
@@ -428,6 +457,7 @@ model WaybillRoute {
   comment     String?  @db.Text
 
   waybill Waybill @relation(fields: [waybillId], references: [id], onDelete: Cascade)
+  route   Route?  @relation(fields: [routeId], references: [id], onDelete: SetNull)
 
   @@map("waybill_routes")
 }
@@ -436,14 +466,16 @@ model WaybillFuel {
   id           String   @id @default(uuid()) @db.Uuid
   waybillId    String   @db.Uuid
   stockItemId  String   @db.Uuid
+  fuelTypeId   String?  @db.Uuid
   fuelStart    Decimal? @db.Decimal(10, 2)
   fuelReceived Decimal? @db.Decimal(10, 2)
   fuelConsumed Decimal? @db.Decimal(10, 2)
   fuelEnd      Decimal? @db.Decimal(10, 2)
   comment      String?  @db.Text
 
-  waybill   Waybill   @relation(fields: [waybillId], references: [id], onDelete: Cascade)
-  stockItem StockItem @relation(fields: [stockItemId], references: [id], onDelete: Restrict)
+  waybill   Waybill    @relation(fields: [waybillId], references: [id], onDelete: Cascade)
+  stockItem StockItem  @relation(fields: [stockItemId], references: [id], onDelete: Restrict)
+  fuelType  FuelType?  @relation(fields: [fuelTypeId], references: [id], onDelete: SetNull)
 
   @@map("waybill_fuel")
 }

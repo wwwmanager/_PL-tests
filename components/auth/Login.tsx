@@ -6,8 +6,8 @@ import { useToast } from '../../hooks/useToast';
 const Login: React.FC = () => {
   const { login } = useAuth();
   const { showToast } = useToast();
-  const [email, setEmail] = useState('admin@example.com'); // для удобства dev
-  const [password, setPassword] = useState('password');
+  const [email, setEmail] = useState('admin'); // для удобства dev
+  const [password, setPassword] = useState('123');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -45,7 +45,8 @@ const Login: React.FC = () => {
             Email
           </label>
           <input
-            type="email"
+            data-testid="login-email"
+            type="text"
             className="w-full border rounded p-2 bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
@@ -60,6 +61,7 @@ const Login: React.FC = () => {
             Пароль
           </label>
           <input
+            data-testid="login-password"
             type="password"
             className="w-full border rounded p-2 bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100"
             value={password}
@@ -70,6 +72,7 @@ const Login: React.FC = () => {
         </div>
 
         <button
+          data-testid="login-submit"
           type="submit"
           disabled={loading}
           className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 disabled:opacity-50"

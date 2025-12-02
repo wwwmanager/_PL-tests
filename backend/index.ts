@@ -48,14 +48,14 @@ interface User {
 const users: Array<User & { password: string }> = [
     {
         id: 'u-admin',
-        email: 'admin@example.com',
+        email: 'admin',
         displayName: 'Администратор',
         role: 'admin',
         extraCaps: [],
         isActive: true,
         createdAt: new Date().toISOString(),
         lastLoginAt: undefined,
-        password: 'Admin123!', // ТОЛЬКО для демо. В бою нужен хэш пароля.
+        password: '123', // ТОЛЬКО для демо. В бою нужен хэш пароля.
     },
     {
         id: 'u-driver',

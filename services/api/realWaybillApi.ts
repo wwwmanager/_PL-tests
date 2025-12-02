@@ -15,13 +15,62 @@ import { toBackendStatus } from './waybillStatusMap';
 import type { BackendWaybillDto, FrontWaybill } from './waybillApiTypes';
 import type { FrontWaybillStatus } from './waybillStatusMap';
 
+interface GetWaybillsParams {
+    page?: number;
+    limit?: number;
+    search?: string;
+    status?: string;
+    startDate?: string;
+    endDate?: string;
+    vehicleId?: string;
+    driverId?: string;
+}
+
+interface PaginatedWaybillsResponse {
+    waybills: FrontWaybill[];
+    pagination?: {
+        total: number;
+        page: number;
+        limit: number;
+        pages: number;
+    };
+}
+
 /**
- * Get list of all waybills
- * Signature matches: mockApi.getWaybills()
+ * Get all waybills with optional filtering and pagination
  */
-export async function getWaybills(): Promise<FrontWaybill[]> {
-    const data = await http.get<BackendWaybillDto[]>('/waybills');
-    return data.map(mapBackendWaybillToFront);
+export async function getWaybills(params?: GetWaybillsParams): Promise<PaginatedWaybillsResponse> {
+    // Build query string from params
+    const queryParams = new URLSearchParams();
+    if (params?.page) queryParams.append('page', params.page.toString());
+    if (params?.limit) queryParams.append('limit', params.limit.toString());
+    if (params?.search) queryParams.append('search', params.search);
+    if (params?.status) queryParams.append('status', params.status);
+    if (params?.startDate) queryParams.append('startDate', params.startDate);
+    if (params?.endDate) queryParams.append('endDate', params.endDate);
+    if (params?.vehicleId) queryParams.append('vehicleId', params.vehicleId);
+    if (params?.driverId) queryParams.append('driverId', params.driverId);
+
+    const queryString = queryParams.toString();
+    const url = queryString ? `/waybills?${queryString}` : '/waybills';
+
+    const response = await http.get<{
+        data: BackendWaybillDto[];
+        pagination?: {
+            total: number;
+            page: number;
+            limit: number;
+            pages: number;
+        };
+    }>(url);
+
+    // Map backend waybills to frontend format
+    const waybills = response.data.map(mapBackendWaybillToFront);
+
+    return {
+        waybills,
+        pagination: response.pagination,
+    };
 }
 
 /**

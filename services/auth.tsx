@@ -161,21 +161,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         }
       }
 
-      // Если нет токена - проверяем режим приложения
-      const settings = await getAppSettings().catch(() => null);
-      const isCentralMode = settings?.appMode === 'central';
-
-      if (import.meta.env.DEV && !isCentralMode) {
-        const dev: User = {
-          id: 'dev-driver',
-          role: 'driver',
-          displayName: 'Driver (DEV)',
-        };
-        setCurrentUser(dev);
-        await saveJSON(CURRENT_USER_KEY, dev);
-      } else {
-        setCurrentUser(null);
-      }
+      // DISABLED FOR E2E: Auto-login as dev-driver blocks Playwright tests
+      setCurrentUser(null);
     })();
 
     const unsubscribe = subscribe((msg) => {
