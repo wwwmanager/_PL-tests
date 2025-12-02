@@ -19,7 +19,7 @@ export interface WaybillsResponse {
     page: number;
     limit: number;
     totalPages: number;
-    pagination?: {  // Added for compatibility with new paginated API
+    pagination?: {
         total: number;
         page: number;
         limit: number;
@@ -38,33 +38,34 @@ export async function getWaybills(filters: WaybillFilters = {}): Promise<Waybill
     if (filters.page) params.append('page', String(filters.page));
     if (filters.limit) params.append('limit', String(filters.limit));
 
-    const response = await httpClient.get<{ success: boolean; data: WaybillsResponse }>(
+    const response = await httpClient.get<{ data: Waybill[]; pagination: { total: number; page: number; limit: number; pages: number } }>(
         `/waybills?${params.toString()}`
     );
-    return response.data;
+
+    // Adapt new backend format {data, pagination} to old WaybillsResponse format
+    return {
+        waybills: response.data,
+        total: response.pagination.total,
+        page: response.pagination.page,
+        limit: response.pagination.limit,
+        totalPages: response.pagination.pages,
+        pagination: response.pagination
+    };
 }
 
 export async function getWaybillById(id: string): Promise<Waybill> {
-    const response = await httpClient.get<{ success: boolean; data: { waybill: Waybill } }>(
-        `/waybills/${id}`
-    );
-    return response.data.data.waybill;
+    const response = await httpClient.get<Waybill>(`/waybills/${id}`);
+    return response;
 }
 
 export async function createWaybill(data: Partial<Waybill>): Promise<Waybill> {
-    const response = await httpClient.post<{ success: boolean; data: { waybill: Waybill } }>(
-        '/waybills',
-        data
-    );
-    return response.data.data.waybill;
+    const response = await httpClient.post<Waybill>('/waybills', data);
+    return response;
 }
 
 export async function updateWaybill(id: string, data: Partial<Waybill>): Promise<Waybill> {
-    const response = await httpClient.put<{ success: boolean; data: { waybill: Waybill } }>(
-        `/waybills/${id}`,
-        data
-    );
-    return response.data.data.waybill;
+    const response = await httpClient.put<Waybill>(`/waybills/${id}`, data);
+    return response;
 }
 
 export async function deleteWaybill(id: string): Promise<void> {
@@ -82,11 +83,8 @@ export async function getLastWaybillForVehicle(vehicleId: string): Promise<Waybi
 }
 
 export async function changeWaybillStatus(id: string, status: string): Promise<Waybill> {
-    const response = await httpClient.patch<{ success: boolean; data: { waybill: Waybill } }>(
-        `/waybills/${id}/status`,
-        { status }
-    );
-    return response.data.data.waybill;
+    const response = await httpClient.patch<Waybill>(`/waybills/${id}/status`, { status });
+    return response;
 }
 
 export { createWaybill as addWaybill };
