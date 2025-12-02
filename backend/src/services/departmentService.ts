@@ -1,9 +1,8 @@
 // Department Service - CRUD operations for departments
-import { AppDataSource } from '../db/data-source';
-import { Department } from '../entities/Department';
+import { PrismaClient, Prisma } from '@prisma/client';
 import { BadRequestError } from '../utils/errors';
 
-const departmentRepo = () => AppDataSource.getRepository(Department);
+const prisma = new PrismaClient();
 
 export interface DepartmentFilters {
     organizationId?: string;
@@ -18,19 +17,28 @@ export async function getDepartments(filters: DepartmentFilters = {}) {
         limit = 100,
     } = filters;
 
-    const query = departmentRepo()
-        .createQueryBuilder('department')
-        .leftJoinAndSelect('department.organization', 'organization')
-        .orderBy('department.name', 'ASC');
+    const where: Prisma.DepartmentWhereInput = {};
 
     if (organizationId) {
-        query.andWhere('department.organizationId = :organizationId', { organizationId });
+        where.organizationId = organizationId;
     }
 
     const skip = (page - 1) * limit;
-    query.skip(skip).take(limit);
 
-    const [departments, total] = await query.getManyAndCount();
+    const [departments, total] = await Promise.all([
+        prisma.department.findMany({
+            where,
+            include: {
+                organization: true,
+            },
+            orderBy: {
+                name: 'asc',
+            },
+            skip,
+            take: limit,
+        }),
+        prisma.department.count({ where }),
+    ]);
 
     return {
         departments,
@@ -41,10 +49,10 @@ export async function getDepartments(filters: DepartmentFilters = {}) {
     };
 }
 
-export async function getDepartmentById(id: string): Promise<Department | null> {
-    return await departmentRepo().findOne({
+export async function getDepartmentById(id: string) {
+    return prisma.department.findUnique({
         where: { id },
-        relations: {
+        include: {
             organization: true,
         },
     });
@@ -55,15 +63,15 @@ export async function createDepartment(data: {
     code?: string;
     name: string;
     address?: string;
-}): Promise<Department> {
-    const department = departmentRepo().create({
-        organizationId: data.organizationId,
-        code: data.code || null,
-        name: data.name,
-        address: data.address || null,
+}) {
+    return prisma.department.create({
+        data: {
+            organizationId: data.organizationId,
+            code: data.code || null,
+            name: data.name,
+            address: data.address || null,
+        },
     });
-
-    return await departmentRepo().save(department);
 }
 
 export async function updateDepartment(
@@ -73,20 +81,25 @@ export async function updateDepartment(
         name: string;
         address: string;
     }>
-): Promise<Department> {
-    const department = await getDepartmentById(id);
+) {
+    const department = await prisma.department.findUnique({
+        where: { id },
+    });
 
     if (!department) {
         throw new BadRequestError('Department not found');
     }
 
-    Object.assign(department, data);
-
-    return await departmentRepo().save(department);
+    return prisma.department.update({
+        where: { id },
+        data,
+    });
 }
 
 export async function deleteDepartment(id: string): Promise<void> {
-    const department = await getDepartmentById(id);
+    const department = await prisma.department.findUnique({
+        where: { id },
+    });
 
     if (!department) {
         throw new BadRequestError('Department not found');
@@ -96,5 +109,7 @@ export async function deleteDepartment(id: string): Promise<void> {
     // For now, allow deletion - FK constraints will handle it
     // TODO: Add dependency check if needed
 
-    await departmentRepo().remove(department);
+    await prisma.department.delete({
+        where: { id },
+    });
 }

@@ -13,6 +13,13 @@ interface CreateWaybillInput {
     odometerEnd?: number;
     plannedRoute?: string;
     notes?: string;
+    fuelLines?: Array<{
+        stockItemId: string;
+        fuelStart?: number;
+        fuelReceived?: number;
+        fuelConsumed?: number;
+        fuelEnd?: number;
+    }>;
 }
 
 interface ListWaybillsFilters {
@@ -131,7 +138,7 @@ export async function createWaybill(organizationId: string, input: CreateWaybill
     });
     if (!driver) throw new BadRequestError('Водитель не найден');
 
-    // Create waybill
+    // Create waybill with fuelLines
     return prisma.waybill.create({
         data: {
             organizationId,
@@ -145,7 +152,19 @@ export async function createWaybill(organizationId: string, input: CreateWaybill
             odometerEnd: input.odometerEnd,
             plannedRoute: input.plannedRoute,
             notes: input.notes,
-            status: WaybillStatus.DRAFT
+            status: WaybillStatus.DRAFT,
+            fuelLines: input.fuelLines ? {
+                create: input.fuelLines.map(fl => ({
+                    stockItemId: fl.stockItemId,
+                    fuelStart: fl.fuelStart,
+                    fuelReceived: fl.fuelReceived,
+                    fuelConsumed: fl.fuelConsumed,
+                    fuelEnd: fl.fuelEnd,
+                }))
+            } : undefined
+        },
+        include: {
+            fuelLines: true
         }
     });
 }

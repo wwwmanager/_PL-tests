@@ -1,18 +1,15 @@
 // Audit Service - Save and retrieve audit logs
-import { AppDataSource } from '../db/data-source';
-import { AuditLog } from '../entities/AuditLog';
-import { AuditActionType } from '../entities/enums';
+import { PrismaClient, Prisma, AuditActionType } from '@prisma/client';
 
-const auditRepo = () => AppDataSource.getRepository(AuditLog);
+const prisma = new PrismaClient();
 
 export interface CreateAuditLogDto {
     userId: string;
     action: AuditActionType;
     entityType: string;
     entityId?: string;
-    changes?: Record<string, any>;
-    ipAddress?: string;
-    userAgent?: string;
+    changes?: Record<string, any>; // Will be saved to newValue for now
+    description?: string;
 }
 
 export interface AuditLogFilters {
@@ -26,18 +23,17 @@ export interface AuditLogFilters {
     limit?: number;
 }
 
-export async function createAuditLog(data: CreateAuditLogDto): Promise<AuditLog> {
-    const log = auditRepo().create({
-        userId: data.userId,
-        action: data.action,
-        entityType: data.entityType,
-        entityId: data.entityId || null,
-        changes: data.changes || null,
-        ipAddress: data.ipAddress || null,
-        userAgent: data.userAgent || null,
+export async function createAuditLog(data: CreateAuditLogDto) {
+    return prisma.auditLog.create({
+        data: {
+            userId: data.userId,
+            actionType: data.action, // Map action -> actionType
+            entityType: data.entityType,
+            entityId: data.entityId || null,
+            description: data.description || null,
+            newValue: data.changes ? (data.changes as any) : Prisma.JsonNull,
+        },
     });
-
-    return await auditRepo().save(log);
 }
 
 export async function getAuditLogs(filters: AuditLogFilters = {}) {
@@ -52,39 +48,48 @@ export async function getAuditLogs(filters: AuditLogFilters = {}) {
         limit = 50,
     } = filters;
 
-    const query = auditRepo()
-        .createQueryBuilder('audit')
-        .leftJoinAndSelect('audit.user', 'user')
-        .orderBy('audit.createdAt', 'DESC');
+    const where: Prisma.AuditLogWhereInput = {};
 
     if (userId) {
-        query.andWhere('audit.userId = :userId', { userId });
+        where.userId = userId;
     }
 
     if (action) {
-        query.andWhere('audit.action = :action', { action });
+        where.actionType = action; // Map action -> actionType
     }
 
     if (entityType) {
-        query.andWhere('audit.entityType = :entityType', { entityType });
+        where.entityType = entityType;
     }
 
     if (entityId) {
-        query.andWhere('audit.entityId = :entityId', { entityId });
+        where.entityId = entityId;
     }
 
     if (startDate) {
-        query.andWhere('audit.createdAt >= :startDate', { startDate });
+        where.createdAt = { ...where.createdAt as Prisma.DateTimeFilter, gte: startDate };
     }
 
     if (endDate) {
-        query.andWhere('audit.createdAt <= :endDate', { endDate });
+        where.createdAt = { ...where.createdAt as Prisma.DateTimeFilter, lte: endDate };
     }
 
     const skip = (page - 1) * limit;
-    query.skip(skip).take(limit);
 
-    const [logs, total] = await query.getManyAndCount();
+    const [logs, total] = await Promise.all([
+        prisma.auditLog.findMany({
+            where,
+            include: {
+                user: true,
+            },
+            orderBy: {
+                createdAt: 'desc',
+            },
+            skip,
+            take: limit,
+        }),
+        prisma.auditLog.count({ where }),
+    ]);
 
     return {
         logs,
@@ -95,33 +100,34 @@ export async function getAuditLogs(filters: AuditLogFilters = {}) {
     };
 }
 
-export async function getAuditLogById(id: string): Promise<AuditLog | null> {
-    return await auditRepo().findOne({
+export async function getAuditLogById(id: string) {
+    return prisma.auditLog.findUnique({
         where: { id },
-        relations: { user: true },
+        include: { user: true },
     });
 }
 
 export async function getAuditLogStats() {
-    const totalLogs = await auditRepo().count();
+    const totalLogs = await prisma.auditLog.count();
 
-    const actionStats = await auditRepo()
-        .createQueryBuilder('audit')
-        .select('audit.action', 'action')
-        .addSelect('COUNT(*)', 'count')
-        .groupBy('audit.action')
-        .getRawMany();
+    const actionStats = await prisma.auditLog.groupBy({
+        by: ['actionType'], // Map action -> actionType
+        _count: {
+            actionType: true,
+        },
+    });
 
-    const recentActivity = await auditRepo()
-        .createQueryBuilder('audit')
-        .where('audit.createdAt >= :date', {
-            date: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) // last 7 days
-        })
-        .getCount();
+    const recentActivity = await prisma.auditLog.count({
+        where: {
+            createdAt: {
+                gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000), // last 7 days
+            },
+        },
+    });
 
     return {
         totalLogs,
-        actionStats,
+        actionStats: actionStats.map(stat => ({ action: stat.actionType, count: stat._count.actionType })),
         recentActivity,
     };
 }

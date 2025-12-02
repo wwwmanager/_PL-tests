@@ -1,9 +1,8 @@
 // Employee Service - CRUD operations for employees
-import { AppDataSource } from '../db/data-source';
-import { Employee } from '../entities/Employee';
+import { PrismaClient, Prisma } from '@prisma/client';
 import { BadRequestError } from '../utils/errors';
 
-const employeeRepo = () => AppDataSource.getRepository(Employee);
+const prisma = new PrismaClient();
 
 export interface EmployeeFilters {
     organizationId?: string;
@@ -22,28 +21,37 @@ export async function getEmployees(filters: EmployeeFilters = {}) {
         limit = 100,
     } = filters;
 
-    const query = employeeRepo()
-        .createQueryBuilder('employee')
-        .leftJoinAndSelect('employee.organization', 'organization')
-        .leftJoinAndSelect('employee.department', 'department')
-        .orderBy('employee.fullName', 'ASC');
+    const where: Prisma.EmployeeWhereInput = {};
 
     if (organizationId) {
-        query.andWhere('employee.organizationId = :organizationId', { organizationId });
+        where.organizationId = organizationId;
     }
 
     if (departmentId) {
-        query.andWhere('employee.departmentId = :departmentId', { departmentId });
+        where.departmentId = departmentId;
     }
 
     if (isActive !== undefined) {
-        query.andWhere('employee.isActive = :isActive', { isActive });
+        where.isActive = isActive;
     }
 
     const skip = (page - 1) * limit;
-    query.skip(skip).take(limit);
 
-    const [employees, total] = await query.getManyAndCount();
+    const [employees, total] = await Promise.all([
+        prisma.employee.findMany({
+            where,
+            include: {
+                organization: true,
+                department: true,
+            },
+            orderBy: {
+                fullName: 'asc',
+            },
+            skip,
+            take: limit,
+        }),
+        prisma.employee.count({ where }),
+    ]);
 
     return {
         employees,
@@ -54,10 +62,10 @@ export async function getEmployees(filters: EmployeeFilters = {}) {
     };
 }
 
-export async function getEmployeeById(id: string): Promise<Employee | null> {
-    return employeeRepo().findOne({
+export async function getEmployeeById(id: string) {
+    return prisma.employee.findUnique({
         where: { id },
-        relations: {
+        include: {
             organization: true,
             department: true,
         },
@@ -70,16 +78,16 @@ export async function createEmployee(data: {
     fullName: string;
     position: string;
     isActive?: boolean;
-}): Promise<Employee> {
-    const employee = employeeRepo().create({
-        organizationId: data.organizationId,
-        departmentId: data.departmentId || null,
-        fullName: data.fullName,
-        position: data.position,
-        isActive: data.isActive !== undefined ? data.isActive : true,
+}) {
+    return prisma.employee.create({
+        data: {
+            organizationId: data.organizationId,
+            departmentId: data.departmentId || null,
+            fullName: data.fullName,
+            position: data.position,
+            isActive: data.isActive !== undefined ? data.isActive : true,
+        },
     });
-
-    return employeeRepo().save(employee);
 }
 
 export async function updateEmployee(
@@ -90,26 +98,33 @@ export async function updateEmployee(
         position: string;
         isActive: boolean;
     }>
-): Promise<Employee> {
-    const employee = await getEmployeeById(id);
+) {
+    const employee = await prisma.employee.findUnique({
+        where: { id },
+    });
 
     if (!employee) {
         throw new BadRequestError('Employee not found');
     }
 
-    Object.assign(employee, data);
-
-    return employeeRepo().save(employee);
+    return prisma.employee.update({
+        where: { id },
+        data,
+    });
 }
 
 export async function deleteEmployee(id: string): Promise<void> {
-    const employee = await getEmployeeById(id);
+    const employee = await prisma.employee.findUnique({
+        where: { id },
+    });
 
     if (!employee) {
         throw new BadRequestError('Employee not found');
     }
 
     // Soft delete - set isActive to false
-    employee.isActive = false;
-    await employeeRepo().save(employee);
+    await prisma.employee.update({
+        where: { id },
+        data: { isActive: false },
+    });
 }

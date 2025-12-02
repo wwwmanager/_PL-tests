@@ -12,22 +12,31 @@ declare module 'express-serve-static-core' {
     }
 }
 
-export function authMiddleware(req: Request, res: Response, next: NextFunction) {
+export const authMiddleware = (req: Request, res: Response, next: NextFunction) => {
     const header = req.headers.authorization;
+    console.log('[authMiddleware] Authorization header:', header ? `Bearer ${header.substring(0, 20)}...` : 'MISSING');
+
     if (!header || !header.startsWith('Bearer ')) {
+        console.log('[authMiddleware] No valid Bearer token');
         return next(new UnauthorizedError('Требуется авторизация'));
     }
 
     const token = header.substring('Bearer '.length);
+    console.log('[authMiddleware] Token length:', token.length);
+
     try {
         const payload = verifyAccessToken(token);
+        console.log('[authMiddleware] Decoded payload:', JSON.stringify(payload, null, 2));
+
         req.user = {
             id: payload.sub,
             organizationId: payload.organizationId,
-            role: payload.role
+            role: payload.role,
         };
+        console.log('[authMiddleware] req.user set:', req.user);
         next();
-    } catch {
+    } catch (err: any) {
+        console.error('[authMiddleware] Token verification error:', err.name, err.message);
         next(new UnauthorizedError('Неверный или истёкший токен'));
     }
-}
+};

@@ -10,6 +10,8 @@ import { router as organizationRoutes } from './organizationRoutes';
 import { router as warehouseRoutes } from './warehouseRoutes';
 import { router as fuelTypeRoutes } from './fuelTypeRoutes';
 import { router as routeRoutes } from './routeRoutes';
+import { router as stockRoutes } from './stockRoutes';
+import { router as driverRoutes } from './driverRoutes';
 
 export const router = Router();
 
@@ -24,6 +26,8 @@ router.use('/organizations', organizationRoutes);
 router.use('/warehouses', warehouseRoutes);
 router.use('/fuel-types', fuelTypeRoutes);
 router.use('/routes', routeRoutes);
+router.use('/stock', stockRoutes);
+router.use('/drivers', driverRoutes);
 
 // Health check endpoint
 router.get('/health', (req, res) => {

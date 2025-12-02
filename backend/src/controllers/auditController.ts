@@ -1,7 +1,7 @@
 // Audit Controller - Handle audit log requests
 import { Request, Response, NextFunction } from 'express';
 import * as auditService from '../services/auditService';
-import { AuditActionType } from '../entities/enums';
+import { AuditActionType } from '@prisma/client';
 
 export async function getAuditLogs(req: Request, res: Response, next: NextFunction) {
     try {
