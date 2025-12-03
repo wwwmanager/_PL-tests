@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { FuelType } from '../../types';
-import { getFuelTypes, addFuelType, updateFuelType, deleteFuelType } from '../../services/mockApi';
+import { getFuelTypes, createFuelType, updateFuelType, deleteFuelType } from '../../services/api/fuelTypeApi';
 import { PencilIcon, TrashIcon, PlusIcon, ArrowUpIcon, ArrowDownIcon } from '../Icons';
 import useTable from '../../hooks/useTable';
 import Modal from '../shared/Modal';
@@ -131,9 +131,9 @@ const FuelTypeManagement = () => {
     setIsSaving(true);
     try {
       if ('id' in currentItem && currentItem.id) {
-        await updateFuelType({ ...currentItem, name, code } as FuelType);
+        await updateFuelType(currentItem.id, { ...currentItem, name, code } as FuelType);
       } else {
-        await addFuelType({ name, code, density: currentItem.density! });
+        await createFuelType({ name, code, density: currentItem.density! });
       }
       showToast('Изменения сохранены', 'success');
       handleCancel();

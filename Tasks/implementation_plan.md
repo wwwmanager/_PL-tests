@@ -197,20 +197,6 @@ export function getAccessToken(): string | null {
         accessToken = localStorage.getItem(TOKEN_KEY);
     }
     return accessToken;
-}
-```
-
----
-
-### Phase 4: Backend Support
-
-#### [CHECK] Backend auth endpoint
-
-Сейчас `auth.tsx` ожидает формат:
-```typescript
-{
-  success: true,
-  data: {
     token: string,
     user: User
   }

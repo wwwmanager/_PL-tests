@@ -51,21 +51,6 @@
 
 ### 3.1. Frontend
 
-- **Основная архитектура:**
-  - DDD‑подход в `services/domain/*` (инварианты, state machines).
-  - Огромный `mockApi.ts` (≈96KB) реализует всю бизнес‑логику и хранение в IndexedDB для Driver/offline режима.
-  - Введён **adapter‑слой** для интеграции с backend:
-    - Например, для путевых листов:
-      - `realWaybillApi.ts` — ходит на backend (`/api/waybills`),
-      - `waybillApi.ts` — фасад, выбирающий mockApi или realApi по флагу.
-- **Режимы:**
-  - Driver Mode:
-    - полностью автономный, данные только в IndexedDB,
-    - упрощённый workflow: `draft → posted`,
-    - localhost‑специфичные dev‑фичи: возможен DEV‑автологин (см. ниже).
-  - Central Mode:
-    - **целевой** режим: данные должны приходить из backend (PostgreSQL),
-    - более сложный workflow: `draft → submitted → posted → cancelled`,
     - вход по login/password через backend API.
 
 ### 3.2. Backend

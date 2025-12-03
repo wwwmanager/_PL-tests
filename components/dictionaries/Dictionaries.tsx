@@ -6,7 +6,7 @@ import OrganizationManagement from '../admin/OrganizationManagement';
 // FIX: Changed import to named import as VehicleList is not a default export.
 import { VehicleList } from '../vehicles/VehicleList';
 import EmployeeList from '../employees/EmployeeList';
-import RouteManagement from './RouteManagement';
+import RouteList from '../routes/RouteList';
 import { DictionaryType } from '../../types';
 
 const GarageManagement = lazy(() => import('./GarageManagement'));
@@ -22,7 +22,7 @@ interface DictionariesProps {
 }
 
 const Dictionaries: React.FC<DictionariesProps> = ({ subViewToOpen }) => {
-    
+
     const allDicts: { type: DictionaryType; label: string; }[] = [
         { type: 'fuelTypes', label: 'Типы топлива' },
         { type: 'organizations', label: 'Организации' },
@@ -54,13 +54,12 @@ const Dictionaries: React.FC<DictionariesProps> = ({ subViewToOpen }) => {
     }, [subViewToOpen]);
 
     const DictionaryButton: React.FC<DictionaryButtonProps> = ({ dictType, label }) => (
-        <button 
-            onClick={() => setActiveDictionary(dictType)} 
-            className={`px-3 py-1 rounded-md text-sm transition-colors ${
-                activeDictionary === dictType 
-                ? 'bg-blue-500 text-white shadow' 
+        <button
+            onClick={() => setActiveDictionary(dictType)}
+            className={`px-3 py-1 rounded-md text-sm transition-colors ${activeDictionary === dictType
+                ? 'bg-blue-500 text-white shadow'
                 : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600'
-            }`}
+                }`}
         >
             {label}
         </button>
@@ -76,25 +75,25 @@ const Dictionaries: React.FC<DictionariesProps> = ({ subViewToOpen }) => {
             </div>
         </div>
     );
-    
+
     const renderActiveDictionary = () => {
-        switch(activeDictionary) {
+        switch (activeDictionary) {
             case 'fuelTypes': return <FuelTypeManagement />;
             case 'organizations': return <OrganizationManagement />;
             case 'vehicles': return <VehicleList />;
             case 'employees': return <EmployeeList />;
             case 'storageLocations': return <Suspense fallback={<div>Загрузка...</div>}><StorageManagement /></Suspense>;
-            case 'routes': return <RouteManagement />;
+            case 'routes': return <RouteList />;
             default: return <p>Выберите справочник.</p>;
         }
     }
 
     return (
         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 space-y-6">
-             <div className="flex justify-between items-center">
+            <div className="flex justify-between items-center">
                 <h2 className="text-2xl font-bold text-gray-800 dark:text-white">Справочники</h2>
             </div>
-            
+
             <DictionarySubMenu />
 
             <div className="overflow-x-auto">

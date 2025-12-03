@@ -184,19 +184,59 @@ model UserRole {
 // ============================================================================
 
 model Employee {
-  id             String   @id @default(uuid()) @db.Uuid
-  organizationId String   @db.Uuid
-  departmentId   String?  @db.Uuid
-  fullName       String   @db.Text
-  position       String?  @db.Text
-  phone          String?  @db.Text
-  isActive       Boolean  @default(true)
-  createdAt      DateTime @default(now()) @db.Timestamp(6)
-  updatedAt      DateTime @default(now()) @updatedAt @db.Timestamp(6)
+  id                           String    @id @default(uuid()) @db.Uuid
+  organizationId               String    @db.Uuid
+  departmentId                 String?   @db.Uuid
+  
+  fullName                     String    @db.Text
+  shortName                    String?   @db.Text
+  employeeType                 String    @default("driver") @db.Text  // driver, dispatcher, controller, etc.
+  position                     String?   @db.Text
+  status                       String    @default("Active") @db.Text  // Active, Inactive
+  
+  phone                        String?   @db.Text
+  address                      String?   @db.Text
+  email                        String?   @db.Text
+  dateOfBirth                  String?   @db.Text  // stored as string in frontend
+  
+  personnelNumber              String?   @db.Text
+  snils                        String?   @db.Text
+  
+  licenseCategory              String?   @db.Text
+  documentNumber               String?   @db.Text
+  documentExpiry               String?   @db.Text  // date as string
+  
+  medicalCertificateSeries     String?   @db.Text
+  medicalCertificateNumber     String?   @db.Text
+  medicalCertificateIssueDate  String?   @db.Text  // date as string
+  medicalCertificateExpiryDate String?   @db.Text  // date as string
+  medicalInstitutionId         String?   @db.Uuid
+  
+  driverCardType               String?   @db.Text
+  driverCardNumber             String?   @db.Text
+  driverCardStartDate          String?   @db.Text  // date as string
+  driverCardExpiryDate         String?   @db.Text  // date as string
+  
+  fuelCardNumber               String?   @db.Text
+  fuelCardBalance              Float     @default(0) @db.DoublePrecision
+  
+  dispatcherId                 String?   @db.Uuid
+  controllerId                 String?   @db.Uuid
+  
+  notes                        String?   @db.Text
+  isActive                     Boolean   @default(true)
+  
+  createdAt                    DateTime  @default(now()) @db.Timestamp(6)
+  updatedAt                    DateTime  @default(now()) @updatedAt @db.Timestamp(6)
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  department   Department?  @relation(fields: [departmentId], references: [id], onDelete: SetNull)
-  driver       Driver?
+  organization         Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  department           Department?   @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  dispatcher           Employee?     @relation("EmployeeDispatcher", fields: [dispatcherId], references: [id], onDelete: SetNull)
+  controller           Employee?     @relation("EmployeeController", fields: [controllerId], references: [id], onDelete: SetNull)
+  
+  assignedDrivers      Employee[]    @relation("EmployeeDispatcher")
+  controlledEmployees  Employee[]    @relation("EmployeeController")
+  driver               Driver?
 
   @@map("employees")
 }

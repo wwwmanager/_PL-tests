@@ -156,7 +156,10 @@ const EmployeeList: React.FC = () => {
     const fetchData = async () => {
         try {
             setIsLoading(true);
-            const [employeesData, orgsData] = await Promise.all([getEmployees(), getOrganizations()]);
+            const [employeesData, orgsData] = await Promise.all([
+                getEmployees({ isActive: true }), // Only fetch active employees
+                getOrganizations()
+            ]);
             setEmployees(employeesData);
             setOrganizations(orgsData);
             setErrors({});

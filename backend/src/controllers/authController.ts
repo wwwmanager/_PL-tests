@@ -27,7 +27,7 @@ export async function getProfile(req: Request, res: Response, next: NextFunction
         }
 
         // Extract role from roles relation (use first role or fallback to 'user')
-        const primaryRole = user.roles[0]?.role.name || 'user';
+        const primaryRole = user.roles[0]?.role.code || 'user';
 
         res.json({
             success: true,

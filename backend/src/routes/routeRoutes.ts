@@ -1,24 +1,23 @@
 import { Router } from 'express';
+import * as routeController from '../controllers/routeController';
 import { authMiddleware } from '../middleware/authMiddleware';
-import {
-    listRoutes,
-    createRoute,
-    updateRoute,
-    deleteRoute
-} from '../controllers/routeController';
 
 export const router = Router();
 
+// All route routes require authentication
 router.use(authMiddleware);
 
-// GET /api/routes - список маршрутов
-router.get('/', listRoutes);
+// GET /api/routes - List all routes
+router.get('/', routeController.listRoutes);
 
-// POST /api/routes - создать маршрут
-router.post('/', createRoute);
+// GET /api/routes/:id - Get route by ID
+router.get('/:id', routeController.getRouteById);
 
-// PUT /api/routes/:id - обновить маршрут
-router.put('/:id', updateRoute);
+// POST /api/routes - Create new route
+router.post('/', routeController.createRoute);
 
-// DELETE /api/routes/:id - удалить маршрут
-router.delete('/:id', deleteRoute);
+// PUT /api/routes/:id - Update route
+router.put('/:id', routeController.updateRoute);
+
+// DELETE /api/routes/:id - Delete route
+router.delete('/:id', routeController.deleteRoute);

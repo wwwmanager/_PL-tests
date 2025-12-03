@@ -1,24 +1,24 @@
 import { Router } from 'express';
+import * as warehouseController from '../controllers/warehouseController';
 import { authMiddleware } from '../middleware/authMiddleware';
-import {
-    listWarehouses,
-    createWarehouse,
-    updateWarehouse,
-    deleteWarehouse
-} from '../controllers/warehouseController';
 
 export const router = Router();
 
+// All warehouse routes require authentication
 router.use(authMiddleware);
 
-// GET /api/warehouses - список складов
-router.get('/', listWarehouses);
+// GET /api/warehouses - List all warehouses
+router.get('/', warehouseController.listWarehouses);
 
-// POST /api/warehouses - создать склад
-router.post('/', createWarehouse);
+// GET /api/warehouses/:id - Get warehouse by ID
+router.get('/:id', warehouseController.getWarehouseById);
 
-// PUT /api/warehouses/:id - обновить склад
-router.put('/:id', updateWarehouse);
+// POST /api/warehouses - Create new warehouse
+router.post('/', warehouseController.createWarehouse);
 
-// DELETE /api/warehouses/:id - удалить склад
-router.delete('/:id', deleteWarehouse);
+// PUT /api/warehouses/:id - Update warehouse
+router.put('/:id', warehouseController.updateWarehouse);
+
+// DELETE /api/warehouses/:id - Delete warehouse
+router.delete('/:id', warehouseController.deleteWarehouse);
+

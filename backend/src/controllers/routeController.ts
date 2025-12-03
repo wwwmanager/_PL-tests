@@ -1,27 +1,51 @@
 import { Request, Response, NextFunction } from 'express';
-import { PrismaClient } from '@prisma/client';
+import * as routeService from '../services/routeService';
 
-const prisma = new PrismaClient();
-
+/**
+ * List all routes
+ */
 export async function listRoutes(req: Request, res: Response, next: NextFunction) {
     try {
-        const routes = await prisma.route.findMany({
-            orderBy: { name: 'asc' }
-        });
-
+        const routes = await routeService.listRoutes();
         res.json({ data: routes });
     } catch (err) {
         next(err);
     }
 }
 
-export async function createRoute(req: Request, res: Response, next: NextFunction) {
+/**
+ * Get route by ID
+ */
+export async function getRouteById(req: Request, res: Response, next: NextFunction) {
     try {
-        if (!req.user) {
-            return res.status(401).json({ error: 'Unauthorized' });
+        const { id } = req.params;
+
+        const route = await routeService.getRouteById(id);
+
+        if (!route) {
+            return res.status(404).json({ error: 'Route not found' });
         }
 
-        const route = await prisma.route.create({ data: req.body });
+        res.json({ data: route });
+    } catch (err) {
+        next(err);
+    }
+}
+
+/**
+ * Create new route
+ */
+export async function createRoute(req: Request, res: Response, next: NextFunction) {
+    try {
+        const { name, startPoint, endPoint, distance, estimatedTime } = req.body;
+
+        const route = await routeService.createRoute({
+            name,
+            startPoint,
+            endPoint,
+            distance: distance != null ? parseFloat(distance) : null,
+            estimatedTime: estimatedTime != null ? parseInt(estimatedTime, 10) : null
+        });
 
         res.status(201).json({ data: route });
     } catch (err) {
@@ -29,16 +53,20 @@ export async function createRoute(req: Request, res: Response, next: NextFunctio
     }
 }
 
+/**
+ * Update route
+ */
 export async function updateRoute(req: Request, res: Response, next: NextFunction) {
     try {
-        if (!req.user) {
-            return res.status(401).json({ error: 'Unauthorized' });
-        }
-
         const { id } = req.params;
-        const route = await prisma.route.update({
-            where: { id },
-            data: req.body
+        const { name, startPoint, endPoint, distance, estimatedTime } = req.body;
+
+        const route = await routeService.updateRoute(id, {
+            name,
+            startPoint,
+            endPoint,
+            distance: distance != null ? parseFloat(distance) : null,
+            estimatedTime: estimatedTime != null ? parseInt(estimatedTime, 10) : null
         });
 
         res.json({ data: route });
@@ -47,16 +75,16 @@ export async function updateRoute(req: Request, res: Response, next: NextFunctio
     }
 }
 
+/**
+ * Delete route
+ */
 export async function deleteRoute(req: Request, res: Response, next: NextFunction) {
     try {
-        if (!req.user) {
-            return res.status(401).json({ error: 'Unauthorized' });
-        }
-
         const { id } = req.params;
-        await prisma.route.delete({ where: { id } });
 
-        res.status(204).send();
+        await routeService.deleteRoute(id);
+
+        res.json({ message: 'Route deleted successfully' });
     } catch (err) {
         next(err);
     }

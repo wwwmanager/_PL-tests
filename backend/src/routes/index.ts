@@ -28,6 +28,7 @@ router.use('/fuel-types', fuelTypeRoutes);
 router.use('/routes', routeRoutes);
 router.use('/stock', stockRoutes);
 router.use('/drivers', driverRoutes);
+router.use('/warehouses', warehouseRoutes);
 
 // Health check endpoint
 router.get('/health', (req, res) => {

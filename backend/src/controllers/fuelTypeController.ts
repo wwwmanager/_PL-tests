@@ -1,27 +1,49 @@
 import { Request, Response, NextFunction } from 'express';
-import { PrismaClient } from '@prisma/client';
+import * as fuelTypeService from '../services/fuelTypeService';
 
-const prisma = new PrismaClient();
-
+/**
+ * List all fuel types
+ */
 export async function listFuelTypes(req: Request, res: Response, next: NextFunction) {
     try {
-        const fuelTypes = await prisma.fuelType.findMany({
-            orderBy: { code: 'asc' }
-        });
-
+        const fuelTypes = await fuelTypeService.listFuelTypes();
         res.json({ data: fuelTypes });
     } catch (err) {
         next(err);
     }
 }
 
-export async function createFuelType(req: Request, res: Response, next: NextFunction) {
+/**
+ * Get fuel type by ID
+ */
+export async function getFuelTypeById(req: Request, res: Response, next: NextFunction) {
     try {
-        if (!req.user) {
-            return res.status(401).json({ error: 'Unauthorized' });
+        const { id } = req.params;
+
+        const fuelType = await fuelTypeService.getFuelTypeById(id);
+
+        if (!fuelType) {
+            return res.status(404).json({ error: 'Fuel type not found' });
         }
 
-        const fuelType = await prisma.fuelType.create({ data: req.body });
+        res.json({ data: fuelType });
+    } catch (err) {
+        next(err);
+    }
+}
+
+/**
+ * Create new fuel type
+ */
+export async function createFuelType(req: Request, res: Response, next: NextFunction) {
+    try {
+        const { code, name, density } = req.body;
+
+        const fuelType = await fuelTypeService.createFuelType({
+            code,
+            name,
+            density: density != null ? parseFloat(density) : null
+        });
 
         res.status(201).json({ data: fuelType });
     } catch (err) {
@@ -29,16 +51,18 @@ export async function createFuelType(req: Request, res: Response, next: NextFunc
     }
 }
 
+/**
+ * Update fuel type
+ */
 export async function updateFuelType(req: Request, res: Response, next: NextFunction) {
     try {
-        if (!req.user) {
-            return res.status(401).json({ error: 'Unauthorized' });
-        }
-
         const { id } = req.params;
-        const fuelType = await prisma.fuelType.update({
-            where: { id },
-            data: req.body
+        const { code, name, density } = req.body;
+
+        const fuelType = await fuelTypeService.updateFuelType(id, {
+            code,
+            name,
+            density: density != null ? parseFloat(density) : null
         });
 
         res.json({ data: fuelType });
@@ -47,16 +71,16 @@ export async function updateFuelType(req: Request, res: Response, next: NextFunc
     }
 }
 
+/**
+ * Delete fuel type
+ */
 export async function deleteFuelType(req: Request, res: Response, next: NextFunction) {
     try {
-        if (!req.user) {
-            return res.status(401).json({ error: 'Unauthorized' });
-        }
-
         const { id } = req.params;
-        await prisma.fuelType.delete({ where: { id } });
 
-        res.status(204).send();
+        await fuelTypeService.deleteFuelType(id);
+
+        res.json({ message: 'Fuel type deleted successfully' });
     } catch (err) {
         next(err);
     }
