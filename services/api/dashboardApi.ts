@@ -1,5 +1,6 @@
 // Dashboard API Facade
-// Aggregates data from other APIs for the dashboard
+// Now uses backend endpoint for aggregation
+import { httpClient, getAccessToken } from '../httpClient';
 import { getWaybills } from './waybillApi';
 import { getVehicles } from './vehicleApi';
 import { getEmployees } from './employeeApi';
@@ -17,17 +18,41 @@ export interface DashboardFilters {
     dateTo?: string;
 }
 
+async function shouldUseRealApi(): Promise<boolean> {
+    return !!getAccessToken();
+}
+
 export async function getDashboardData(filters: DashboardFilters): Promise<DashboardData> {
-    // Fetch all waybills for aggregation (client-side for now)
-    // In a real app, this should be a backend endpoint
+    if (await shouldUseRealApi()) {
+        try {
+            const params = new URLSearchParams();
+            if (filters.vehicleId) params.append('vehicleId', filters.vehicleId);
+            if (filters.dateFrom) params.append('dateFrom', filters.dateFrom);
+            if (filters.dateTo) params.append('dateTo', filters.dateTo);
+
+            const queryString = params.toString() ? `?${params.toString()}` : '';
+            const response = await httpClient.get<{ success: boolean; data: DashboardData }>(`/dashboard/stats${queryString}`);
+
+            console.log('📊 [dashboardApi] Backend stats:', response.data);
+            return response.data;
+        } catch (e) {
+            console.warn('⚠️ [dashboardApi] Backend failed, falling back to client-side aggregation:', e);
+            return getDashboardDataClientSide(filters);
+        }
+    }
+
+    return getDashboardDataClientSide(filters);
+}
+
+// Client-side fallback (for mock mode)
+async function getDashboardDataClientSide(filters: DashboardFilters): Promise<DashboardData> {
     const { waybills } = await getWaybills({
         startDate: filters.dateFrom,
         endDate: filters.dateTo,
         vehicleId: filters.vehicleId,
-        limit: 1000 // Fetch reasonably large number
+        limit: 1000
     });
 
-    // Calculate KPIs
     let mileageMonth = 0;
     let mileageQuarter = 0;
     let mileageYear = 0;
@@ -43,7 +68,7 @@ export async function getDashboardData(filters: DashboardFilters): Promise<Dashb
     waybills.forEach(w => {
         const date = new Date(w.date);
         const mileage = (w.odometerEnd ?? w.odometerStart) - w.odometerStart;
-        const fuel = (w.fuelAtStart ?? 0) + (w.fuelFilled ?? 0) - (w.fuelAtEnd ?? 0); // Approximate consumption
+        const fuel = (w.fuelAtStart ?? 0) + (w.fuelFilled ?? 0) - (w.fuelAtEnd ?? 0);
 
         if (date.getFullYear() === currentYear) {
             mileageYear += mileage;
@@ -61,14 +86,11 @@ export async function getDashboardData(filters: DashboardFilters): Promise<Dashb
         }
     });
 
-    // Fuel Balance (from vehicles)
-    const vehicles = await getVehicles({ organizationId: waybills[0]?.organizationId }); // optimization needed
+    const vehicles = await getVehicles({ organizationId: waybills[0]?.organizationId });
     const totalFuelBalance = vehicles.reduce((sum, v) => sum + (v.currentFuel ?? 0), 0);
 
-    // Issues (count expiring docs)
-    const issues = await getIssuesCount(vehicles);
+    const issues = await getIssuesCountClientSide(vehicles);
 
-    // Charts Data (simplified)
     const fuelConsumptionByMonth = aggregateByMonth(waybills, 'fuel');
     const medicalExamsByMonth = aggregateByMonth(waybills, 'exams');
 
@@ -88,7 +110,7 @@ export async function getDashboardData(filters: DashboardFilters): Promise<Dashb
     };
 }
 
-async function getIssuesCount(vehicles: Vehicle[]): Promise<number> {
+async function getIssuesCountClientSide(vehicles: Vehicle[]): Promise<number> {
     let count = 0;
     const now = new Date();
     const warningDate = new Date();
@@ -99,7 +121,6 @@ async function getIssuesCount(vehicles: Vehicle[]): Promise<number> {
         if (v.diagnosticCardExpiryDate && new Date(v.diagnosticCardExpiryDate) < warningDate) count++;
     });
 
-    // Also check drivers
     const employees = await getEmployees({ isActive: true });
     employees.forEach(e => {
         if (e.driverCardExpiryDate && new Date(e.driverCardExpiryDate) < warningDate) count++;
@@ -120,7 +141,6 @@ function aggregateByMonth(waybills: any[], type: 'fuel' | 'exams') {
             const fuel = (w.fuelAtStart ?? 0) + (w.fuelFilled ?? 0) - (w.fuelAtEnd ?? 0);
             map.set(key, (map.get(key) || 0) + fuel);
         } else {
-            // Count exams (assuming 1 waybill = 1 exam for now)
             map.set(key, (map.get(key) || 0) + 1);
         }
     });
@@ -132,7 +152,24 @@ function aggregateByMonth(waybills: any[], type: 'fuel' | 'exams') {
 }
 
 export async function getIssues(filters: { vehicleId?: string }) {
-    const vehicles = await getVehicles(); // Filter by ID if needed
+    if (await shouldUseRealApi()) {
+        try {
+            const params = new URLSearchParams();
+            if (filters.vehicleId) params.append('vehicleId', filters.vehicleId);
+            const queryString = params.toString() ? `?${params.toString()}` : '';
+
+            const response = await httpClient.get<{ success: boolean; data: { expiringDocs: any[] } }>(`/dashboard/issues${queryString}`);
+            return response.data;
+        } catch (e) {
+            console.warn('⚠️ [dashboardApi] Issues endpoint failed, falling back');
+            return getIssuesClientSide(filters);
+        }
+    }
+    return getIssuesClientSide(filters);
+}
+
+async function getIssuesClientSide(filters: { vehicleId?: string }) {
+    const vehicles = await getVehicles();
     const employees = await getEmployees({ isActive: true });
 
     const expiringDocs: { type: string; name: string; date: string }[] = [];

@@ -122,9 +122,20 @@ async function main() {
     const org = await prisma.organization.create({
         data: {
             name: 'ООО "Тестовая Транспортная Компания"',
+            shortName: 'ТТК',
+            fullName: 'Общество с ограниченной ответственностью "Тестовая Транспортная Компания"',
             inn: '7401234567',
             kpp: '740101001',
+            ogrn: '1027400000001',
             address: 'г. Челябинск, ул. Транспортная, д. 1',
+            status: 'Active',
+            group: 'Перевозчик',
+            phone: '+7 (351) 123-45-67',
+            email: 'info@ttk.ru',
+            bankName: 'ПАО Сбербанк',
+            bankBik: '047501602',
+            bankAccount: '40702810500000000001',
+            correspondentAccount: '30101810500000000602',
         },
     });
 

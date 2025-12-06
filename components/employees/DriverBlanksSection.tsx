@@ -1,7 +1,6 @@
 // components/employees/DriverBlanksSection.tsx
 import React, { useEffect, useState } from 'react';
-import type { DriverBlankSummary, DriverBlankRange } from '../../services/mockApi';
-import { getDriverBlankSummary } from '../../services/mockApi';
+import { getDriverBlankSummary, DriverBlankSummary, DriverBlankRange } from '../../services/blankApi';
 
 interface Props {
     driverId: string;

@@ -1,14 +1,22 @@
 import * as mockApi from './mockApi';
 import * as realApi from './api/realBlankApi';
 import { getAppSettings } from './mockApi';
+import { getAccessToken } from './httpClient';
 import { WaybillBlank, WaybillBlankBatch, BlankStatus } from '../types';
 
 async function shouldUseRealApi(): Promise<boolean> {
+    const hasToken = !!getAccessToken();
+
     try {
         const settings = await getAppSettings();
-        return settings.appMode === 'central';
-    } catch {
-        return !import.meta.env.DEV;
+        const useReal = settings.appMode === 'central' || (settings.appMode === undefined && hasToken);
+
+        console.log(`🔗 [blankApi] appMode = "${settings.appMode}", hasToken = ${hasToken} → ${useReal ? 'REAL BACKEND' : 'MOCK API'}`);
+
+        return useReal;
+    } catch (error) {
+        console.warn('⚠️ [blankApi] Could not load AppSettings, hasToken:', hasToken);
+        return hasToken || !import.meta.env.DEV;
     }
 }
 
@@ -62,3 +70,27 @@ export async function countBlanksByFilter(filter: any): Promise<number> {
     const useReal = await shouldUseRealApi();
     return useReal ? realApi.countBlanksByFilter(filter) : mockApi.countBlanksByFilter(filter);
 }
+
+// Types for driver blank summary
+export interface DriverBlankRange {
+    series: string;
+    numberStart: number;
+    numberEnd: number;
+    count: number;
+}
+
+export interface DriverBlankSummary {
+    active: DriverBlankRange[];
+    used: DriverBlankRange[];
+    spoiled: DriverBlankRange[];
+}
+
+export async function getDriverBlankSummary(driverId: string): Promise<DriverBlankSummary> {
+    const useReal = await shouldUseRealApi();
+    if (useReal) {
+        return realApi.getDriverBlankSummary(driverId);
+    } else {
+        return mockApi.getDriverBlankSummary(driverId);
+    }
+}
+

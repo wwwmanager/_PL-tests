@@ -6,7 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { getVehicles, createVehicle as addVehicle, updateVehicle, deleteVehicle } from '../../services/api/vehicleApi';
 import { getEmployees } from '../../services/api/employeeApi';
 import { getFuelTypes } from '../../services/api/fuelTypeApi';
-import { generateId, getOrganizations } from '../../services/mockApi';
+import { getOrganizations } from '../../services/organizationApi';
 import { validation } from '../../services/faker';
 import { PencilIcon, TrashIcon, PlusIcon, ArrowUpIcon, ArrowDownIcon, ArchiveBoxIcon, ArrowUpTrayIcon } from '../Icons';
 import useTable from '../../hooks/useTable';

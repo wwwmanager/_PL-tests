@@ -12,6 +12,9 @@ router.use(auditMiddleware('blank'));
 // List blanks (read permission)
 router.get('/', checkPermission('blank.read'), blankController.listBlanks);
 
+// List batches (read permission)
+router.get('/batches', checkPermission('blank.read'), blankController.listBatches);
+
 // Create batch (create permission)
 router.post('/batches', checkPermission('blank.create'), blankController.createBatch);
 
@@ -21,4 +24,7 @@ router.post('/batches/:id/materialize', checkPermission('blank.create'), blankCo
 // Issue blank (update/issue permission)
 // Assuming 'blank.issue' is a specific permission, or reusing 'blank.update'
 router.post('/issue', checkPermission('blank.update'), blankController.issueBlank);
+
+// Get driver blank summary (read permission)
+router.get('/summary/driver/:driverId', checkPermission('blank.read'), blankController.getDriverSummary);
 

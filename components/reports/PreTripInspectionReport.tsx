@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { getWaybills } from '../../services/api/waybillApi';
 import { getVehicles } from '../../services/api/vehicleApi';
-import { getEmployees } from '../../services/mockApi'; // TODO: Create employeeApi facade
-import { getMedicalExamsCount } from '../../services/mockApi'; // Utility function
+import { getEmployees } from '../../services/api/employeeApi';
 import { Waybill, WaybillStatus, Employee, Vehicle } from '../../types';
 import { useToast } from '../../hooks/useToast';
+
+// Utility: Each completed waybill represents 1 pre-trip medical exam
+const getMedicalExamsCount = (waybill: Waybill): number => 1;
+
 
 interface InspectionRow {
     driverId: string;
@@ -121,7 +124,7 @@ const PreTripInspectionReport: React.FC = () => {
                         driverId: w.driverId,
                         driverName: driver.shortName,
                         vehicleId: w.vehicleId,
-                        vehiclePlate: vehicle.plateNumber,
+                        vehiclePlate: vehicle.registrationNumber,
                         inspectionDate: date,
                         waybillNumber: w.number,
                         waybillId: w.id
@@ -143,8 +146,8 @@ const PreTripInspectionReport: React.FC = () => {
                     if (!summary.inspectionDates.includes(date)) {
                         summary.inspectionDates.push(date);
                     }
-                    if (!summary.vehiclesUsed.includes(vehicle.plateNumber)) {
-                        summary.vehiclesUsed.push(vehicle.plateNumber);
+                    if (!summary.vehiclesUsed.includes(vehicle.registrationNumber)) {
+                        summary.vehiclesUsed.push(vehicle.registrationNumber);
                     }
                 });
             });
@@ -259,7 +262,7 @@ const PreTripInspectionReport: React.FC = () => {
                 >
                     <option value="">Все ТС</option>
                     {vehicles.map(v => (
-                        <option key={v.id} value={v.id}>{v.plateNumber} - {v.brand}</option>
+                        <option key={v.id} value={v.id}>{v.registrationNumber} - {v.brand}</option>
                     ))}
                 </select>
                 <button

@@ -51,8 +51,14 @@ export async function createOrganization(req: Request, res: Response, next: Next
             return res.status(401).json({ error: 'Unauthorized' });
         }
 
+        // name is required in Prisma schema, populate from shortName if not provided
+        const data = {
+            ...req.body,
+            name: req.body.name || req.body.shortName || 'Unnamed Organization',
+        };
+
         const organization = await prisma.organization.create({
-            data: req.body
+            data
         });
 
         res.status(201).json({ data: organization });
@@ -68,9 +74,15 @@ export async function updateOrganization(req: Request, res: Response, next: Next
         }
 
         const { id } = req.params;
+
+        // If shortName is updated but name is not provided, update name too
+        const data = { ...req.body };
+        if (req.body.shortName && !req.body.name) {
+            data.name = req.body.shortName;
+        }
         const organization = await prisma.organization.update({
             where: { id },
-            data: req.body
+            data
         });
 
         res.json({ data: organization });

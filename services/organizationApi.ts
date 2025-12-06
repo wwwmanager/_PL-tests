@@ -1,21 +1,34 @@
 import * as mockApi from './mockApi';
 import { getAppSettings } from './mockApi';
 import { Organization } from '../types';
-import { httpClient } from './httpClient';
+import { httpClient, getAccessToken } from './httpClient';
 
 async function shouldUseRealApi(): Promise<boolean> {
+    // Если есть токен авторизации — пользователь работает с backend, используем real API
+    const hasToken = !!getAccessToken();
+
     try {
         const settings = await getAppSettings();
-        return settings.appMode === 'central';
-    } catch {
-        return !import.meta.env.DEV;
+        // Если appMode не установлен (undefined) — используем real API если залогинен
+        const useReal = settings.appMode === 'central' || (settings.appMode === undefined && hasToken);
+
+        console.log(`🔗 [organizationApi] appMode = "${settings.appMode}", hasToken = ${hasToken} → ${useReal ? 'REAL BACKEND' : 'MOCK API (IndexedDB)'}`);
+
+        return useReal;
+    } catch (error) {
+        // Если есть токен — используем real API
+        console.warn('⚠️ [organizationApi] Could not load AppSettings, hasToken:', hasToken);
+        return hasToken || !import.meta.env.DEV;
     }
 }
 
 // Real API implementations
 async function getOrganizationsReal(): Promise<Organization[]> {
+    console.log('📡 [organizationApi] Fetching from BACKEND /organizations...');
     const response = await httpClient.get<{ data: Organization[] }>('/organizations');
-    return response.data;
+    const organizations = response.data || [];
+    console.log('📡 [organizationApi] Received from backend:', organizations.length, 'organizations');
+    return organizations;
 }
 
 async function addOrganizationReal(data: Omit<Organization, 'id'>): Promise<Organization> {

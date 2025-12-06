@@ -53,10 +53,30 @@ export async function createBatch(organizationId: string, userId: string, data: 
     return batch;
 }
 
-export async function materializeBatch(organizationId: string, batchId: string) {
-    // Find the batch
+export async function listBatches(organizationId?: string) {
+    const batches = await prisma.blankBatch.findMany({
+        where: organizationId ? { organizationId } : undefined,  // No filter for admin
+        orderBy: { createdAt: 'desc' }
+    });
+
+    // Transform to match frontend WaybillBlankBatch interface
+    return batches.map(batch => ({
+        id: batch.id,
+        organizationId: batch.organizationId,
+        series: batch.series || '',
+        startNumber: batch.numberFrom,
+        endNumber: batch.numberTo,
+        status: 'active',
+        notes: batch.departmentId ? `Отдел: ${batch.departmentId}` : undefined,
+        createdAt: batch.createdAt.toISOString(),
+        updatedAt: batch.createdAt.toISOString()  // BlankBatch doesn't have updatedAt
+    }));
+}
+
+export async function materializeBatch(organizationId: string | undefined, batchId: string) {
+    // Find the batch (admin can find any batch, others only their org)
     const batch = await prisma.blankBatch.findFirst({
-        where: { id: batchId, organizationId }
+        where: organizationId ? { id: batchId, organizationId } : { id: batchId }
     });
 
     if (!batch) {
@@ -80,7 +100,7 @@ export async function materializeBatch(organizationId: string, batchId: string) 
     const blanksData = [];
     for (let i = batch.numberFrom; i <= batch.numberTo; i++) {
         blanksData.push({
-            organizationId,
+            organizationId: batch.organizationId,
             departmentId: batch.departmentId,
             batchId: batch.id,
             series: batch.series || '',
@@ -101,13 +121,13 @@ export async function materializeBatch(organizationId: string, batchId: string) 
     };
 }
 
-export async function listBlanks(organizationId: string, filters: { series?: string; status?: BlankStatus; page?: number; limit?: number }) {
+export async function listBlanks(organizationId: string | undefined, filters: { series?: string; status?: BlankStatus; page?: number; limit?: number }) {
     const page = filters.page || 1;
     const limit = filters.limit || 50;
     const skip = (page - 1) * limit;
 
     const where = {
-        organizationId,
+        ...(organizationId ? { organizationId } : {}),  // Admin sees all orgs
         series: filters.series ? { contains: filters.series } : undefined,
         status: filters.status
     };
@@ -158,3 +178,74 @@ export async function issueBlank(organizationId: string, data: IssueBlankDto) {
         }
     });
 }
+
+// --- Driver Blank Summary ---
+
+export interface DriverBlankRange {
+    series: string;
+    numberStart: number;
+    numberEnd: number;
+    count: number;
+}
+
+export interface DriverBlankSummary {
+    active: DriverBlankRange[];
+    used: DriverBlankRange[];
+    spoiled: DriverBlankRange[];
+}
+
+function buildBlankRanges(blanks: { series: string | null; number: number }[]): DriverBlankRange[] {
+    const items = blanks
+        .filter(b => b.series && b.number != null)
+        .map(b => ({ series: b.series!, num: b.number }))
+        .sort((a, b) => {
+            const bySeries = a.series.localeCompare(b.series);
+            if (bySeries !== 0) return bySeries;
+            return a.num - b.num;
+        });
+
+    const ranges: DriverBlankRange[] = [];
+    let current: DriverBlankRange | null = null;
+
+    for (const item of items) {
+        if (
+            !current ||
+            item.series !== current.series ||
+            item.num !== current.numberEnd + 1
+        ) {
+            if (current) ranges.push(current);
+            current = {
+                series: item.series,
+                numberStart: item.num,
+                numberEnd: item.num,
+                count: 1
+            };
+        } else {
+            current.numberEnd = item.num;
+            current.count += 1;
+        }
+    }
+
+    if (current) ranges.push(current);
+    return ranges;
+}
+
+export async function getDriverSummary(driverId: string): Promise<DriverBlankSummary> {
+    // Find all blanks issued to this driver
+    const blanks = await prisma.blank.findMany({
+        where: { issuedToDriverId: driverId },
+        select: { series: true, number: true, status: true }
+    });
+
+    // Categorize by status
+    const activeBlanks = blanks.filter(b => b.status === BlankStatus.ISSUED);
+    const usedBlanks = blanks.filter(b => b.status === BlankStatus.USED);
+    const spoiledBlanks = blanks.filter(b => b.status === BlankStatus.SPOILED);
+
+    return {
+        active: buildBlankRanges(activeBlanks),
+        used: buildBlankRanges(usedBlanks),
+        spoiled: buildBlankRanges(spoiledBlanks)
+    };
+}
+

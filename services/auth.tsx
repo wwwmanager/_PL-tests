@@ -8,7 +8,8 @@ import React, {
   useState,
 } from 'react';
 import { loadJSON, saveJSON, removeKey } from './storage';
-import { getRolePolicies, getAppSettings } from './mockApi';
+import { getAppSettings } from './mockApi';
+import { roleApi } from './roleApi';
 import { subscribe } from './bus';
 import type { Role, Capability, User, AppSettings } from '../types';
 import { DEFAULT_ROLE_POLICIES, ALL_CAPS } from '../constants';
@@ -125,7 +126,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   });
 
   const fetchPolicies = useCallback(async () => {
-    const policies = await getRolePolicies();
+    const policies = await roleApi.getRolePolicies();
     setRolePolicies(policies);
   }, []);
 

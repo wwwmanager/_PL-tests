@@ -2,7 +2,7 @@ import React, { useState, useMemo, useCallback } from 'react';
 import { Role, Capability } from '../../types';
 import { useAuth } from '../../services/auth';
 // FIX: Added missing import for saveRolePolicies
-import { saveRolePolicies } from '../../services/mockApi';
+import { roleApi } from '../../services/roleApi';
 import { PencilIcon } from '../Icons';
 import Modal from '../shared/Modal';
 import { useToast } from '../../hooks/useToast';
@@ -44,7 +44,7 @@ const RoleManagement: React.FC = () => {
             [editingRole]: Array.from(currentCaps),
         };
         try {
-            await saveRolePolicies(updatedPolicies);
+            await roleApi.saveRolePolicies(updatedPolicies);
             showToast(`Права для роли "${ROLE_TRANSLATIONS[editingRole]}" сохранены.`, 'success');
             setEditingRole(null);
         } catch (error) {
@@ -73,8 +73,8 @@ const RoleManagement: React.FC = () => {
     };
 
     const isAllSelected = useMemo(() => {
-      if (allCaps.length === 0) return false;
-      return allCaps.every(cap => currentCaps.has(cap));
+        if (allCaps.length === 0) return false;
+        return allCaps.every(cap => currentCaps.has(cap));
     }, [allCaps, currentCaps]);
 
 
@@ -123,11 +123,11 @@ const RoleManagement: React.FC = () => {
                         <thead className="sticky top-0 bg-gray-50 dark:bg-gray-700 z-10">
                             <tr className="text-left">
                                 <th className="p-2 w-12 text-center">
-                                    <input 
-                                        type="checkbox" 
+                                    <input
+                                        type="checkbox"
                                         className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                                        checked={isAllSelected} 
-                                        onChange={(e) => handleToggleAll(e.target.checked)} 
+                                        checked={isAllSelected}
+                                        onChange={(e) => handleToggleAll(e.target.checked)}
                                         title="Выбрать все"
                                     />
                                 </th>

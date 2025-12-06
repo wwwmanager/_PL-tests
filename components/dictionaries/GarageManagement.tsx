@@ -6,10 +6,13 @@ import { GarageStockItem, StockTransaction, StockTransactionItem, Vehicle, Emplo
 import {
     getGarageStockItems, addGarageStockItem, updateGarageStockItem, deleteGarageStockItem,
     getStockTransactions, addStockTransaction, updateStockTransaction, deleteStockTransaction,
-    getVehicles, getEmployees, getOrganizations, generateId, getFuelTypes,
+    generateId, getFuelTypes,
     fetchStorages,
     fetchWaybillById
 } from '../../services/mockApi';
+import { getOrganizations } from '../../services/organizationApi';
+import { getVehicles } from '../../services/api/vehicleApi';
+import { getEmployees } from '../../services/api/employeeApi';
 import { MockStorage as StorageLocation } from '../../services/mockApi';
 import { PencilIcon, TrashIcon, PlusIcon } from '../Icons';
 import useTable from '../../hooks/useTable';
@@ -436,7 +439,7 @@ const TransactionList: React.FC<TransactionListProps> = ({ onOpenWaybill, organi
                         const isIncome = t.type === 'income';
                         const counterparty = isIncome
                             ? organizations.find(o => o.id === t.supplierOrganizationId)?.shortName || t.supplier
-                            : vehicles.find(v => v.id === t.vehicleId)?.plateNumber;
+                            : vehicles.find(v => v.id === t.vehicleId)?.registrationNumber;
 
                         return (
                             <tr key={t.id} className="border-t dark:border-gray-700">
@@ -488,7 +491,7 @@ const TransactionList: React.FC<TransactionListProps> = ({ onOpenWaybill, organi
                     </FormField>
                     {watchedType === 'expense' && (
                         <div className="grid grid-cols-2 gap-4">
-                            <FormField label="ТС" error={errors.vehicleId?.message}><FormSelect {...register("vehicleId")}><option value="">Выберите</option>{vehicles.map(v => <option key={v.id} value={v.id}>{v.plateNumber}</option>)}</FormSelect></FormField>
+                            <FormField label="ТС" error={errors.vehicleId?.message}><FormSelect {...register("vehicleId")}><option value="">Выберите</option>{vehicles.map(v => <option key={v.id} value={v.id}>{v.registrationNumber}</option>)}</FormSelect></FormField>
                             <FormField label="Водитель" error={errors.driverId?.message}><FormSelect {...register("driverId")}><option value="">Выберите</option>{employees.map(e => <option key={e.id} value={e.id}>{e.shortName}</option>)}</FormSelect></FormField>
                         </div>
                     )}

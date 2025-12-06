@@ -4,9 +4,8 @@ import { useForm, SubmitHandler } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { WaybillBlank, WaybillBlankBatch, BlankStatus, Organization, Employee } from '../../types';
-import {
-    getOrganizations, getEmployees,
-} from '../../services/mockApi';
+import { getOrganizations } from '../../services/organizationApi';
+import { getEmployees } from '../../services/api/employeeApi';
 import {
     getBlankBatches, createBlankBatch, materializeBatch,
     issueBlanksToDriver,
@@ -57,11 +56,22 @@ const BatchList: React.FC<{ refreshBlanks: () => void }> = ({ refreshBlanks }) =
     const { currentUser } = useAuth();
 
     const fetchData = useCallback(async () => {
-        const [batchData, orgData, empData, blankData] = await Promise.all([getBlankBatches(), getOrganizations(), getEmployees(), getBlanks()]);
-        setBatches(batchData.sort((a, b) => b.series.localeCompare(a.series) || b.startNumber - a.startNumber));
-        setOrganizations(orgData);
-        setEmployees(empData.filter(e => e.employeeType === 'driver'));
-        setAllBlanks(blankData);
+        try {
+            const [batchData, orgData, empData, blankData] = await Promise.all([getBlankBatches(), getOrganizations(), getEmployees(), getBlanks()]);
+            console.log('📋 [BlankManagement] fetchData results:', {
+                batches: batchData?.length,
+                orgs: orgData?.length,
+                employees: empData?.length,
+                blanks: blankData?.length,
+                orgData: orgData
+            });
+            setBatches(batchData.sort((a, b) => b.series.localeCompare(a.series) || b.startNumber - a.startNumber));
+            setOrganizations(orgData);
+            setEmployees(empData.filter(e => e.employeeType === 'driver'));
+            setAllBlanks(blankData);
+        } catch (err) {
+            console.error('❌ [BlankManagement] fetchData error:', err);
+        }
     }, []);
 
     useEffect(() => { fetchData(); }, [fetchData]);

@@ -317,8 +317,11 @@ export const WaybillDetail: React.FC<WaybillDetailProps> = ({ waybill, isPrefill
   const calculatedFuelRate = useMemo(() => {
     if (!selectedVehicle || !seasonSettings) return 0;
 
+    // Fallback for vehicles without fuelConsumptionRates (e.g., from backend)
+    const rates = selectedVehicle.fuelConsumptionRates || { winterRate: 0, summerRate: 0 };
+
     const isWaybillWinter = isWinterDate(formData.date, seasonSettings);
-    const baseConsumptionRate = isWaybillWinter ? selectedVehicle.fuelConsumptionRates.winterRate : selectedVehicle.fuelConsumptionRates.summerRate;
+    const baseConsumptionRate = isWaybillWinter ? (rates.winterRate || 0) : (rates.summerRate || 0);
 
     let totalConsumption = 0;
     let totalDistance = 0;
@@ -328,14 +331,14 @@ export const WaybillDetail: React.FC<WaybillDetailProps> = ({ waybill, isPrefill
 
       const routeDate = dayMode === 'multi' && route.date ? route.date : formData.date;
       const isWinter = isWinterDate(routeDate, seasonSettings);
-      const baseRate = isWinter ? selectedVehicle.fuelConsumptionRates.winterRate : selectedVehicle.fuelConsumptionRates.summerRate;
+      const baseRate = isWinter ? (rates.winterRate || 0) : (rates.summerRate || 0);
       let effectiveRate = baseRate;
 
-      if (route.isCityDriving && selectedVehicle.useCityModifier && selectedVehicle.fuelConsumptionRates.cityIncreasePercent) {
-        effectiveRate *= (1 + selectedVehicle.fuelConsumptionRates.cityIncreasePercent / 100);
+      if (route.isCityDriving && selectedVehicle.useCityModifier && rates.cityIncreasePercent) {
+        effectiveRate *= (1 + rates.cityIncreasePercent / 100);
       }
-      if (route.isWarming && selectedVehicle.useWarmingModifier && selectedVehicle.fuelConsumptionRates.warmingIncreasePercent) {
-        effectiveRate *= (1 + selectedVehicle.fuelConsumptionRates.warmingIncreasePercent / 100);
+      if (route.isWarming && selectedVehicle.useWarmingModifier && rates.warmingIncreasePercent) {
+        effectiveRate *= (1 + rates.warmingIncreasePercent / 100);
       }
 
       totalConsumption += (route.distanceKm / 100) * effectiveRate;
@@ -351,13 +354,15 @@ export const WaybillDetail: React.FC<WaybillDetailProps> = ({ waybill, isPrefill
       return;
     }
 
-    const { cityIncreasePercent = 0, warmingIncreasePercent = 0 } = selectedVehicle.fuelConsumptionRates;
+    // Fallback for vehicles without fuelConsumptionRates (e.g., from backend)
+    const rates = selectedVehicle.fuelConsumptionRates || { winterRate: 0, summerRate: 0 };
+    const { cityIncreasePercent = 0, warmingIncreasePercent = 0 } = rates;
 
     let totalConsumption = 0;
     for (const route of formData.routes) {
       const routeDate = dayMode === 'multi' && route.date ? route.date : formData.date;
       const isWinter = isWinterDate(routeDate, seasonSettings);
-      const baseRate = isWinter ? selectedVehicle.fuelConsumptionRates.winterRate : selectedVehicle.fuelConsumptionRates.summerRate;
+      const baseRate = isWinter ? (rates.winterRate || 0) : (rates.summerRate || 0);
 
       let effectiveRate = baseRate;
       if (route.isCityDriving && selectedVehicle.useCityModifier) {
@@ -1100,7 +1105,7 @@ export const WaybillDetail: React.FC<WaybillDetailProps> = ({ waybill, isPrefill
             <FormField label="Транспортное средство">
               <FormSelect name="vehicleId" value={formData.vehicleId} onChange={handleVehicleChange} disabled={!canEdit}>
                 <option value="">Выберите ТС</option>
-                {vehicles.map(v => <option key={v.id} value={v.id}>{v.plateNumber} ({v.brand})</option>)}
+                {vehicles.map(v => <option key={v.id} value={v.id}>{v.registrationNumber} ({v.brand})</option>)}
               </FormSelect>
               {autoFillMessage && <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">{autoFillMessage}</p>}
             </FormField>

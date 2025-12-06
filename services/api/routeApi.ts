@@ -12,20 +12,25 @@ export interface Route {
     updatedAt?: string;
 }
 
+interface ApiResponse<T> {
+    data: T;
+}
+
 /**
  * Get all routes
  */
 export async function getRoutes(): Promise<Route[]> {
-    const response = await httpClient.get<{ data: Route[] }>('/routes');
-    return response.data?.data || [];
+    const response = await httpClient.get<ApiResponse<Route[]>>('/routes');
+    console.log('📡 [api/routeApi] GET /routes response:', response);
+    return response.data || [];
 }
 
 /**
  * Get route by ID
  */
 export async function getRouteById(id: string): Promise<Route> {
-    const response = await httpClient.get<{ data: Route }>(`/routes/${id}`);
-    return response.data.data;
+    const response = await httpClient.get<ApiResponse<Route>>(`/routes/${id}`);
+    return response.data;
 }
 
 /**
@@ -38,8 +43,8 @@ export async function createRoute(data: {
     distance?: number | null;
     estimatedTime?: number | null;
 }): Promise<Route> {
-    const response = await httpClient.post<{ data: Route }>('/routes', data);
-    return response.data.data;
+    const response = await httpClient.post<ApiResponse<Route>>('/routes', data);
+    return response.data;
 }
 
 /**
@@ -52,8 +57,8 @@ export async function updateRoute(id: string, data: {
     distance?: number | null;
     estimatedTime?: number | null;
 }): Promise<Route> {
-    const response = await httpClient.put<{ data: Route }>(`/routes/${id}`, data);
-    return response.data.data;
+    const response = await httpClient.put<ApiResponse<Route>>(`/routes/${id}`, data);
+    return response.data;
 }
 
 /**
@@ -62,3 +67,4 @@ export async function updateRoute(id: string, data: {
 export async function deleteRoute(id: string): Promise<void> {
     await httpClient.delete(`/routes/${id}`);
 }
+

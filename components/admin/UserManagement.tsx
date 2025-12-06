@@ -3,7 +3,7 @@ import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { User, Role, Capability } from '../../types';
-import { getUsers, addUser, updateUser, deleteUser } from '../../services/mockApi';
+import { userApi } from '../../services/userApi';
 import { useAuth } from '../../services/auth';
 import { PencilIcon, TrashIcon, PlusIcon } from '../Icons';
 import Modal from '../shared/Modal';
@@ -41,9 +41,14 @@ const UserManagement: React.FC = () => {
     const watchedRole = watch('role');
 
     const fetchData = useCallback(async () => {
-        const data = await getUsers();
-        setUsers(data);
-    }, []);
+        try {
+            const data = await userApi.getUsers();
+            setUsers(data);
+        } catch (e) {
+            console.error(e);
+            showToast('Не удалось загрузить пользователей', 'error');
+        }
+    }, [showToast]);
 
     useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -54,14 +59,15 @@ const UserManagement: React.FC = () => {
     const onSubmit = async (data: UserFormData) => {
         try {
             if (data.id) {
-                await updateUser(data as User);
+                await userApi.updateUser(data as User);
             } else {
-                await addUser(data as Omit<User, 'id'>);
+                await userApi.addUser(data as Omit<User, 'id'>);
             }
             showToast('Пользователь сохранен');
             handleCancel();
             fetchData();
         } catch (e) {
+            console.error(e);
             showToast('Не удалось сохранить', 'error');
         }
     };
@@ -74,7 +80,7 @@ const UserManagement: React.FC = () => {
             return;
         }
         try {
-            await deleteUser(deleteModal.id);
+            await userApi.deleteUser(deleteModal.id);
             showToast('Пользователь удален');
             setDeleteModal(null);
             fetchData();
@@ -103,8 +109,8 @@ const UserManagement: React.FC = () => {
                             <td className="p-2">{ROLE_TRANSLATIONS[user.role] ?? user.role}</td>
                             <td className="p-2 text-xs text-gray-500">{(user.extraCaps || []).map(c => CAPABILITY_TRANSLATIONS[c as Capability] ?? c).join(', ')}</td>
                             <td className="p-2">
-                                <button onClick={() => handleEdit(user)} className="p-1"><PencilIcon className="h-5 w-5 text-blue-500"/></button>
-                                <button onClick={() => setDeleteModal(user)} className="p-1"><TrashIcon className="h-5 w-5 text-red-500"/></button>
+                                <button onClick={() => handleEdit(user)} className="p-1"><PencilIcon className="h-5 w-5 text-blue-500" /></button>
+                                <button onClick={() => setDeleteModal(user)} className="p-1"><TrashIcon className="h-5 w-5 text-red-500" /></button>
                             </td>
                         </tr>
                     ))}

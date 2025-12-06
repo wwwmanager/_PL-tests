@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Employee, Organization, EmployeeType, EMPLOYEE_TYPE_TRANSLATIONS, WaybillBlankBatch } from '../../types';
 import { getEmployees, createEmployee, updateEmployee, deleteEmployee } from '../../services/api/employeeApi';
-import { getOrganizations } from '../../services/mockApi';
+import { getOrganizations } from '../../services/organizationApi';
 import { PencilIcon, TrashIcon, PlusIcon, ArrowUpIcon, ArrowDownIcon, XIcon } from '../Icons';
 import useTable from '../../hooks/useTable';
 import Modal from '../shared/Modal';

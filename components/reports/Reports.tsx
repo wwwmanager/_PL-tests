@@ -1,12 +1,14 @@
 
 import React, { useState, useEffect } from 'react';
-// FIX: Use API facades instead of mockApi
+// All API facades now use real backend
 import { getVehicles } from '../../services/api/vehicleApi';
 import { getWaybills } from '../../services/api/waybillApi';
-import { getMedicalExamsCount } from '../../services/mockApi'; // Still needed for utility function
 import { Vehicle, Waybill, WaybillStatus } from '../../types';
 import { useToast } from '../../hooks/useToast';
 import PreTripInspectionReport from './PreTripInspectionReport';
+
+// Utility: Each completed waybill represents 1 pre-trip medical exam
+const getMedicalExamsCount = (waybill: Waybill): number => 1;
 
 interface ReportRow {
     type: 'month' | 'quarter' | 'year';
@@ -195,7 +197,7 @@ const VehicleSummaryReport = () => {
         const link = document.createElement("a");
         const url = URL.createObjectURL(blob);
         link.setAttribute("href", url);
-        const vehicleName = vehicles.find(v => v.id === filters.vehicleId)?.plateNumber || 'report';
+        const vehicleName = vehicles.find(v => v.id === filters.vehicleId)?.registrationNumber || 'report';
         link.setAttribute("download", `report_${vehicleName}_${filters.dateFrom}_${filters.dateTo}.xlsx`);
         link.style.visibility = 'hidden';
         document.body.appendChild(link);
@@ -209,7 +211,7 @@ const VehicleSummaryReport = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
                 <select name="vehicleId" value={filters.vehicleId} onChange={handleFilterChange} className="bg-white dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded-md p-2" disabled={vehicles.length === 1}>
                     <option value="">Выберите ТС</option>
-                    {vehicles.map(v => <option key={v.id} value={v.id}>{v.plateNumber} - {v.brand}</option>)}
+                    {vehicles.map(v => <option key={v.id} value={v.id}>{v.registrationNumber} - {v.brand}</option>)}
                 </select>
                 <input type="date" name="dateFrom" value={filters.dateFrom} onChange={handleFilterChange} className="bg-white dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded-md p-2" />
                 <input type="date" name="dateTo" value={filters.dateTo} onChange={handleFilterChange} className="bg-white dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded-md p-2" />

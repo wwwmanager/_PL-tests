@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { getSeasonSettings, saveSeasonSettings } from '../../services/mockApi';
+import { getSeasonSettings, saveSeasonSettings } from '../../services/settingsApi';
 import { SeasonSettings } from '../../types';
 import { XIcon } from '../Icons';
 
@@ -10,15 +10,15 @@ interface SeasonSettingsModalProps {
 }
 
 const defaultRecurringSettings = {
-    type: 'recurring' as const,
-    summerDay: 1, summerMonth: 4, // April 1st
-    winterDay: 1, winterMonth: 11, // November 1st
+  type: 'recurring' as const,
+  summerDay: 1, summerMonth: 4, // April 1st
+  winterDay: 1, winterMonth: 11, // November 1st
 };
 
 const defaultManualSettings = {
-    type: 'manual' as const,
-    winterStartDate: `${new Date().getFullYear()}-11-01`,
-    winterEndDate: `${new Date().getFullYear() + 1}-03-31`,
+  type: 'manual' as const,
+  winterStartDate: `${new Date().getFullYear()}-11-01`,
+  winterEndDate: `${new Date().getFullYear() + 1}-03-31`,
 };
 
 const MONTHS = Array.from({ length: 12 }, (_, i) => ({ value: i + 1, name: new Date(0, i).toLocaleString('ru-RU', { month: 'long' }) }));
@@ -52,7 +52,7 @@ const SeasonSettingsModal: React.FC<SeasonSettingsModalProps> = ({ isOpen, onClo
     const { name, value } = e.target;
     setSettings(prev => ({ ...prev, [name]: value }));
   };
-  
+
   const handleNumericChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const { name, value } = e.target;
     setSettings(prev => ({ ...prev, [name]: parseInt(value, 10) }));
@@ -107,47 +107,47 @@ const SeasonSettingsModal: React.FC<SeasonSettingsModalProps> = ({ isOpen, onClo
 
               {settings.type === 'recurring' && (
                 <div className="p-4 border border-gray-200 dark:border-gray-600 rounded-lg space-y-4 bg-gray-50 dark:bg-gray-700">
-                    <h4 className="font-semibold text-gray-800 dark:text-white">Даты перехода</h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
-                        <label className="block space-y-1">
-                            <span className="text-sm font-medium text-gray-600 dark:text-gray-300">Переход на летние нормы</span>
-                            <div className="flex gap-2">
-                                <select name="summerDay" value={settings.summerDay} onChange={handleNumericChange} className="w-full bg-white dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded-md p-2">
-                                    {DAYS.map(d => <option key={d} value={d}>{d}</option>)}
-                                </select>
-                                <select name="summerMonth" value={settings.summerMonth} onChange={handleNumericChange} className="w-full bg-white dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded-md p-2">
-                                    {MONTHS.map(m => <option key={m.value} value={m.value}>{m.name}</option>)}
-                                </select>
-                            </div>
-                        </label>
-                         <label className="block space-y-1">
-                            <span className="text-sm font-medium text-gray-600 dark:text-gray-300">Переход на зимние нормы</span>
-                            <div className="flex gap-2">
-                                <select name="winterDay" value={settings.winterDay} onChange={handleNumericChange} className="w-full bg-white dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded-md p-2">
-                                    {DAYS.map(d => <option key={d} value={d}>{d}</option>)}
-                                </select>
-                                <select name="winterMonth" value={settings.winterMonth} onChange={handleNumericChange} className="w-full bg-white dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded-md p-2">
-                                    {MONTHS.map(m => <option key={m.value} value={m.value}>{m.name}</option>)}
-                                </select>
-                            </div>
-                        </label>
-                    </div>
+                  <h4 className="font-semibold text-gray-800 dark:text-white">Даты перехода</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
+                    <label className="block space-y-1">
+                      <span className="text-sm font-medium text-gray-600 dark:text-gray-300">Переход на летние нормы</span>
+                      <div className="flex gap-2">
+                        <select name="summerDay" value={settings.summerDay} onChange={handleNumericChange} className="w-full bg-white dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded-md p-2">
+                          {DAYS.map(d => <option key={d} value={d}>{d}</option>)}
+                        </select>
+                        <select name="summerMonth" value={settings.summerMonth} onChange={handleNumericChange} className="w-full bg-white dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded-md p-2">
+                          {MONTHS.map(m => <option key={m.value} value={m.value}>{m.name}</option>)}
+                        </select>
+                      </div>
+                    </label>
+                    <label className="block space-y-1">
+                      <span className="text-sm font-medium text-gray-600 dark:text-gray-300">Переход на зимние нормы</span>
+                      <div className="flex gap-2">
+                        <select name="winterDay" value={settings.winterDay} onChange={handleNumericChange} className="w-full bg-white dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded-md p-2">
+                          {DAYS.map(d => <option key={d} value={d}>{d}</option>)}
+                        </select>
+                        <select name="winterMonth" value={settings.winterMonth} onChange={handleNumericChange} className="w-full bg-white dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded-md p-2">
+                          {MONTHS.map(m => <option key={m.value} value={m.value}>{m.name}</option>)}
+                        </select>
+                      </div>
+                    </label>
+                  </div>
                 </div>
               )}
 
               {settings.type === 'manual' && (
                 <div className="p-4 border border-gray-200 dark:border-gray-600 rounded-lg space-y-4 bg-gray-50 dark:bg-gray-700">
-                    <h4 className="font-semibold text-gray-800 dark:text-white">Зимний период</h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
-                        <label className="block space-y-1">
-                             <span className="text-sm font-medium text-gray-600 dark:text-gray-300">Дата начала</span>
-                            <input type="date" name="winterStartDate" value={settings.winterStartDate} onChange={handleChange} className="w-full bg-white dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded-md p-2" />
-                        </label>
-                        <label className="block space-y-1">
-                            <span className="text-sm font-medium text-gray-600 dark:text-gray-300">Дата окончания</span>
-                            <input type="date" name="winterEndDate" value={settings.winterEndDate} onChange={handleChange} className="w-full bg-white dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded-md p-2" />
-                        </label>
-                    </div>
+                  <h4 className="font-semibold text-gray-800 dark:text-white">Зимний период</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
+                    <label className="block space-y-1">
+                      <span className="text-sm font-medium text-gray-600 dark:text-gray-300">Дата начала</span>
+                      <input type="date" name="winterStartDate" value={settings.winterStartDate} onChange={handleChange} className="w-full bg-white dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded-md p-2" />
+                    </label>
+                    <label className="block space-y-1">
+                      <span className="text-sm font-medium text-gray-600 dark:text-gray-300">Дата окончания</span>
+                      <input type="date" name="winterEndDate" value={settings.winterEndDate} onChange={handleChange} className="w-full bg-white dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded-md p-2" />
+                    </label>
+                  </div>
                 </div>
               )}
 
@@ -155,10 +155,10 @@ const SeasonSettingsModal: React.FC<SeasonSettingsModalProps> = ({ isOpen, onClo
             </>
           )}
         </main>
-        
+
         <footer className="p-4 bg-gray-50 dark:bg-gray-700/50 border-t border-gray-200 dark:border-gray-700 flex justify-end gap-3 flex-shrink-0">
-            <button onClick={onClose} className="bg-gray-200 dark:bg-gray-600 text-gray-800 dark:text-white font-semibold py-2 px-4 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-500 transition-colors">Отмена</button>
-            <button onClick={handleSave} disabled={isLoading} className="bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md hover:bg-blue-700 transition-colors disabled:bg-blue-400">Сохранить</button>
+          <button onClick={onClose} className="bg-gray-200 dark:bg-gray-600 text-gray-800 dark:text-white font-semibold py-2 px-4 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-500 transition-colors">Отмена</button>
+          <button onClick={handleSave} disabled={isLoading} className="bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md hover:bg-blue-700 transition-colors disabled:bg-blue-400">Сохранить</button>
         </footer>
 
       </div>

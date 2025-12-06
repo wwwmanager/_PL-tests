@@ -43,8 +43,22 @@ export async function getBlankBatches(): Promise<WaybillBlankBatch[]> {
 }
 
 export async function createBlankBatch(data: Omit<WaybillBlankBatch, 'id' | 'status'>): Promise<WaybillBlankBatch> {
-    const response = await httpClient.post<{ data: WaybillBlankBatch }>('/blanks/batches', data);
-    return response.data;
+    // Map frontend fields to backend DTO
+    const backendPayload = {
+        organizationId: data.organizationId,  // Important: pass selected org
+        series: data.series,
+        numberFrom: data.startNumber,
+        numberTo: data.endNumber,
+        departmentId: undefined  // optional
+    };
+    console.log('📡 [realBlankApi] Creating batch:', backendPayload);
+    const response = await httpClient.post<WaybillBlankBatch>('/blanks/batches', backendPayload);
+    // Backend returns batch directly, transform to frontend format
+    return {
+        ...(response as any),
+        startNumber: backendPayload.numberFrom,
+        endNumber: backendPayload.numberTo
+    };
 }
 
 export async function issueBlanksToDriver(params: { batchId: string, ownerEmployeeId: string, ranges: { from: number, to: number }[] }, ctx: any): Promise<void> {
@@ -84,14 +98,24 @@ export async function issueBlanksToDriver(params: { batchId: string, ownerEmploy
 }
 
 export async function searchBlanks(filters: BlankFilters): Promise<{ items: WaybillBlank[], total: number }> {
-    const response = await httpClient.get<BlankListResponse>('/blanks', { params: filters });
+    const params = new URLSearchParams();
+    if (filters.series) params.append('series', filters.series);
+    if (filters.number) params.append('number', String(filters.number));
+    if (filters.status && filters.status.length > 0) params.append('status', filters.status.join(','));
+    if (filters.ownerEmployeeId) params.append('ownerEmployeeId', filters.ownerEmployeeId);
+    if (filters.page) params.append('page', String(filters.page));
+    if (filters.pageSize) params.append('pageSize', String(filters.pageSize));
+
+    const queryString = params.toString() ? `?${params.toString()}` : '';
+    const response = await httpClient.get<BlankListResponse>(`/blanks${queryString}`);
     return { items: response.items, total: response.total };
 }
 
 // These are needed for the component but might not be in the new API yet
 export async function materializeBatch(batchId: string): Promise<{ created: number }> {
-    // In real backend, batches are materialized on creation.
-    return { created: 0 };
+    console.log('📡 [realBlankApi] Materializing batch:', batchId);
+    const response = await httpClient.post<{ count: number; message: string }>(`/blanks/batches/${batchId}/materialize`, {});
+    return { created: response.count || 0 };
 }
 
 export async function spoilBlank(params: any, ctx: any): Promise<void> {
@@ -109,3 +133,23 @@ export async function countBlanksByFilter(filter: any): Promise<number> {
     const { total } = await searchBlanks({ ...filter, page: 1, pageSize: 1 });
     return total;
 }
+
+// Types for driver blank summary
+export interface DriverBlankRange {
+    series: string;
+    numberStart: number;
+    numberEnd: number;
+    count: number;
+}
+
+export interface DriverBlankSummary {
+    active: DriverBlankRange[];
+    used: DriverBlankRange[];
+    spoiled: DriverBlankRange[];
+}
+
+export async function getDriverBlankSummary(driverId: string): Promise<DriverBlankSummary> {
+    const response = await httpClient.get<DriverBlankSummary>(`/blanks/summary/driver/${driverId}`);
+    return response;
+}
+

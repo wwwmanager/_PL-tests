@@ -12,6 +12,11 @@ import { router as fuelTypeRoutes } from './fuelTypeRoutes';
 import { router as routeRoutes } from './routeRoutes';
 import { router as stockRoutes } from './stockRoutes';
 import { router as driverRoutes } from './driverRoutes';
+import { router as fuelCardRoutes } from './fuelCardRoutes';
+import { router as userRoutes } from './userRoutes';
+import { router as roleRoutes } from './roleRoutes';
+import { router as settingsRoutes } from './settingsRoutes';
+import { router as dashboardRoutes } from './dashboardRoutes';
 
 export const router = Router();
 
@@ -28,9 +33,15 @@ router.use('/fuel-types', fuelTypeRoutes);
 router.use('/routes', routeRoutes);
 router.use('/stock', stockRoutes);
 router.use('/drivers', driverRoutes);
-router.use('/warehouses', warehouseRoutes);
+router.use('/fuel-cards', fuelCardRoutes);
+router.use('/users', userRoutes);
+router.use('/roles', roleRoutes);
+router.use('/settings', settingsRoutes);
+router.use('/dashboard', dashboardRoutes);
 
 // Health check endpoint
 router.get('/health', (req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
+
+

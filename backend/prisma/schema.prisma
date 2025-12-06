@@ -61,10 +61,28 @@ enum AuditActionType {
 
 model Organization {
   id        String   @id @default(uuid()) @db.Uuid // Изменено: uuid() вместо gen_random_uuid()
-  name      String   @db.Text
+  name      String   @db.Text  // Deprecated, use shortName
+  shortName String?  @db.Text
+  fullName  String?  @db.Text
   inn       String?  @db.VarChar(12)
   kpp       String?  @db.VarChar(9)
+  ogrn      String?  @db.VarChar(15)
   address   String?  @db.Text
+  registrationDate String? @db.Text
+  contactPerson String? @db.Text
+  phone     String?  @db.Text
+  email     String?  @db.Text
+  bankAccount String? @db.Text
+  bankName  String?  @db.Text
+  bankBik   String?  @db.VarChar(9)
+  correspondentAccount String? @db.Text
+  accountCurrency String? @db.Text
+  paymentPurpose String? @db.Text
+  status    String   @default("Active") @db.Text
+  group     String?  @db.Text
+  notes     String?  @db.Text
+  medicalLicenseNumber String? @db.Text
+  medicalLicenseIssueDate String? @db.Text
   createdAt DateTime @default(now()) @db.Timestamp(6)
   updatedAt DateTime @default(now()) @updatedAt @db.Timestamp(6)
 
@@ -554,3 +572,13 @@ model RefreshToken {
 
   @@map("refresh_tokens")
 }
+
+/// Настройки приложения (key-value с JSON значением)
+model Setting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @default(now()) @updatedAt @db.Timestamp(6)
+
+  @@map("settings")
+}
+
