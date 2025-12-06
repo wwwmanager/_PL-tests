@@ -30,15 +30,15 @@ export async function getEmployees(filters: EmployeeFilters = {}): Promise<Emplo
         `/employees?${params.toString()}`
     );
 
-    // Backend returns { success: true, data: { employees: [...], total, page, ... } }
-    return response.data?.data?.employees || response.data?.employees || [];
+    // httpClient already unwraps response.data, so backend { success: true, data: {...} } becomes response.data
+    return response.data?.employees || [];
 }
 
 export async function getEmployeeById(id: string): Promise<Employee> {
     const response = await httpClient.get<{ success: boolean; data: { employee: Employee } }>(
         `/employees/${id}`
     );
-    return response.data.data.employee;
+    return response.data.employee;
 }
 
 export async function createEmployee(data: Partial<Employee>): Promise<Employee> {
@@ -46,7 +46,7 @@ export async function createEmployee(data: Partial<Employee>): Promise<Employee>
         '/employees',
         data
     );
-    return response.data.data.employee;
+    return response.data.employee;
 }
 
 export async function updateEmployee(id: string, data: Partial<{
@@ -60,7 +60,7 @@ export async function updateEmployee(id: string, data: Partial<{
         `/employees/${id}`,
         data
     );
-    return response.data.data.employee;
+    return response.data.employee;
 }
 
 export async function deleteEmployee(id: string): Promise<void> {

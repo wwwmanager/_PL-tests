@@ -493,7 +493,7 @@ export const fetchVehicles = async (
     result = result.filter((vehicle) => {
       const haystack = [
         vehicle.brand,
-        vehicle.plateNumber,
+        vehicle.registrationNumber,
         vehicle.vin,
       ]
         .filter(Boolean)
@@ -1115,10 +1115,10 @@ export const getIssues = async (filters: { vehicleId?: string } = {}) => {
 
   vehiclesToCheck.forEach(v => {
     if (v.diagnosticCardExpiryDate && new Date(v.diagnosticCardExpiryDate) < in30Days) {
-      expiringDocs.push({ type: 'Диагностическая карта', name: v.plateNumber, date: v.diagnosticCardExpiryDate });
+      expiringDocs.push({ type: 'Диагностическая карта', name: v.registrationNumber, date: v.diagnosticCardExpiryDate });
     }
     if (v.osagoEndDate && new Date(v.osagoEndDate) < in30Days) {
-      expiringDocs.push({ type: 'ОСАГО', name: v.plateNumber, date: v.osagoEndDate });
+      expiringDocs.push({ type: 'ОСАГО', name: v.registrationNumber, date: v.osagoEndDate });
     }
   });
 
@@ -1265,7 +1265,7 @@ export const getDashboardData = async (filters: { vehicleId: string; dateFrom: s
 export const getWaybills = async () => {
   await initFromStorage();
   const orgMap = new Map(organizations.map(o => [o.id, o.shortName]));
-  const vehicleMap = new Map(vehicles.map(v => [v.id, `${v.brand} ${v.plateNumber} `]));
+  const vehicleMap = new Map(vehicles.map(v => [v.id, `${v.brand} ${v.registrationNumber} `]));
   const driverMap = new Map(drivers.map(d => [d.id, d.shortName]));
 
   const enriched = waybills.map(w => ({

@@ -15,6 +15,18 @@ export async function createBatch(req: Request, res: Response, next: NextFunctio
     }
 }
 
+export async function materializeBatch(req: Request, res: Response, next: NextFunction) {
+    try {
+        const orgId = req.user!.organizationId;
+        const { id } = req.params;
+
+        const result = await blankService.materializeBatch(orgId, id);
+        res.json(result);
+    } catch (err) {
+        next(err);
+    }
+}
+
 export async function listBlanks(req: Request, res: Response, next: NextFunction) {
     try {
         const orgId = req.user!.organizationId;
@@ -43,3 +55,4 @@ export async function issueBlank(req: Request, res: Response, next: NextFunction
         next(err);
     }
 }
+

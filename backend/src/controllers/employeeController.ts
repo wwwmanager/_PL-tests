@@ -4,10 +4,12 @@ import * as employeeService from '../services/employeeService';
 
 export async function listEmployees(req: Request, res: Response, next: NextFunction) {
     try {
-        const { organizationId, departmentId, isActive, page, limit } = req.query;
+        // Extract organizationId from authenticated user (set by auth middleware)
+        const organizationId = req.user!.organizationId;
+        const { departmentId, isActive, page, limit } = req.query;
 
         const filters: employeeService.EmployeeFilters = {
-            organizationId: organizationId as string,
+            organizationId,  // Always filter by user's organization
             departmentId: departmentId as string,
             isActive: isActive === 'true' ? true : isActive === 'false' ? false : undefined,
             page: page ? parseInt(page as string) : undefined,
@@ -49,7 +51,13 @@ export async function getEmployeeById(req: Request, res: Response, next: NextFun
 
 export async function createEmployee(req: Request, res: Response, next: NextFunction) {
     try {
-        const employee = await employeeService.createEmployee(req.body);
+        // Extract organizationId from authenticated user (set by auth middleware)
+        const organizationId = req.user!.organizationId;
+
+        const employee = await employeeService.createEmployee({
+            ...req.body,
+            organizationId  // Override/add organizationId from token
+        });
 
         res.status(201).json({
             success: true,

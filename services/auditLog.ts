@@ -230,7 +230,7 @@ export function inferCategoryByKeyName(key: string): KeyCategory {
 }
 export function makeLabel(obj: any) {
   if (!obj || typeof obj !== 'object') return undefined;
-  return obj.name || obj.title || obj.fullName || obj.number || obj.plateNumber || obj.brand || obj.code || obj.id || undefined;
+  return obj.name || obj.title || obj.fullName || obj.number || obj.registrationNumber || obj.brand || obj.code || obj.id || undefined;
 }
 
 export const PARAMS_CONFIG = {
@@ -238,7 +238,7 @@ export const PARAMS_CONFIG = {
     'id', 'number', 'date',
     { field: 'routeCount', derive: (o: any) => Array.isArray(o?.routes) ? o.routes.length : 0 },
   ],
-  vehicles: ['id', 'plateNumber', 'brand', 'year', 'fuelTankCapacity'],
+  vehicles: ['id', 'registrationNumber', 'brand', 'year', 'fuelTankCapacity'],
   employees: ['id', 'fullName', 'position', 'employeeType'],
   organizations: ['id', 'fullName', 'inn'],
   fuelTypes: ['id','code','name','density'],
@@ -258,7 +258,7 @@ export function buildParams(key: string, obj: any) {
     }
   }
   if (!Object.keys(out).length) {
-    const fallback = ['id','code','name','number','fullName','plateNumber','brand'];
+    const fallback = ['id','code','name','number','fullName','registrationNumber','brand'];
     for (const f of fallback) if (obj?.[f] !== undefined) { out[f] = obj[f]; break; }
   }
   return out;

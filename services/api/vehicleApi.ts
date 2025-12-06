@@ -12,21 +12,23 @@ export async function getVehicles(filters: VehicleFilters = {}): Promise<Vehicle
     const params = new URLSearchParams();
     if (filters.organizationId) params.append('organizationId', filters.organizationId);
 
-    // Backend returns Vehicle[] directly, not wrapped
-    const response = await httpClient.get<Vehicle[]>(`/vehicles?${params.toString()}`);
-    return response.data || [];
+    console.log('🔍 [vehicleApi] Calling GET /vehicles with params:', params.toString());
+    // httpClient returns data directly (unwrapped)
+    const vehiclesArray = await httpClient.get<Vehicle[]>(`/vehicles?${params.toString()}`);
+    console.log('🔍 [vehicleApi] GET /vehicles response:', vehiclesArray);
+    return vehiclesArray || [];
 }
 
 export async function getVehicleById(id: string): Promise<Vehicle> {
-    // Backend returns Vehicle directly, not wrapped
-    const response = await httpClient.get<Vehicle>(`/vehicles/${id}`);
-    return response.data;
+    // httpClient returns data directly (unwrapped)
+    const vehicle = await httpClient.get<Vehicle>(`/vehicles/${id}`);
+    return vehicle;
 }
 
 export async function createVehicle(data: Partial<Vehicle>): Promise<Vehicle> {
-    // Backend returns Vehicle directly, not wrapped
-    const response = await httpClient.post<Vehicle>('/vehicles', data);
-    return response.data;
+    // httpClient returns data directly (unwrapped)
+    const vehicle = await httpClient.post<Vehicle>('/vehicles', data);
+    return vehicle;
 }
 
 export async function updateVehicle(data: Partial<Vehicle> & { id: string }): Promise<Vehicle> {

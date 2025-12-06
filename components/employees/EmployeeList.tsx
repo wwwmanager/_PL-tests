@@ -285,16 +285,25 @@ const EmployeeList: React.FC = () => {
         }
 
         try {
+            // Save employee
             if ('id' in currentItem! && currentItem.id) {
                 await updateEmployee(currentItem.id!, currentItem as Employee);
             } else {
                 await createEmployee(currentItem as Omit<Employee, 'id'>);
             }
+
+            // Show success and close modal BEFORE refetching
             showToast("Изменения сохранены");
             setCurrentItem(null);
             setInitialItem(null);
-            fetchData();
+
+            // Refetch data in background (won't show error if it fails)
+            fetchData().catch(() => {
+                // Silent fail - data will be stale but user saw success
+                console.error('Failed to refresh employee list after save');
+            });
         } catch (error) {
+            // Only show error if the SAVE failed
             showToast("Не удалось сохранить изменения.", "error");
         }
     };

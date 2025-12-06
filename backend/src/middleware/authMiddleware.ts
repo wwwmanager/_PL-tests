@@ -7,6 +7,7 @@ declare module 'express-serve-static-core' {
         user?: {
             id: string;
             organizationId: string;
+            departmentId: string | null;  // NEW: department-level isolation
             role: string;
         };
     }
@@ -31,6 +32,7 @@ export const authMiddleware = (req: Request, res: Response, next: NextFunction) 
         req.user = {
             id: payload.sub,
             organizationId: payload.organizationId,
+            departmentId: payload.departmentId,  // NEW: extract from JWT
             role: payload.role,
         };
         console.log('[authMiddleware] req.user set:', req.user);

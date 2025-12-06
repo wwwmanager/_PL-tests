@@ -53,6 +53,54 @@ export async function createBatch(organizationId: string, userId: string, data: 
     return batch;
 }
 
+export async function materializeBatch(organizationId: string, batchId: string) {
+    // Find the batch
+    const batch = await prisma.blankBatch.findFirst({
+        where: { id: batchId, organizationId }
+    });
+
+    if (!batch) {
+        throw new Error('Партия бланков не найдена');
+    }
+
+    // Check if blanks already exist for this batch
+    const existingCount = await prisma.blank.count({
+        where: { batchId }
+    });
+
+    if (existingCount > 0) {
+        return {
+            message: 'Бланки уже материализованы',
+            count: existingCount,
+            batch
+        };
+    }
+
+    // Generate individual blanks (same logic as createBatch)
+    const blanksData = [];
+    for (let i = batch.numberFrom; i <= batch.numberTo; i++) {
+        blanksData.push({
+            organizationId,
+            departmentId: batch.departmentId,
+            batchId: batch.id,
+            series: batch.series || '',
+            number: i,
+            status: BlankStatus.AVAILABLE
+        });
+    }
+
+    await prisma.blank.createMany({
+        data: blanksData,
+        skipDuplicates: true
+    });
+
+    return {
+        message: 'Бланки успешно материализованы',
+        count: blanksData.length,
+        batch
+    };
+}
+
 export async function listBlanks(organizationId: string, filters: { series?: string; status?: BlankStatus; page?: number; limit?: number }) {
     const page = filters.page || 1;
     const limit = filters.limit || 50;

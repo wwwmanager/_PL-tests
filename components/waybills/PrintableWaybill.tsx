@@ -342,7 +342,7 @@ const PrintableWaybill: FC<PrintableWaybillProps> = ({
         case 'vehicleBrand':
           return vehicle?.brand ?? '';
         case 'vehiclePlate':
-          return vehicle?.plateNumber ?? '';
+          return vehicle?.registrationNumber ?? '';
         case 'driverFullName':
           return driver?.fullName ?? '';
         case 'driverPersonnelNumber':

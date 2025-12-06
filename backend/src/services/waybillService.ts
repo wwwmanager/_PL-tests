@@ -138,6 +138,25 @@ export async function createWaybill(organizationId: string, input: CreateWaybill
     });
     if (!driver) throw new BadRequestError('Водитель не найден');
 
+    // Verify blank if provided
+    let validatedBlankId = null;
+    if (input.blankId) {
+        const blank = await prisma.blank.findFirst({
+            where: { id: input.blankId, organizationId }
+        });
+
+        if (!blank) {
+            throw new BadRequestError('Бланк не найден');
+        }
+
+        // SECURITY: Blank must belong to the same department as the vehicle
+        if (blank.departmentId !== vehicle.departmentId) {
+            throw new BadRequestError('Бланк принадлежит другому подразделению');
+        }
+
+        validatedBlankId = blank.id;
+    }
+
     // Create waybill with fuelLines
     return prisma.waybill.create({
         data: {
@@ -147,7 +166,7 @@ export async function createWaybill(organizationId: string, input: CreateWaybill
             date: date,
             vehicleId: input.vehicleId,
             driverId: input.driverId,
-            blankId: input.blankId || null,
+            blankId: validatedBlankId,
             odometerStart: input.odometerStart,
             odometerEnd: input.odometerEnd,
             plannedRoute: input.plannedRoute,

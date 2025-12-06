@@ -47,10 +47,10 @@ async function main() {
 
     const permissionCodes = [
         // Waybills
-        'waybill.create', 'waybill.submit', 'waybill.post', 'waybill.cancel',
+        'waybill.read', 'waybill.create', 'waybill.submit', 'waybill.post', 'waybill.cancel',
         'waybill.backdate', 'waybill.correct',
         // Blanks
-        'blanks.issue', 'blanks.return', 'blanks.spoil.self', 'blanks.spoil.warehouse',
+        'blank.read', 'blank.create', 'blanks.issue', 'blanks.return', 'blanks.spoil.self', 'blanks.spoil.warehouse',
         'blanks.spoil.override',
         // RBAC
         'rbac.delegate',
@@ -86,10 +86,10 @@ async function main() {
     const rolePolicies: Record<string, string[]> = {
         admin: permissionCodes, // все права
         dispatcher: [
-            'waybill.create', 'waybill.submit', 'waybill.cancel',
+            'waybill.read', 'waybill.create', 'waybill.submit', 'waybill.cancel',
             'vehicle.view', 'vehicle.create', 'vehicle.update',
             'driver.view', 'driver.create', 'driver.update',
-            'stock.view', 'blanks.issue', 'blanks.return',
+            'stock.view', 'blank.read', 'blank.create', 'blanks.issue', 'blanks.return',
         ],
         mechanic: [
             'blanks.issue', 'blanks.return', 'blanks.spoil.warehouse',
@@ -199,6 +199,36 @@ async function main() {
     await prisma.userRole.create({
         data: { userId: mechanicUser.id, roleId: roleMap.mechanic.id },
     });
+
+    // E2E test users for department isolation
+    const userDeptA = await prisma.user.create({
+        data: {
+            organizationId: org.id,
+            departmentId: mainDept.id,
+            email: 'user_dept_a',
+            passwordHash,
+            fullName: 'Пользователь Подразделения A',
+        },
+    });
+
+    await prisma.userRole.create({
+        data: { userId: userDeptA.id, roleId: roleMap.dispatcher.id },
+    });
+
+    const userDeptB = await prisma.user.create({
+        data: {
+            organizationId: org.id,
+            departmentId: branchDept.id,
+            email: 'user_dept_b',
+            passwordHash,
+            fullName: 'Пользователь Подразделения B',
+        },
+    });
+
+    await prisma.userRole.create({
+        data: { userId: userDeptB.id, roleId: roleMap.dispatcher.id },
+    });
+
 
     // ============================================================================
     // 7. EMPLOYEES & DRIVERS
@@ -578,20 +608,22 @@ async function main() {
     console.log(`   - ${roles.length} roles`);
     console.log(`   - ${permissions.length} permissions`);
     console.log(`   - 1 organization`);
-    console.log(`   - 2 departments`);
-    console.log(`   - 3 users (admin, dispatcher, mechanic)`);
-    console.log(`   - 3 drivers`);
-    console.log(`   - 3 vehicles`);
-    console.log(`   - 2 fuel cards`);
-    console.log(`   - 2 warehouses`);
-    console.log(`   - 4 stock items`);
-    console.log(`   - 100 blanks (ЧБ 1-100)`);
-    console.log(`   - 2 waybills`);
+    console.log('   - 2 departments');
+    console.log('   - 5 users (admin, dispatcher, mechanic, user_dept_a, user_dept_b)');
+    console.log('   - 3 drivers');
+    console.log('   - 3 vehicles');
+    console.log('   - 2 fuel cards');
+    console.log('   - 2 warehouses');
+    console.log('   - 4 stock items');
+    console.log('   - 100 blanks (ЧБ 1-100)');
+    console.log('   - 2 waybills');
     console.log('');
     console.log('🔑 Test credentials:');
-    console.log('   admin / 123 (admin)');
-    console.log('   dispatcher@test.ru / password123 (dispatcher)');
-    console.log('   mechanic@test.ru / password123 (mechanic)');
+    console.log('   admin / 123 (admin, no department)');
+    console.log('   user_dept_a / 123 (dispatcher, Main Department)');
+    console.log('   user_dept_b / 123 (dispatcher, Branch-01)');
+    console.log('   dispatcher@test.ru / 123 (dispatcher, Main Department)');
+    console.log('   mechanic@test.ru / 123 (mechanic, Main Department)');
 }
 
 main()

@@ -141,7 +141,7 @@ const waybillBlankBatchSchema = z.object({
 
 const vehicleSchema = z.object({
   id: z.string(),
-  plateNumber: z.string(),
+  registrationNumber: z.string(),
   brand: z.string(),
   vin: z.string(),
   mileage: z.number(),

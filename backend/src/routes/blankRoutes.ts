@@ -15,6 +15,10 @@ router.get('/', checkPermission('blank.read'), blankController.listBlanks);
 // Create batch (create permission)
 router.post('/batches', checkPermission('blank.create'), blankController.createBatch);
 
+// Materialize batch (create permission) - for E2E test clarity, though createBatch already does this
+router.post('/batches/:id/materialize', checkPermission('blank.create'), blankController.materializeBatch);
+
 // Issue blank (update/issue permission)
 // Assuming 'blank.issue' is a specific permission, or reusing 'blank.update'
 router.post('/issue', checkPermission('blank.update'), blankController.issueBlank);
+

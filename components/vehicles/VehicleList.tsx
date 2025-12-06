@@ -40,8 +40,8 @@ const maintenanceRecordSchema = z.object({
 
 const vehicleSchema = z.object({
     id: z.string().optional(),
-    plateNumber: z.string().min(1, "Гос. номер обязателен").superRefine((val, ctx) => {
-        const error = validation.plateNumber(val);
+    registrationNumber: z.string().min(1, "Гос. номер обязателен").superRefine((val, ctx) => {
+        const error = validation.registrationNumber(val);
         if (error) ctx.addIssue({ code: z.ZodIssueCode.custom, message: error });
     }),
     brand: z.string().min(1, "Марка/модель обязательна"),
@@ -98,7 +98,7 @@ export const VehicleList: React.FC = () => {
     });
 
     const currentId = watch("id");
-    const currentPlateNumber = watch("plateNumber");
+    const currentregistrationNumber = watch("registrationNumber");
 
     const COLLAPSED_SECTIONS_KEY = 'vehicleList_collapsedSections';
     const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>(() => {
@@ -117,20 +117,23 @@ export const VehicleList: React.FC = () => {
     };
 
     const fetchData = async () => {
+        console.log('🔍 [VehicleList] fetchData called');
         try {
             setIsLoading(true);
+            console.log('🔍 [VehicleList] Calling getVehicles()...');
             const [vehiclesData, fuelTypesData, employeesData, organizationsData] = await Promise.all([
                 getVehicles(),
                 getFuelTypes(),
                 getEmployees(),
                 getOrganizations()
             ]);
+            console.log('🔍 [VehicleList] Received data:', { vehiclesCount: vehiclesData.length });
             setVehicles(vehiclesData);
             setFuelTypes(fuelTypesData);
             setEmployees(employeesData.filter(e => e.employeeType === 'driver'));
             setOrganizations(organizationsData);
         } catch (e) {
-            console.error('Ошибка загрузки данных:', e);
+            console.error('❌ [VehicleList] Error in fetchData:', e);
             showToast('Не удалось загрузить данные', 'error');
         } finally {
             setIsLoading(false);
@@ -155,7 +158,7 @@ export const VehicleList: React.FC = () => {
     type EnrichedVehicleKey = Extract<keyof EnrichedVehicle, string>;
 
     const columns: { key: EnrichedVehicleKey; label: string }[] = [
-        { key: 'plateNumber', label: 'Гос. номер' },
+        { key: 'registrationNumber', label: 'Гос. номер' },
         { key: 'brand', label: 'Марка и модель' },
         { key: 'driverName', label: 'Водитель' },
         { key: 'status', label: 'Статус' },
@@ -215,13 +218,13 @@ export const VehicleList: React.FC = () => {
         try {
             if (type === 'delete') {
                 await deleteVehicle(item.id);
-                showToast(`ТС "${item.plateNumber}" удалено.`, 'info');
+                showToast(`ТС "${item.registrationNumber}" удалено.`, 'info');
             } else if (type === 'archive') {
                 await updateVehicle({ ...item, status: VehicleStatus.ARCHIVED });
-                showToast(`ТС "${item.plateNumber}" архивировано.`, 'info');
+                showToast(`ТС "${item.registrationNumber}" архивировано.`, 'info');
             } else if (type === 'unarchive') {
                 await updateVehicle({ ...item, status: VehicleStatus.ACTIVE });
-                showToast(`ТС "${item.plateNumber}" восстановлено.`, 'info');
+                showToast(`ТС "${item.registrationNumber}" восстановлено.`, 'info');
             }
             fetchData();
         } catch (error) {
@@ -236,9 +239,9 @@ export const VehicleList: React.FC = () => {
         if (!type || !item) return { title: '', message: '', confirmText: '', confirmButtonClass: '' };
 
         switch (type) {
-            case 'delete': return { title: 'Подтвердить удаление', message: `Удалить ТС "${item.plateNumber}"?`, confirmText: 'Удалить', confirmButtonClass: 'bg-red-600 hover:bg-red-700' };
-            case 'archive': return { title: 'Подтвердить архивацию', message: `Архивировать "${item.plateNumber}"?`, confirmText: 'Архивировать', confirmButtonClass: 'bg-purple-600 hover:bg-purple-700' };
-            case 'unarchive': return { title: 'Подтвердить восстановление', message: `Восстановить "${item.plateNumber}" из архива?`, confirmText: 'Восстановить', confirmButtonClass: 'bg-green-600 hover:bg-green-700' };
+            case 'delete': return { title: 'Подтвердить удаление', message: `Удалить ТС "${item.registrationNumber}"?`, confirmText: 'Удалить', confirmButtonClass: 'bg-red-600 hover:bg-red-700' };
+            case 'archive': return { title: 'Подтвердить архивацию', message: `Архивировать "${item.registrationNumber}"?`, confirmText: 'Архивировать', confirmButtonClass: 'bg-purple-600 hover:bg-purple-700' };
+            case 'unarchive': return { title: 'Подтвердить восстановление', message: `Восстановить "${item.registrationNumber}" из архива?`, confirmText: 'Восстановить', confirmButtonClass: 'bg-green-600 hover:bg-green-700' };
             default: return { title: '', message: '', confirmText: '', confirmButtonClass: '' };
         }
     }, [actionModal]);
@@ -251,7 +254,7 @@ export const VehicleList: React.FC = () => {
                 isOpen={isModalOpen}
                 onClose={handleCancel}
                 isDirty={isDirty}
-                title={currentId ? `Редактирование: ${currentPlateNumber}` : 'Добавить ТС'}
+                title={currentId ? `Редактирование: ${currentregistrationNumber}` : 'Добавить ТС'}
                 footer={
                     <>
                         <button onClick={handleCancel} className="bg-gray-200 dark:bg-gray-600 text-gray-800 dark:text-white font-semibold py-2 px-4 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-500">Отмена</button>
@@ -262,7 +265,7 @@ export const VehicleList: React.FC = () => {
                 <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
                     <CollapsibleSection title="Основная информация" isCollapsed={collapsedSections.basic || false} onToggle={() => toggleSection('basic')}>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <FormField label="Гос. номер" error={errors.plateNumber?.message} required><FormInput {...register("plateNumber")} /></FormField>
+                            <FormField label="Гос. номер" error={errors.registrationNumber?.message} required><FormInput {...register("registrationNumber")} /></FormField>
                             <FormField label="Марка, модель" error={errors.brand?.message} required><FormInput {...register("brand")} /></FormField>
                             <FormField label="Организация" error={errors.organizationId?.message}>
                                 <FormSelect {...register("organizationId")}>
@@ -360,7 +363,7 @@ export const VehicleList: React.FC = () => {
                             {isLoading ? (<tr><td colSpan={columns.length + 1} className="text-center p-4">Загрузка...</td></tr>)
                                 : rows.map(v => (
                                     <tr key={v.id} className="bg-white dark:bg-gray-800 border-b dark:border-gray-700">
-                                        <td className="px-6 py-4 font-medium text-gray-900 dark:text-white">{v.plateNumber}</td>
+                                        <td className="px-6 py-4 font-medium text-gray-900 dark:text-white">{v.registrationNumber}</td>
                                         <td className="px-6 py-4">{v.brand}</td>
                                         <td className="px-6 py-4">{v.driverName}</td>
                                         <td className="px-6 py-4"><span className={`px-2 py-1 text-xs font-semibold rounded-full ${VEHICLE_STATUS_COLORS[v.status]}`}>{VEHICLE_STATUS_TRANSLATIONS[v.status]}</span></td>

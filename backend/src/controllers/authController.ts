@@ -37,7 +37,8 @@ export async function getProfile(req: Request, res: Response, next: NextFunction
                     email: user.email,
                     role: primaryRole,
                     displayName: user.fullName,
-                    organizationId: user.organizationId
+                    organizationId: user.organizationId,
+                    departmentId: user.departmentId  // NEW: return department info
                 }
             }
         });

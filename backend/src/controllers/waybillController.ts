@@ -4,6 +4,7 @@ import * as waybillService from '../services/waybillService';
 export async function listWaybills(req: Request, res: Response, next: NextFunction) {
     try {
         const orgId = req.user!.organizationId;
+        const userDepartmentId = req.user!.departmentId;
 
         // Extract filters from query params
         const filters = {
@@ -12,7 +13,11 @@ export async function listWaybills(req: Request, res: Response, next: NextFuncti
             vehicleId: req.query.vehicleId as string | undefined,
             driverId: req.query.driverId as string | undefined,
             status: req.query.status as any,
-            departmentId: (req.query.departmentId as string) || undefined,
+            // IMPORTANT: If user has departmentId, filter by it (unless they explicitly request another dept)
+            // Admin users (no departmentId) can see all departments
+            departmentId: userDepartmentId
+                ? (req.query.departmentId as string) || userDepartmentId
+                : (req.query.departmentId as string) || undefined,
             search: req.query.search as string | undefined,
         };
 

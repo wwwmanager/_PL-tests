@@ -1,115 +1,46 @@
-# Central Mode Backend Integration Task
+# Список Задач
 
-## Main Objective
-Перевести Central mode на полную работу через backend API, убрать автологин и локальное хранилище из Central mode.
+## 🚀 Месяц 1: Основа (Backend + Данные)
+- [x] **Неделя 1: Схема и Каркас Backend**
+  - [x] Проектирование схемы PostgreSQL (Организации, Пользователи, ТС, Путевые листы, Бланки, Склад) <!-- id: 0 -->
+  - [x] Настройка Prisma и миграций <!-- id: 1 -->
+  - [x] Базовый Backend (Node + Express + TypeScript) <!-- id: 2 -->
+- [x] **Неделя 2: Аутентификация и RBAC**
+  - [x] Реализация аутентификации (Login, JWT) <!-- id: 3 -->
+  - [x] Реализация RBAC (Роли, Права) <!-- id: 4 -->
+  - [x] Изоляция по Организациям/Подразделениям <!-- id: 5 -->
+  - [x] Интеграция с Frontend (Auth Adapter) <!-- id: 6 -->
+- [x] **Неделя 3: Основной Домен (ПЛ и Бланки)**
+  - [x] API Путевых листов (CRUD, State Machine) <!-- id: 7 -->
+  - [x] API Бланков (Партии, Выдача) <!-- id: 8 -->
+  - [x] Базовый Аудит (Изменение статусов) <!-- id: 9 -->
+  - [x] Интеграция с Frontend (Фасад API ПЛ) <!-- id: 10 -->
+- [/] **Неделя 4: Склад, Топливо и Тесты**
+  - [x] API Склада (Номенклатура, Движения) <!-- id: 11 -->
+  - [x] Интеграция ПЛ -> Склад (Списание топлива при завершении) <!-- id: 12 -->
+  - [ ] API Топливных карт (Транзакции) <!-- id: 13 -->
+  - [x] Базовые E2E тесты (Playwright настроен, покрытие критических сценариев) <!-- id: 14 -->
 
-## Current Problems
+## 🛠 Месяц 2: Стабильность и UX
+- [x] **Неделя 5: E2E Тесты и CI**
+  - [x] Расширение сценариев Playwright (Login -> ПЛ -> Склад -> Бланки -> Изоляция) <!-- id: 15 -->
+  - [ ] Интеграция CI <!-- id: 16 -->
+- [ ] **Неделя 6: UX и Производительность (ТЕКУЩИЙ ПРИОРИТЕТ)**
+  - [ ] Продвинутые фильтры и поиск (Frontend UI) <!-- id: 17 -->
+  - [ ] Оптимизация (Lazy Loading) <!-- id: 18 -->
+  - [ ] Печатные формы (Стандарт РФ) <!-- id: 19 -->
+- [ ] **Неделя 7-8: Виртуализация и Отчеты**
+  - [ ] Виртуализация списков (react-window) <!-- id: 20 -->
+  - [ ] Базовые отчеты (Расход топлива, Пробег) <!-- id: 21 -->
+  - [ ] Экспорт в Excel/CSV <!-- id: 22 -->
 
-### Problem 1: DEV Autologin
-**Найдено:** В `services/auth.tsx` строки 165-172
-```typescript
-if (import.meta.env.DEV) {
-  const dev: User = {
-    id: 'dev-admin',
-    role: defaultRole,
-    displayName: 'Admin (DEV)',
-  };
-  setCurrentUser(dev);
-  await saveJSON(CURRENT_USER_KEY, dev);
-}
-```
-**Результат:** Пользователь автоматически логинится без ввода пароля
-
-### Problem 2: Два разных backend
-**Найдено:** 
-- `auth.tsx` использует `http://localhost:4000/api` (строка 35)
-- `waybillApi.ts` использует `http://localhost:3001/api` (через httpClient)
-**Результат:** Auth и данные идут на разные backend
-
-### Problem 3: waybillApi hardcoded USE_REAL_API
-**Найдено:** В `waybillApi.ts` строка 13: `const USE_REAL_API = true;`
-**Хорошо:** Захардкожен на true для отладки
-**Плохо:** Другие компоненты могут использовать mockApi напрямую
-
-### Problem 4: Локальное хранилище всё ещё используется
-**Потенциально:** Компоненты Dashboard, WaybillList могут читать из IndexedDB
-**Нужно проверить:** Все ли компоненты используют API фасады
-
-## Implementation Plan
-
-### Phase 1: Fix Authentication ✅ COMPLETED
-- [x] Унифицировать backend URL (3001 для всех) ✅
-- [x] Отключить автологин в Central mode (auth.tsx) ✅
-- [x] Настроить httpClient с правильным токеном backend ✅
-- [x] Убрать defaultRole prop из App.tsx ✅
-- [x] DEV autologin работает только в Driver mode ✅
-- [x] Исправить TypeScript ошибки в backend ✅
-- [x] Очистить и пересоздать PostgreSQL schema ✅
-- [x] Создать тестового пользователя (admin@example.com) ✅
-- [x] Login screen появляется в Central mode ✅
-- [x] **Добавить кнопку Logout** (добавлено + импорт LogoutIcon исправлен) ✅
-- [x] **Добавить backend endpoint /logout** (authController.ts + authRoutes.ts) ✅
-- [x] **Исправить пароль в Login.tsx** (password вместо Admin123!) ✅
-- [x] **TEST:** Logout возвращает на login screen ✅
-
-### Phase 2: Verify API Usage ✅ COMPLETED
-- [x] Проверить Dashboard использует waybillApi ✅ (используется dashboardApi + vehicleApi)
-- [x] Проверить WaybillList использует waybillApi ✅ (используется waybillApi + vehicleApi)
-- [x] Проверить Reports использует правильные API ✅ (FIXED: заменён на vehicleApi + waybillApi)
-- [x] Найти прямые импорты mockApi в компонентах ✅ (найдено 22 компонента)
-- [x] **FIX Reports.tsx** ✅ (заменён mockApi на API фасады)
-- [x] **FIX Pre TripInspectionReport.tsx** ✅ (заменён mockApi на API фасады)
-
-### Phase 3: Configure Modes ✅ COMPLETED
-- [x] Определить, где хранится режим Central/Driver ✅ (AppSettings in IndexedDB)
-- [x] Central mode: требовать реальный login ✅ (работает в auth.tsx)
-- [x] **Link USE_REAL_API to appMode dynamically** ✅ (FIXED: waybillApi.ts)
-  - Central mode: USE_REAL_API = true (использовать backend)
-  - Driver mode: USE_REAL_API = false (использовать mockApi + IndexedDB)
-- [x] Добавить явный переключатель режима ✅ (есть в Admin panel)
-- [ ] **TODO:** Test mode switching and add warning about app reload
-- [ ] **TODO:** Apply same pattern to vehicleApi, dashboardApi (если захардкожены)
-- [ ] **TODO:** Create facades for other entities (employeeApi, driverApi)
-
-### Phase 4: Test Complete Flow
-- [x] Test: Login через реальный backend ✅ (admin@example.com / password)
-- [ ] Test: Создание ПЛ в одном браузере
-- [ ] Test: Проверка ПЛ виден в другом браузере
-- [x] Test: Logout корректно работает ✅
-  - Токен удаляется из localStorage
-  - Возврат на экран входа
-  - Backend endpoint /logout возвращает 200 OK
-
-## Key Files to Modify
-
-1. **services/auth.tsx** (строки 165-172, 35)
-   - Отключить DEV autologin
-   - Изменить API_BASE на 3001
-
-2. **services/httpClient.ts**
-   - Проверить использует правильный URL backend
-   - Проверить токен правильно извлекается
-
-3. **App.tsx** (строка 235)
-   - Возможно убрать defaultRole="admin"
-
-4. **components/waybills/WaybillList.tsx**
-   - Проверить использует waybillApi а не mockApi
-
-5. **components/dashboard/Dashboard.tsx**
-   - Проверить использует правильные API
-
-## Success Criteria
-
-- [x] Backend запущен на 3001 ✅
-- [x] Central/Driver mode detection работает ✅
-- [x] TypeScript ошибки исправлены ✅
-- [x] Database schema пересоздана ✅
-- [x] Тестовый пользователь создан ✅
-- [x] Login экран показывается в Central mode ✅
-- [x] Успешный вход с admin@example.com / password ✅
-- [x] **Logout button:** Кнопка выхода работает ✅
-- [x] **TEST:** Logout успешно возвращает на login screen ✅
-- [x] **TEST:** Токен очищается из localStorage при logout ✅
-- [ ] **TEST:** Driver mode работает с DEV autologin
-- [ ] **TEST:** Token persists across page refresh
+## 🚀 Месяц 3: Подготовка к Продакшну
+- [ ] **Неделя 9: Мониторинг и Логирование**
+  - [ ] Структурированное логирование (Backend) <!-- id: 23 -->
+  - [ ] Мониторинг Frontend (Sentry) <!-- id: 24 -->
+- [ ] **Неделя 10: Безопасность и Бэкапы**
+  - [ ] Бэкапы БД (pg_dump) <!-- id: 25 -->
+  - [ ] Rate Limiting и заголовки безопасности <!-- id: 26 -->
+- [ ] **Неделя 11-12: Подготовка Пилота**
+  - [ ] Демо-режим и тестовые данные <!-- id: 27 -->
+  - [ ] Финальная полировка <!-- id: 28 -->

@@ -40,6 +40,7 @@ export async function login(email: string, password: string) {
     const token = signAccessToken({
         id: user.id,
         organizationId: user.organizationId,
+        departmentId: user.departmentId,  // NEW: include department
         role: primaryRole
     });
 
@@ -53,7 +54,8 @@ export async function login(email: string, password: string) {
                 email: user.email,
                 role: primaryRole,
                 displayName: user.fullName,
-                organizationId: user.organizationId
+                organizationId: user.organizationId,
+                departmentId: user.departmentId  // NEW: return department info
             }
         }
     };

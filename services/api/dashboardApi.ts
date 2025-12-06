@@ -148,8 +148,8 @@ export async function getIssues(filters: { vehicleId?: string }) {
 
     vehicles.forEach(v => {
         if (filters.vehicleId && v.id !== filters.vehicleId) return;
-        check(v.osagoEndDate, 'ОСАГО', `${v.brand} ${v.plateNumber}`);
-        check(v.diagnosticCardExpiryDate, 'Диагностическая карта', `${v.brand} ${v.plateNumber}`);
+        check(v.osagoEndDate, 'ОСАГО', `${v.brand} ${v.registrationNumber}`);
+        check(v.diagnosticCardExpiryDate, 'Диагностическая карта', `${v.brand} ${v.registrationNumber}`);
     });
 
     if (!filters.vehicleId) {

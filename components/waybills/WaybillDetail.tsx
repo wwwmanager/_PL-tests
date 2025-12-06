@@ -186,7 +186,11 @@ export const WaybillDetail: React.FC<WaybillDetailProps> = ({ waybill, isPrefill
           formDataToSet.routes = waybill.routes.map(r => ({ ...r, id: generateId() }));
         }
       } else {
-        formDataToSet = waybill || emptyWaybill;
+        formDataToSet = waybill ? {
+          ...waybill,
+          routes: waybill.routes || [],
+          date: waybill.date?.split('T')[0] || new Date().toISOString().split('T')[0],
+        } : emptyWaybill;
       }
 
       if (waybill && 'id' in waybill) {
@@ -207,8 +211,8 @@ export const WaybillDetail: React.FC<WaybillDetailProps> = ({ waybill, isPrefill
       }
 
       if (waybill && !isPrefill) { // For editing existing
-        const fromDate = waybill.validFrom.split('T')[0];
-        const toDate = waybill.validTo.split('T')[0];
+        const fromDate = waybill.validFrom?.split('T')[0] || waybill.date?.split('T')[0] || '';
+        const toDate = waybill.validTo?.split('T')[0] || waybill.date?.split('T')[0] || '';
         setDayMode(fromDate === toDate ? 'single' : 'multi');
       } else { // For new (blank or prefilled)
         setDayMode('multi');
@@ -283,7 +287,7 @@ export const WaybillDetail: React.FC<WaybillDetailProps> = ({ waybill, isPrefill
       if (route.to) locations.add(route.to);
     });
 
-    formData.routes.forEach(route => {
+    (formData.routes || []).forEach(route => {
       if (route.from) locations.add(route.from);
       if (route.to) locations.add(route.to);
     });
@@ -293,7 +297,7 @@ export const WaybillDetail: React.FC<WaybillDetailProps> = ({ waybill, isPrefill
 
 
   const totalDistance = useMemo(() =>
-    Math.round(formData.routes.reduce((sum, r) => sum + (Number(r.distanceKm) || 0), 0)),
+    Math.round((formData.routes || []).reduce((sum, r) => sum + (Number(r.distanceKm) || 0), 0)),
     [formData.routes]
   );
 
@@ -1075,16 +1079,16 @@ export const WaybillDetail: React.FC<WaybillDetailProps> = ({ waybill, isPrefill
               <FormInput
                 type={dayMode === 'single' ? 'time' : 'datetime-local'}
                 name="validTo"
-                value={dayMode === 'single' ? formData.validTo.split('T')[1] : formData.validTo}
+                value={dayMode === 'single' ? (formData.validTo?.split('T')[1] || '') : (formData.validTo || '')}
                 onChange={(e) => {
                   if (dayMode === 'single') {
-                    const datePart = formData.validFrom.split('T')[0];
+                    const datePart = formData.validFrom?.split('T')[0] || formData.date?.split('T')[0] || '';
                     setFormData({ ...formData, validTo: `${datePart}T${e.target.value}` });
                   } else {
                     handleChange(e);
                   }
                 }}
-                min={dayMode === 'multi' ? formData.validFrom : undefined}
+                min={dayMode === 'multi' ? (formData.validFrom || '') : undefined}
                 disabled={!canEdit}
               />
             </FormField>
@@ -1279,15 +1283,14 @@ export const WaybillDetail: React.FC<WaybillDetailProps> = ({ waybill, isPrefill
             </div>
           )}
           <div className="space-y-4">
-            {formData.routes.map(route => (
-              <RouteRow
-                key={route.id}
-                route={route}
-                dayMode={dayMode}
-                selectedVehicle={selectedVehicle}
-                onChange={handleRouteChance}
-                onRemove={handleRemoveRoute}
-              />
+            {(formData.routes || []).map(route => (<RouteRow
+              key={route.id}
+              route={route}
+              dayMode={dayMode}
+              selectedVehicle={selectedVehicle}
+              onChange={handleRouteChance}
+              onRemove={handleRemoveRoute}
+            />
             ))}
           </div>
           <button onClick={handleAddRoute} className="mt-4 text-blue-600 hover:text-blue-800">

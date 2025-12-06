@@ -174,7 +174,7 @@ export interface MaintenanceRecord {
 
 export interface Vehicle {
   id: string;
-  plateNumber: string;
+  registrationNumber: string;  // Changed from plateNumber to match backend
   brand: string;
   vin: string;
   mileage: number;

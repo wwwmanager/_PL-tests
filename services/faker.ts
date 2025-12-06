@@ -38,7 +38,7 @@ export const faker = {
     },
     location: {
         city: (): string => randomElement(CITIES),
-        streetAddress: (includeStreet?: boolean): string => `${includeStreet ? randomElement(STREETS) + ', ' : ''}д. ${faker.number.int({min: 1, max: 150})}`
+        streetAddress: (includeStreet?: boolean): string => `${includeStreet ? randomElement(STREETS) + ', ' : ''}д. ${faker.number.int({ min: 1, max: 150 })}`
     },
     vehicle: {
         manufacturer: (): string => randomElement(VEHICLE_MAKES),
@@ -56,7 +56,7 @@ export const faker = {
     },
     helpers: {
         arrayElement: <T>(arr: T[]): T => randomElement(arr),
-        weightedArrayElement: <T>(arr: {weight: number, value: T}[]): T => {
+        weightedArrayElement: <T>(arr: { weight: number, value: T }[]): T => {
             const totalWeight = arr.reduce((sum, item) => sum + item.weight, 0);
             let random = Math.random() * totalWeight;
             for (const item of arr) {
@@ -67,7 +67,7 @@ export const faker = {
         }
     },
     phone: {
-      number: (): string => `+7 (9${faker.string.numeric(2)}) ${faker.string.numeric(3)}-${faker.string.numeric(2)}-${faker.string.numeric(2)}`
+        number: (): string => `+7 (9${faker.string.numeric(2)}) ${faker.string.numeric(3)}-${faker.string.numeric(2)}-${faker.string.numeric(2)}`
     }
 };
 
@@ -98,7 +98,7 @@ export const validation = {
         }
         return "";
     },
-    plateNumber: (plate: string): string => {
+    registrationNumber: (plate: string): string => {
         if (!plate) return "Номерной знак обязателен";
         if (!/^[АВЕКМНОРСТУХ]\d{3}[АВЕКМНОРСТУХ]{2}\d{2,3}$/i.test(plate.replace(/\s/g, ''))) {
             return "Неверный формат (Пример: А123ВС45)";
