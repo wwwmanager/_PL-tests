@@ -1,19 +1,19 @@
 import { Route, Waybill } from "../types";
-import { generateId } from "./mockApi";
+import { generateId } from "./api/core";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
 // FIX: Safely access environment variables.
 const getApiKey = (): string | undefined => {
   try {
-     // @ts-ignore
-     if (typeof process !== 'undefined' && process.env?.API_KEY) {
-       // @ts-ignore
-       return process.env.API_KEY;
-     }
-  } catch {}
+    // @ts-ignore
+    if (typeof process !== 'undefined' && process.env?.API_KEY) {
+      // @ts-ignore
+      return process.env.API_KEY;
+    }
+  } catch { }
   try {
     return (import.meta as any).env?.VITE_GEMINI_API_KEY;
-  } catch {}
+  } catch { }
   return undefined;
 }
 
@@ -41,7 +41,7 @@ export const generateRouteFromPrompt = async (
   try {
     // Используем модель flash для скорости и экономии
     const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
-    
+
     const systemPrompt = `
       Ты помощник логиста. Твоя задача - преобразовать текстовое описание маршрута в структурированный JSON.
       Текущая дата: ${new Date().toLocaleDateString()}.
@@ -60,23 +60,23 @@ export const generateRouteFromPrompt = async (
     const result = await model.generateContent(systemPrompt);
     const response = await result.response;
     const text = response.text();
-    
+
     // Очистка от markdown, если модель всё же его добавила
     const jsonStr = text.replace(/```json/g, '').replace(/```/g, '').trim();
-    
+
     const parsed = JSON.parse(jsonStr);
-    
+
     if (!Array.isArray(parsed)) {
       throw new Error("Ответ AI не является массивом");
     }
 
     return parsed.map((r: any) => ({
-        id: generateId(),
-        from: r.from || 'Неизвестно',
-        to: r.to || 'Неизвестно',
-        distanceKm: Number(r.distanceKm) || 0,
-        isCityDriving: false,
-        isWarming: false
+      id: generateId(),
+      from: r.from || 'Неизвестно',
+      to: r.to || 'Неизвестно',
+      distanceKm: Number(r.distanceKm) || 0,
+      isCityDriving: false,
+      isWarming: false
     }));
 
   } catch (error) {

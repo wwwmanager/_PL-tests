@@ -1,6 +1,11 @@
-// Dashboard API Facade
-// Now uses backend endpoint for aggregation
-import { httpClient, getAccessToken } from '../httpClient';
+/**
+ * Dashboard API Facade
+ * 
+ * Uses real backend API for dashboard statistics.
+ * Falls back to client-side aggregation if backend fails.
+ */
+
+import { httpClient } from '../httpClient';
 import { getWaybills } from './waybillApi';
 import { getVehicles } from './vehicleApi';
 import { getEmployees } from './employeeApi';
@@ -18,30 +23,22 @@ export interface DashboardFilters {
     dateTo?: string;
 }
 
-async function shouldUseRealApi(): Promise<boolean> {
-    return !!getAccessToken();
-}
-
 export async function getDashboardData(filters: DashboardFilters): Promise<DashboardData> {
-    if (await shouldUseRealApi()) {
-        try {
-            const params = new URLSearchParams();
-            if (filters.vehicleId) params.append('vehicleId', filters.vehicleId);
-            if (filters.dateFrom) params.append('dateFrom', filters.dateFrom);
-            if (filters.dateTo) params.append('dateTo', filters.dateTo);
+    try {
+        const params = new URLSearchParams();
+        if (filters.vehicleId) params.append('vehicleId', filters.vehicleId);
+        if (filters.dateFrom) params.append('dateFrom', filters.dateFrom);
+        if (filters.dateTo) params.append('dateTo', filters.dateTo);
 
-            const queryString = params.toString() ? `?${params.toString()}` : '';
-            const response = await httpClient.get<{ success: boolean; data: DashboardData }>(`/dashboard/stats${queryString}`);
+        const queryString = params.toString() ? `?${params.toString()}` : '';
+        const response = await httpClient.get<{ success: boolean; data: DashboardData }>(`/dashboard/stats${queryString}`);
 
-            console.log('📊 [dashboardApi] Backend stats:', response.data);
-            return response.data;
-        } catch (e) {
-            console.warn('⚠️ [dashboardApi] Backend failed, falling back to client-side aggregation:', e);
-            return getDashboardDataClientSide(filters);
-        }
+        console.log('📊 [dashboardApi] Backend stats:', response.data);
+        return response.data;
+    } catch (e) {
+        console.warn('⚠️ [dashboardApi] Backend failed, falling back to client-side aggregation:', e);
+        return getDashboardDataClientSide(filters);
     }
-
-    return getDashboardDataClientSide(filters);
 }
 
 // Client-side fallback (for mock mode)
@@ -152,20 +149,17 @@ function aggregateByMonth(waybills: any[], type: 'fuel' | 'exams') {
 }
 
 export async function getIssues(filters: { vehicleId?: string }) {
-    if (await shouldUseRealApi()) {
-        try {
-            const params = new URLSearchParams();
-            if (filters.vehicleId) params.append('vehicleId', filters.vehicleId);
-            const queryString = params.toString() ? `?${params.toString()}` : '';
+    try {
+        const params = new URLSearchParams();
+        if (filters.vehicleId) params.append('vehicleId', filters.vehicleId);
+        const queryString = params.toString() ? `?${params.toString()}` : '';
 
-            const response = await httpClient.get<{ success: boolean; data: { expiringDocs: any[] } }>(`/dashboard/issues${queryString}`);
-            return response.data;
-        } catch (e) {
-            console.warn('⚠️ [dashboardApi] Issues endpoint failed, falling back');
-            return getIssuesClientSide(filters);
-        }
+        const response = await httpClient.get<{ success: boolean; data: { expiringDocs: any[] } }>(`/dashboard/issues${queryString}`);
+        return response.data;
+    } catch (e) {
+        console.warn('⚠️ [dashboardApi] Issues endpoint failed, falling back');
+        return getIssuesClientSide(filters);
     }
-    return getIssuesClientSide(filters);
 }
 
 async function getIssuesClientSide(filters: { vehicleId?: string }) {

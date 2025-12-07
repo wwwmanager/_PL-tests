@@ -1,7 +1,6 @@
 import React, { useMemo, useRef, useState, useEffect, lazy } from 'react';
 import { storageKeys, storageClear, loadJSON, saveJSON } from '../../services/storage';
 import { getAppSettings, saveAppSettings } from '../../services/settingsApi';
-import { dumpAllDataForExport } from '../../services/mockApi';
 import { DB_KEYS } from '../../services/dbKeys';
 import { DownloadIcon, UploadIcon, XIcon, UserGroupIcon } from '../Icons';
 import { useToast } from '../../hooks/useToast';
@@ -789,9 +788,13 @@ const Admin: React.FC = () => {
 
   const handleExportAllData = async () => {
     try {
-      const data = await dumpAllDataForExport();
-      const keys = Object.keys(data);
-      handleExportConfirm(keys, data);
+      // Export all data from local storage instead of mockApi
+      const allKeys = await getAllDbKeys();
+      const data: Record<string, unknown> = {};
+      for (const key of allKeys) {
+        data[key] = await loadJSON(key, null);
+      }
+      handleExportConfirm(allKeys, data);
     } catch (error) {
       console.error('Full export error:', error);
       showToast('Ошибка полного экспорта.', 'error');

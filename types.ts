@@ -353,6 +353,26 @@ export type StorageType =
   | 'vehicleTank'
   | 'contractorWarehouse';
 
+/**
+ * Storage location for warehouse management
+ */
+export interface Storage {
+  id: string;
+  organizationId: string;
+  type: StorageType;
+  name: string;
+  description?: string;
+  address?: string;
+  responsiblePerson?: string;
+  fuelType?: string;
+  capacityLiters?: number;
+  currentLevelLiters?: number;
+  safetyStockLiters?: number;
+  createdAt: string;
+  updatedAt: string;
+  status: 'active' | 'archived';
+}
+
 export type StockItemGroup = 'ГСМ' | 'Запчасти' | 'Шины' | 'Прочее';
 
 export type StockItemKind = 'Товар' | 'Услуга';

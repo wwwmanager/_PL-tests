@@ -1,6 +1,9 @@
 
 import React, { useState, useEffect } from 'react';
-import { getVehicles, getWaybills, getSeasonSettings, isWinterDate } from '../../services/mockApi';
+import { getVehicles } from '../../services/vehicleApiFacade';
+import { getWaybills } from '../../services/waybillApi';
+import { getSeasonSettings } from '../../services/settingsApi';
+import { isWinterDate } from '../../services/dateUtils';
 import { Vehicle, Waybill } from '../../types';
 import { XIcon } from '../Icons';
 

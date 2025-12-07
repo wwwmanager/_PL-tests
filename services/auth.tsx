@@ -8,7 +8,7 @@ import React, {
   useState,
 } from 'react';
 import { loadJSON, saveJSON, removeKey } from './storage';
-import { getAppSettings } from './mockApi';
+import { getAppSettings } from './settingsApi';
 import { roleApi } from './roleApi';
 import { subscribe } from './bus';
 import type { Role, Capability, User, AppSettings } from '../types';

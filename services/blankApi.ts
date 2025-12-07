@@ -1,96 +1,82 @@
-import * as mockApi from './mockApi';
+/**
+ * Blank API Facade
+ * 
+ * Uses real backend API for all blank/batch operations.
+ * Driver Mode with mockApi has been removed.
+ */
+
 import * as realApi from './api/realBlankApi';
-import { getAppSettings } from './mockApi';
-import { getAccessToken } from './httpClient';
-import { WaybillBlank, WaybillBlankBatch, BlankStatus } from '../types';
+import { WaybillBlank, WaybillBlankBatch } from '../types';
+import { httpClient } from './httpClient';
 
-async function shouldUseRealApi(): Promise<boolean> {
-    const hasToken = !!getAccessToken();
+// Re-export all functions from realApi
+export const getBlankBatches = realApi.getBlankBatches;
+export const createBlankBatch = realApi.createBlankBatch;
+export const issueBlanksToDriver = realApi.issueBlanksToDriver;
+export const searchBlanks = realApi.searchBlanks;
+export const materializeBatch = realApi.materializeBatch;
+export const spoilBlank = realApi.spoilBlank;
+export const bulkSpoilBlanks = realApi.bulkSpoilBlanks;
+export const countBlanksByFilter = realApi.countBlanksByFilter;
+export const getDriverBlankSummary = realApi.getDriverBlankSummary;
 
-    try {
-        const settings = await getAppSettings();
-        const useReal = settings.appMode === 'central' || (settings.appMode === undefined && hasToken);
-
-        console.log(`🔗 [blankApi] appMode = "${settings.appMode}", hasToken = ${hasToken} → ${useReal ? 'REAL BACKEND' : 'MOCK API'}`);
-
-        return useReal;
-    } catch (error) {
-        console.warn('⚠️ [blankApi] Could not load AppSettings, hasToken:', hasToken);
-        return hasToken || !import.meta.env.DEV;
-    }
-}
-
-export async function getBlankBatches(): Promise<WaybillBlankBatch[]> {
-    const useReal = await shouldUseRealApi();
-    return useReal ? realApi.getBlankBatches() : mockApi.getBlankBatches();
-}
-
-export async function createBlankBatch(data: Omit<WaybillBlankBatch, 'id' | 'status'>): Promise<WaybillBlankBatch> {
-    const useReal = await shouldUseRealApi();
-    return useReal ? realApi.createBlankBatch(data) : mockApi.createBlankBatch(data);
-}
-
-export async function issueBlanksToDriver(params: { batchId: string, ownerEmployeeId: string, ranges: { from: number, to: number }[] }, ctx: any): Promise<any> {
-    const useReal = await shouldUseRealApi();
-    return useReal ? realApi.issueBlanksToDriver(params, ctx) : mockApi.issueBlanksToDriver(params, ctx);
-}
-
-export async function searchBlanks(filters: any): Promise<{ items: WaybillBlank[], total: number }> {
-    const useReal = await shouldUseRealApi();
-    return useReal ? realApi.searchBlanks(filters) : mockApi.searchBlanks(filters);
-}
-
+/**
+ * Get all blanks (convenience wrapper)
+ */
 export async function getBlanks(): Promise<WaybillBlank[]> {
-    const useReal = await shouldUseRealApi();
-    // realApi.searchBlanks returns { items, total }, mockApi.getBlanks returns array
-    if (useReal) {
-        const { items } = await realApi.searchBlanks({ page: 1, pageSize: 1000 });
-        return items;
-    } else {
-        return mockApi.getBlanks();
+    const { items } = await realApi.searchBlanks({ page: 1, pageSize: 1000 });
+    return items;
+}
+
+/**
+ * Get next available blank for a driver
+ * @param driverId - Driver ID
+ * @param organizationId - Organization ID
+ * @returns First available blank or null
+ */
+export async function getNextBlankForDriver(
+    driverId: string,
+    organizationId: string
+): Promise<{ blankId: string; series: string; number: number } | null> {
+    try {
+        const { items } = await realApi.searchBlanks({
+            ownerEmployeeId: driverId,
+            status: ['issued'],
+            page: 1,
+            pageSize: 1
+        });
+
+        if (items.length === 0) return null;
+
+        const first = items[0];
+        return { blankId: first.id, series: first.series, number: first.number };
+    } catch (error) {
+        console.error('[blankApi] getNextBlankForDriver error:', error);
+        return null;
     }
 }
 
-export async function materializeBatch(batchId: string): Promise<{ created: number }> {
-    const useReal = await shouldUseRealApi();
-    return useReal ? realApi.materializeBatch(batchId) : mockApi.materializeBatch(batchId);
+/**
+ * Mark a blank as used for a waybill
+ * @param organizationId - Organization ID
+ * @param series - Blank series
+ * @param number - Blank number
+ * @param waybillId - Waybill ID to link
+ */
+export async function useBlankForWaybill(
+    organizationId: string,
+    series: string,
+    number: number,
+    waybillId: string
+): Promise<WaybillBlank> {
+    const response = await httpClient.post<{ data: WaybillBlank }>('/blanks/use', {
+        organizationId,
+        series,
+        number,
+        waybillId
+    });
+    return response.data;
 }
 
-export async function spoilBlank(params: any, ctx: any): Promise<void> {
-    const useReal = await shouldUseRealApi();
-    return useReal ? realApi.spoilBlank(params, ctx) : mockApi.spoilBlank(params, ctx);
-}
-
-export async function bulkSpoilBlanks(params: any, ctx: any): Promise<any> {
-    const useReal = await shouldUseRealApi();
-    return useReal ? realApi.bulkSpoilBlanks(params, ctx) : mockApi.bulkSpoilBlanks(params, ctx);
-}
-
-export async function countBlanksByFilter(filter: any): Promise<number> {
-    const useReal = await shouldUseRealApi();
-    return useReal ? realApi.countBlanksByFilter(filter) : mockApi.countBlanksByFilter(filter);
-}
-
-// Types for driver blank summary
-export interface DriverBlankRange {
-    series: string;
-    numberStart: number;
-    numberEnd: number;
-    count: number;
-}
-
-export interface DriverBlankSummary {
-    active: DriverBlankRange[];
-    used: DriverBlankRange[];
-    spoiled: DriverBlankRange[];
-}
-
-export async function getDriverBlankSummary(driverId: string): Promise<DriverBlankSummary> {
-    const useReal = await shouldUseRealApi();
-    if (useReal) {
-        return realApi.getDriverBlankSummary(driverId);
-    } else {
-        return mockApi.getDriverBlankSummary(driverId);
-    }
-}
-
+// Re-export types
+export type { DriverBlankRange, DriverBlankSummary } from './api/realBlankApi';

@@ -2,7 +2,7 @@ import React, { useState, useCallback, useMemo } from 'react';
 import type { Route, Vehicle } from '../../types';
 import { TrashIcon } from '../Icons';
 import { AutocompleteInput } from '../shared/AutocompleteInput';
-import { searchSavedLocations } from '../../services/mockApi';
+import { searchSavedLocations } from '../../services/routeApi';
 
 // Re-defining FormField locally to avoid circular dependencies or complex imports if it's not exported
 const FormField: React.FC<{ label: string; children: React.ReactNode }> = ({ label, children }) => (

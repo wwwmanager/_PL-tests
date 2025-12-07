@@ -1,74 +1,54 @@
-import * as mockApi from './mockApi';
-import { getAppSettings, MockStorage } from './mockApi';
-import { httpClient, getAccessToken } from './httpClient';
+/**
+ * Warehouse API Facade
+ * 
+ * Uses real backend API for all warehouse/storage operations.
+ * Driver Mode with mockApi has been removed.
+ */
+
+import { httpClient } from './httpClient';
 
 interface ApiResponse<T> {
     data: T;
 }
 
-async function shouldUseRealApi(): Promise<boolean> {
-    const hasToken = !!getAccessToken();
-
-    try {
-        const settings = await getAppSettings();
-        const useReal = settings.appMode === 'central' || (settings.appMode === undefined && hasToken);
-
-        console.log(`🔗 [warehouseApi] appMode = "${settings.appMode}", hasToken = ${hasToken} → ${useReal ? 'REAL BACKEND' : 'MOCK API'}`);
-
-        return useReal;
-    } catch (error) {
-        console.warn('⚠️ [warehouseApi] Could not load AppSettings, hasToken:', hasToken);
-        return hasToken || !import.meta.env.DEV;
-    }
+// Storage type matching backend model
+export interface Storage {
+    id: string;
+    organizationId: string;
+    type: 'fuel_tank' | 'warehouse' | 'other';
+    name: string;
+    description?: string;
+    address?: string;
+    responsiblePerson?: string;
+    fuelType?: string;
+    capacityLiters?: number;
+    currentLevelLiters?: number;
+    safetyStockLiters?: number;
+    createdAt: string;
+    updatedAt: string;
+    status: 'active' | 'archived';
 }
 
-// Real API implementations
-async function getWarehousesReal(): Promise<MockStorage[]> {
+export async function getWarehouses(): Promise<Storage[]> {
     console.log('📡 [warehouseApi] Fetching from BACKEND /warehouses...');
-    const response = await httpClient.get<ApiResponse<MockStorage[]>>('/warehouses');
+    const response = await httpClient.get<ApiResponse<Storage[]>>('/warehouses');
     const warehouses = response.data || [];
     console.log('📡 [warehouseApi] Received from backend:', warehouses.length, 'warehouses');
     return warehouses;
 }
 
-async function addWarehouseReal(data: Omit<MockStorage, 'id'>): Promise<MockStorage> {
-    const response = await httpClient.post<ApiResponse<MockStorage>>('/warehouses', data);
+export async function addWarehouse(data: Omit<Storage, 'id'>): Promise<Storage> {
+    const response = await httpClient.post<ApiResponse<Storage>>('/warehouses', data);
     return response.data;
 }
 
-async function updateWarehouseReal(data: MockStorage): Promise<MockStorage> {
-    const response = await httpClient.put<ApiResponse<MockStorage>>(`/warehouses/${data.id}`, data);
+export async function updateWarehouse(data: Storage): Promise<Storage> {
+    const response = await httpClient.put<ApiResponse<Storage>>(`/warehouses/${data.id}`, data);
     return response.data;
-}
-
-async function deleteWarehouseReal(id: string): Promise<void> {
-    await httpClient.delete(`/warehouses/${id}`);
-}
-
-// Facade functions
-export async function getWarehouses(): Promise<MockStorage[]> {
-    const useReal = await shouldUseRealApi();
-    if (useReal) {
-        return getWarehousesReal();
-    }
-    // mockApi.fetchStorages returns ApiListResponse with pagination
-    const response = await mockApi.fetchStorages({ perPage: 9999 });
-    return response.data;
-}
-
-export async function addWarehouse(data: Omit<MockStorage, 'id'>): Promise<MockStorage> {
-    const useReal = await shouldUseRealApi();
-    return useReal ? addWarehouseReal(data) : mockApi.addStorage(data);
-}
-
-export async function updateWarehouse(data: MockStorage): Promise<MockStorage> {
-    const useReal = await shouldUseRealApi();
-    return useReal ? updateWarehouseReal(data) : mockApi.updateStorage(data);
 }
 
 export async function deleteWarehouse(id: string): Promise<void> {
-    const useReal = await shouldUseRealApi();
-    return useReal ? deleteWarehouseReal(id) : mockApi.deleteStorage(id);
+    await httpClient.delete(`/warehouses/${id}`);
 }
 
 // Aliases for compatibility with StorageManagement.tsx which uses mockApi names

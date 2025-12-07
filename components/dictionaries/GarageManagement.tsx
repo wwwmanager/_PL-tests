@@ -3,17 +3,16 @@ import { useForm, useFieldArray, Controller } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { GarageStockItem, StockTransaction, StockTransactionItem, Vehicle, Employee, StockTransactionType, Organization, FuelType, Waybill } from '../../types';
-import {
-    getGarageStockItems, addGarageStockItem, updateGarageStockItem, deleteGarageStockItem,
-    getStockTransactions, addStockTransaction, updateStockTransaction, deleteStockTransaction,
-    generateId, getFuelTypes,
-    fetchStorages,
-    fetchWaybillById
-} from '../../services/mockApi';
+// API facades
+import { getGarageStockItems, addGarageStockItem, updateGarageStockItem, deleteGarageStockItem, getStockTransactions, addStockTransaction, updateStockTransaction, deleteStockTransaction } from '../../services/stockApi';
+import { getFuelTypes } from '../../services/fuelTypeApi';
+import { fetchStorages, Storage as StorageLocation } from '../../services/warehouseApi';
+import { getWaybillById } from '../../services/waybillApi';
 import { getOrganizations } from '../../services/organizationApi';
 import { getVehicles } from '../../services/api/vehicleApi';
 import { getEmployees } from '../../services/api/employeeApi';
-import { MockStorage as StorageLocation } from '../../services/mockApi';
+// Utility functions
+import { generateId } from '../../services/api/core';
 import { PencilIcon, TrashIcon, PlusIcon } from '../Icons';
 import useTable from '../../hooks/useTable';
 import Modal from '../shared/Modal';
@@ -96,7 +95,7 @@ const StockItemList = () => {
         setItems(data);
         setFuelTypes(fuelData);
         setOrganizations(orgsData);
-        setStorages(storagesData.data);
+        setStorages(storagesData);
     }, []);
 
     useEffect(() => { fetchData(); }, [fetchData]);
@@ -562,7 +561,7 @@ const GarageManagement: React.FC = () => {
 
     const handleOpenWaybillFromStock = async (waybillId: string) => {
         try {
-            const w = await fetchWaybillById(waybillId);
+            const w = await getWaybillById(waybillId);
             if (!w) {
                 showToast('Путевой лист не найден', 'error');
                 return;

@@ -1,11 +1,17 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Waybill, Route, Vehicle, Employee, WaybillStatus, Organization, SavedRoute, FuelType, SeasonSettings, Attachment, AppSettings, StockTransaction, GarageStockItem } from '../../types';
-import {
-  getOrganizations, addWaybill, updateWaybill, addSavedRoutesFromWaybill, getSavedRoutes,
-  getFuelTypes, getSeasonSettings, isWinterDate, getLastWaybillForVehicle, getAppSettings, generateId,
-  getAvailableFuelExpenses, updateStockTransaction, getStockTransactions, getGarageStockItems,
-  getNextBlankForDriver, useBlankForWaybill, getNextWaybillNumber, changeWaybillStatus, getFuelCardBalance
-} from '../../services/mockApi';
+// API facades
+import { getOrganizations } from '../../services/organizationApi';
+import { addWaybill, updateWaybill, changeWaybillStatus, getLastWaybillForVehicle } from '../../services/waybillApi';
+import { getSavedRoutes, addSavedRoutesFromWaybill } from '../../services/routeApi';
+import { getFuelTypes } from '../../services/fuelTypeApi';
+import { getSeasonSettings, getAppSettings } from '../../services/settingsApi';
+import { getNextBlankForDriver, useBlankForWaybill } from '../../services/blankApi';
+// Utility functions
+import { isWinterDate } from '../../services/dateUtils';
+import { generateId } from '../../services/api/core';
+// Stock API facade
+import { getAvailableFuelExpenses, updateStockTransaction, getStockTransactions, getGarageStockItems, getNextWaybillNumber, getFuelCardBalance } from '../../services/stockApi';
 import { getVehicles } from '../../services/vehicleApiFacade';
 import { getEmployees } from '../../services/employeeApiFacade';
 import { generateRouteFromPrompt } from '../../services/geminiService';

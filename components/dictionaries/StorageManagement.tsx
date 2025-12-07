@@ -4,8 +4,7 @@ import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 
 import { Organization, Employee, StorageType } from '../../types';
-import { MockStorage as StorageLocation } from '../../services/mockApi';
-import { fetchStorages, addStorage, updateStorage, deleteStorage } from '../../services/warehouseApi';
+import { fetchStorages, addStorage, updateStorage, deleteStorage, Storage } from '../../services/warehouseApi';
 import { getOrganizations } from '../../services/organizationApi';
 import { getEmployees } from '../../services/api/employeeApi';
 import { PencilIcon, TrashIcon, PlusIcon, ArrowUpIcon, ArrowDownIcon, ArchiveBoxIcon, ArrowUpTrayIcon } from '../Icons';
@@ -44,13 +43,13 @@ const storageSchema = z.object({
 type StorageFormData = z.infer<typeof storageSchema>;
 
 const StorageManagement = () => {
-    const [storages, setStorages] = useState<StorageLocation[]>([]);
+    const [storages, setStorages] = useState<Storage[]>([]);
     const [organizations, setOrganizations] = useState<Organization[]>([]);
     const [employees, setEmployees] = useState<Employee[]>([]);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
     const [showArchived, setShowArchived] = useState(false);
-    const [actionModal, setActionModal] = useState<{ isOpen: boolean; type?: 'delete' | 'archive' | 'unarchive'; item?: StorageLocation }>({ isOpen: false });
+    const [actionModal, setActionModal] = useState<{ isOpen: boolean; type?: 'delete' | 'archive' | 'unarchive'; item?: Storage }>({ isOpen: false });
     const { showToast } = useToast();
 
     const {
@@ -122,7 +121,7 @@ const StorageManagement = () => {
         setIsModalOpen(true);
     };
 
-    const handleEdit = (item: StorageLocation) => {
+    const handleEdit = (item: Storage) => {
         reset(item);
         setIsModalOpen(true);
     };
@@ -132,9 +131,9 @@ const StorageManagement = () => {
     const onSubmit = async (data: StorageFormData) => {
         try {
             if (data.id) {
-                await updateStorage(data as StorageLocation);
+                await updateStorage(data as Storage);
             } else {
-                await addStorage(data as Omit<StorageLocation, 'id'>);
+                await addStorage(data as Omit<Storage, 'id'>);
             }
             showToast("Изменения сохранены");
             setIsModalOpen(false);
@@ -144,7 +143,7 @@ const StorageManagement = () => {
         }
     };
 
-    const openActionModal = (type: 'delete' | 'archive' | 'unarchive', item: StorageLocation) => {
+    const openActionModal = (type: 'delete' | 'archive' | 'unarchive', item: Storage) => {
         setActionModal({ isOpen: true, type, item });
     };
 
