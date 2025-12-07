@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import { router as apiRouter } from './routes';
 import { errorMiddleware } from './middleware/errorMiddleware';
+import { loggerMiddleware, correlationIdMiddleware } from './middleware/loggerMiddleware';
 
 export const createApp = () => {
     const app = express();
@@ -11,6 +12,12 @@ export const createApp = () => {
         origin: process.env.CORS_ORIGIN || '*',
         credentials: true
     }));
+
+    // Correlation ID (must be before logger)
+    app.use(correlationIdMiddleware);
+
+    // Request logging
+    app.use(loggerMiddleware);
 
     // Body parsing
     app.use(express.json());
