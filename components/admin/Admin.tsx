@@ -1,6 +1,7 @@
 import React, { useMemo, useRef, useState, useEffect, lazy } from 'react';
 import { storageKeys, storageClear, loadJSON, saveJSON } from '../../services/storage';
 import { getAppSettings, saveAppSettings } from '../../services/settingsApi';
+import { importData as backendImportData } from '../../services/adminApi';
 import { DB_KEYS } from '../../services/dbKeys';
 import { DownloadIcon, UploadIcon, XIcon, UserGroupIcon } from '../Icons';
 import { useToast } from '../../hooks/useToast';
@@ -17,6 +18,7 @@ const UserManagement = lazy(() => import('./UserManagement'));
 const RoleManagement = lazy(() => import('./RoleManagement'));
 const BusinessAuditLog = lazy(() => import('./BusinessAuditLog'));
 const BlankManagement = lazy(() => import('./BlankManagement'));
+const DataDeletionModal = lazy(() => import('./DataDeletionModal'));
 
 // ===== Метаданные/совместимость =====
 
@@ -932,6 +934,33 @@ const Admin: React.FC = () => {
 
       if (!safeRows.length) return;
 
+      // ====== BACKEND IMPORT ======
+      // Send data to PostgreSQL backend for entities it supports
+      const backendData: Record<string, any[]> = {};
+      for (const row of safeRows) {
+        const { key, incoming } = row;
+        if (Array.isArray(incoming) && incoming.length > 0) {
+          backendData[key] = incoming;
+        }
+      }
+
+      if (Object.keys(backendData).length > 0) {
+        try {
+          const backendResult = await backendImportData(backendData);
+          console.log('[Import] Backend result:', backendResult);
+          if (backendResult.success) {
+            const summary = backendResult.results
+              .map(r => `${r.table}: +${r.created} ~${r.updated}`)
+              .join(', ');
+            showToast(`PostgreSQL: ${summary}`, 'success');
+          }
+        } catch (backendError: any) {
+          console.warn('[Import] Backend import failed:', backendError);
+          // Continue with localStorage import even if backend fails
+        }
+      }
+      // ====== END BACKEND IMPORT ======
+
       const selectedKeys = safeRows.map((r) => r.key);
       await backupCurrent(selectedKeys);
 
@@ -1074,7 +1103,7 @@ const Admin: React.FC = () => {
                   ? {
                     ...buildParams(key, w),
                     driverName: byId.emp.get(w?.driverId)?.fullName,
-                    vehiclePlate: byId.veh.get(w?.vehicleId)?.plateNumber,
+                    vehiclePlate: byId.veh.get(w?.vehicleId)?.registrationNumber,
                     organizationName: byId.org.get(w?.organizationId)?.fullName,
                   }
                   : buildParams(key, w);
@@ -1189,10 +1218,17 @@ const Admin: React.FC = () => {
     setIsClearDataModalOpen(false);
     setIsImporting(true); // Reuse loading state to disable buttons
     try {
+      // 1. Clear PostgreSQL database via backend API
+      const { resetDatabase } = await import('../../services/adminApi');
+      const result = await resetDatabase();
+      console.log('Database reset result:', result);
+
+      // 2. Clear localStorage
       await storageClear();
+
       // Устанавливаем флаг, чтобы предотвратить повторное заполнение демо-данными при перезагрузке
       await saveJSON(DB_KEYS.DB_SEEDED_FLAG, true);
-      showToast('Все данные успешно удалены. Приложение будет перезагружено.', 'success');
+      showToast('Все данные успешно удалены (БД и localStorage). Приложение будет перезагружено.', 'success');
       setTimeout(() => {
         window.location.reload();
       }, 1500);
@@ -1243,15 +1279,18 @@ const Admin: React.FC = () => {
       <input type="file" ref={fileInputRef} onChange={handleFileSelect} accept=".json" className="hidden" />
       {showExportModal && <ExportModal onClose={() => setShowExportModal(false)} onConfirm={(keys) => handleExportConfirm(keys)} />}
       {importBundle && importPolicy && <ImportPreviewModal bundle={importBundle} policy={importPolicy} onClose={() => { setImportBundle(null); setIsImporting(false); }} onApply={(rows) => applySelectiveImport(rows, importPolicy)} />}
-      <ConfirmationModal
-        isOpen={isClearDataModalOpen}
-        onClose={() => setIsClearDataModalOpen(false)}
-        onConfirm={handleClearAllData}
-        title="Подтвердить полную очистку данных?"
-        message="Вы уверены, что хотите полностью удалить ВСЕ данные приложения? Это действие необратимо и приведет к сбросу до начального состояния."
-        confirmText="Да, удалить все"
-        confirmButtonClass="bg-red-600 hover:bg-red-700"
-      />
+      <React.Suspense fallback={<div className="p-4 text-center">Загрузка...</div>}>
+        <DataDeletionModal
+          isOpen={isClearDataModalOpen}
+          onClose={() => setIsClearDataModalOpen(false)}
+          onComplete={() => {
+            storageClear().then(() => {
+              saveJSON(DB_KEYS.DB_SEEDED_FLAG, true);
+              setTimeout(() => window.location.reload(), 1500);
+            });
+          }}
+        />
+      </React.Suspense>
       <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
         <h2 className="text-2xl font-bold text-gray-800 dark:text-white">Настройки</h2>
         <div className="flex items-center gap-4 flex-wrap">

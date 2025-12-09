@@ -17,6 +17,7 @@ import { router as userRoutes } from './userRoutes';
 import { router as roleRoutes } from './roleRoutes';
 import { router as settingsRoutes } from './settingsRoutes';
 import { router as dashboardRoutes } from './dashboardRoutes';
+import adminRoutes from './adminRoutes';
 
 export const router = Router();
 
@@ -38,6 +39,7 @@ router.use('/users', userRoutes);
 router.use('/roles', roleRoutes);
 router.use('/settings', settingsRoutes);
 router.use('/dashboard', dashboardRoutes);
+router.use('/admin', adminRoutes);
 
 // Health check endpoint
 router.get('/health', (req, res) => {

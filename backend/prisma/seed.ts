@@ -172,10 +172,11 @@ async function main() {
     const adminUser = await prisma.user.create({
         data: {
             organizationId: org.id,
-            email: 'admin',
+            email: 'admin@waybills.local',
             passwordHash,
-            fullName: 'Иванов Иван Иванович',
+            fullName: 'Системный Администратор',
             isActive: true,
+            isSystem: true,  // System user - cannot be deleted
         },
     });
 

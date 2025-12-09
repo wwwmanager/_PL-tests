@@ -5,9 +5,7 @@
 - **Название:** Waybill App  
 - **Версия:** 1.0.0  
 - **Назначение:** управление путевыми листами, транспортом, водителями, бланками и складом для автопредприятий.  
-- **Режимы работы:**
-  - **Driver Mode** — офлайн/локальный режим для водителей, хранение данных в IndexedDB.
-  - **Central Mode** — централизованный режим для диспетчеров/администраторов, данные в общей БД через backend API.
+- **Режим работы:** Централизованный (Central Mode) — данные хранятся в PostgreSQL через Backend API.
 
 ---
 
@@ -18,173 +16,118 @@
 - **React** 19 + **TypeScript** + **Vite**
 - **TailwindCSS**
 - **Формы:** React Hook Form + Zod
-- **Хранение (Driver/offline):** IndexedDB через LocalForage (mockApi + локальная БД)
-- **Тесты:** Vitest + Testing Library
-- **Запуск dev:** `npm run dev` → http://localhost:3000/_PL-tests/ (адрес может отличаться)
+- **Тесты:** Vitest + Testing Library + Playwright (E2E)
+- **Запуск dev:** `npm run dev` → http://localhost:3000/_PL-tests/
 
 ### Backend
 
-В данный момент есть два исторических варианта, но **основным считается TypeORM backend**:
-
-1. **Auth Server (legacy, порт 4000)**  
-   - Файл: `backend/index.ts`  
-   - In‑memory users, простой JWT login.  
+- **Express** + **TypeScript** + **TypeORM** (порт 3001)
+- **PostgreSQL** — основная БД
+- **JWT** аутентификация
+- **Структурированное логирование** (Winston)
 
 ---
 
-## 3. Архитектура и ключевые решения
+## 3. Архитектура
 
 ### 3.1. Frontend
 
-    - вход по login/password через backend API.
+- Авторизация через `/api/auth/login`
+- Все данные получаются через API фасады (`services/*Api.ts`)
+- httpClient добавляет `Authorization: Bearer <token>` автоматически
 
 ### 3.2. Backend
 
-- **Слоистая архитектура:**
-  - routes → controllers → services → TypeORM (репозитории)
-- **Основные сущности (на TypeORM):**
+- **Слоистая архитектура:** routes → controllers → services → TypeORM
+- **Основные сущности:**
   - Organization, Department
   - User, Role, Permission, UserRole, RolePermission
-  - Employee (с типом 'driver', 'dispatcher' и др.)
+  - Employee (driver, dispatcher, etc.)
   - Vehicle, FuelCard
   - Waybill, WaybillRoute, WaybillFuel
   - BlankBatch, Blank
   - StockItem, Warehouse, StockMovement
   - AuditLog, RefreshToken
 - **Принципы:**
-  - Organization isolation: все запросы фильтруются по `organizationId` (из JWT).
-  - Планируется и частично реализовано:
-    - state machines на backend (как на фронте),
-    - audit logging,
-    - RBAC на уровне backend.
+  - Organization isolation: запросы фильтруются по `organizationId` (из JWT)
+  - Audit logging для критических операций
+  - RBAC на уровне backend
 
 ---
 
-## 4. Правила и соглашения
+## 4. API Endpoints
 
-### 4.1. Central vs Driver Mode
+### 4.1. Авторизация
+- `POST /api/auth/login` — вход, возвращает JWT
+- `POST /api/auth/refresh` — обновление токена (планируется)
 
-- **Central Mode (Цель):**
-  - Источник данных → backend (Express + TypeORM на порту 3001).
-  - Все операции с ПЛ/ТС/водителями должны идти через API:
-    - ПЛ: `/api/waybills`
-    - ТС: `/api/vehicles`
-    - Водители: `/api/employees?type=driver`
-  - **Нельзя** использовать IndexedDB как источник правды для ПЛ в Central mode.
-  - Авторизация через реальный login (`/api/auth/login`), JWT хранится и используется httpClient'ом.
+### 4.2. Основные ресурсы
+| Ресурс | Endpoint | Описание |
+|--------|----------|----------|
+| Путевые листы | `/api/waybills` | CRUD, смена статусов |
+| Транспорт | `/api/vehicles` | CRUD |
+| Сотрудники | `/api/employees` | CRUD, фильтр по типу |
+| Бланки | `/api/blanks` | Партии, выдача, материализация |
+| Склад | `/api/stock` | Номенклатура, движения |
+| Dashboard | `/api/dashboard` | Статистика, истекающие документы |
 
-- **Driver Mode:**
-  - Можно использовать локальное хранилище и mockApi.
-  - Допускается DEV‑автологин (упрощённый вход без пароля) **только** в Driver/offline режиме.
-  - Backend может быть недоступен → система продолжает работать локально.
+### 4.3. Авторизация и токены
 
-### 4.2. Авторизация и токены
-
-- В планах/частично реализовано:
-  - `/api/auth/login` (backend на 3001) → возвращает JWT и данные пользователя.
-  - Фронтенд:
-    - хранит токен под единым ключом (`auth_token`) в localStorage,
-    - httpClient добавляет `Authorization: Bearer <token>` к каждому запросу.
-  - Refresh tokens — запланированы (модель `RefreshToken` уже есть в схеме).
-
-### 4.3. Использование mockApi vs backend API
-
-- Все компоненты/UI должны работать через фасады (`*Api.ts`), а не напрямую с `mockApi`.
-- Пример:
-  - **Правильно:** `import { getWaybills } from 'services/waybillApi';`
-  - **Неправильно:** `import { getWaybills } from 'services/mockApi';`
-- В Central mode:
-  - `VITE_USE_REAL_API=true` → `waybillApi` должен использовать backend.
-- В Driver mode:
-  - Допускается `VITE_USE_REAL_API=false` → `waybillApi` использует mockApi + IndexedDB.
+- `/api/auth/login` → возвращает JWT и данные пользователя
+- Токен хранится в localStorage (`auth_token`)
+- httpClient добавляет `Authorization: Bearer <token>` к каждому запросу
+- Refresh tokens — запланированы (модель `RefreshToken` уже есть)
 
 ---
 
-## 5. Текущий статус реализации и миграций
+## 5. Текущий статус
 
-### 5.1. Путевые листы (Waybills)
+### ✅ Завершено (Месяц 1-2)
+- Полная миграция всех модулей на Backend API
+- Удалён mockApi.ts и Driver Mode
+- Аутентификация и RBAC
+- Dashboard и отчёты
+- Структурированное логирование
 
-- **Frontend:**
-  - Полный функционал на mockApi (CRUD, стейт‑машина, инварианты).
-  - Реализован adapter‑слой:
-    - `realWaybillApi` → ходит на backend `/api/waybills`.
-    - `waybillApi` → фасад, умеет переключаться между real/mock.
-  - В dev сейчас adapter для ПЛ уже использует backend (жёстко или через `VITE_USE_REAL_API`).
+### ⏳ В работе (Месяц 3)
+- Мониторинг Frontend (Sentry)
+- Rate Limiting и Security Headers
+- Бэкапы БД
 
-- **Backend (3001, TypeORM):**
-  - `/api/waybills`:
-    - `GET /api/waybills` — список ПЛ (работает).
-    - `POST /api/waybills` — создание ПЛ (работает, с логированием и базовой валидацией).
-    - update/delete/status — частично/в процессе реализации.
-  - Связи:
-    - Waybill ↔ Vehicle, Driver, Organization, Department, (опционально) Blank, FuelCard.
-  - TypeORM auto-sync создал таблицу `waybills` с колонками (включая `blankId`).
+### 📋 Отложено
+- Унификация валидации (Zod на backend)
+- Виртуализация больших списков
 
-- **Состояние миграции:**
-  - Часть фронта (Central mode) уже использует backend для списка и создания ПЛ.
-  - Ещё остаются компоненты, которые читают ПЛ из IndexedDB/mockApi — нужно постепенно переводить на `waybillApi`.
+---
 
-### 5.2. Vehicles и Drivers
+## 6. AI Session Rules
 
-- Backend:
-  - `/api/vehicles` и `/api/employees` (включая водителей) реализованы и работают (TypeORM).
-- Frontend:
-  - Есть mockApi‑реализация.
-  - Требуется adapter‑слой по аналогии с ПЛ и переключение UI на этот фасад.
+### 6.1. При старте сессии
 
+AI обязан:
+1. Прочитать `APPLICATION_CONTEXT.md`
+2. Прочитать `implementation_plan.md` (если есть)
+3. Прочитать `task.md` (если есть)
+4. Сообщить пользователю о загруженном контексте
 
-- Завершить миграцию Central mode на backend:
-  - отключить DEV‑автологин в Central mode,
-  - унифицировать auth на backend: `/api/auth/login` на 3001,
-  - убедиться, что все ПЛ/ТС/водители в Central mode читаются из backend (не из IndexedDB).
-- Безопасность:
-  - реализовать refresh tokens,
-  - добавить rate limiting на `/auth/login`,
-  - усилить backend‑валидацию (Zod/аналог).
-- Инфраструктура:
-  - Docker (backend + Postgres),
-  - базовый CI (lint+test+build backend и фронта),
-  - логирование/monitoring на backend.
-
-### Phase 2 — Оптимизация и UX
-
-- Разделение `mockApi.ts` на модули.
-- Виртуализация больших списков (WaybillList, Vehicles, Drivers).
-
-### 8.2. Поведение при старте КАЖДОЙ новой сессии
-
-После того как AI:
-- прочитал `APPLICATION_CONTEXT.md`,
-- прочитал `implementation_plan.md` (если есть),
-- прочитал `task.md` (если есть),
-
-**AI ОБЯЗАН явно сообщить об этом пользователю в первом ответе сессии.**
-
-**Формат сообщения:**
+### 6.2. Формат первого сообщения
 
 ```
 Контекст загружен:
 - APPLICATION_CONTEXT.md прочитан
-- implementation_plan.md (Central Mode Backend Integration Plan) прочитан
 - task.md прочитан
 
 Согласно текущему плану, предлагаю следующие шаги:
 1) …
 2) …
-3) …
 ```
 
-**Важно:**
-- Не пересказывать полностью все файлы, но опираться на них.
-- Следующие шаги должны быть согласованы с `implementation_plan.md` и `task.md`.
-- Если план явно устарел (часть шагов уже выполнена) — сразу указать и предложить обновить файлы.
+### 6.3. При получении команды
 
-### 8.3. Если пользователь сразу даёт конкретную команду
-
-- Сначала кратко подтвердить, что контекст и план загружены.
-- Затем соотнести команду с текущим планом (подходит / требует корректировки).
-- При необходимости предложить обновление `implementation_plan.md` / `task.md`, а уже потом переходить к выполнению.
+1. Подтвердить загрузку контекста
+2. Соотнести команду с планом
+3. При необходимости предложить обновление документации
 
 ---
 
-=== END OF PROJECT CONTEXT & PLANNING MANAGEMENT ===
+=== END OF PROJECT CONTEXT ===

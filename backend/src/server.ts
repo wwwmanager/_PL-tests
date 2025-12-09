@@ -2,11 +2,15 @@
 import { createApp } from './app';
 import { env } from './config/env';
 import { logger } from './utils/logger';
+import { ensureAdminExists } from './services/authService';
 
 async function bootstrap() {
     try {
         logger.info({ database: 'Prisma' }, 'Database initialized');
         logger.info({ url: env.DATABASE_URL.split('@')[1]?.split('/')[0] || 'PostgreSQL' }, 'Database connection');
+
+        // Ensure system admin exists (auto-restore if deleted)
+        await ensureAdminExists();
 
         const app = createApp();
 

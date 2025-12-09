@@ -75,3 +75,68 @@ export async function findUserById(id: string) {
         }
     });
 }
+
+/**
+ * Ensure system admin user exists.
+ * Called at server startup to auto-restore admin if deleted.
+ */
+export async function ensureAdminExists() {
+    const ADMIN_EMAIL = 'admin@waybills.local';
+
+    const existingAdmin = await prisma.user.findUnique({
+        where: { email: ADMIN_EMAIL }
+    });
+
+    if (existingAdmin) {
+        // Mark as system user if not already
+        if (!existingAdmin.isSystem) {
+            await prisma.user.update({
+                where: { id: existingAdmin.id },
+                data: { isSystem: true }
+            });
+            console.log('✅ Admin marked as system user');
+        }
+        return;
+    }
+
+    console.log('⚠️ System admin not found, creating...');
+
+    // Get or create default organization
+    let org = await prisma.organization.findFirst();
+    if (!org) {
+        org = await prisma.organization.create({
+            data: {
+                name: 'Default Organization',
+                shortName: 'Default',
+            }
+        });
+        console.log('📦 Created default organization');
+    }
+
+    // Get or create admin role
+    let adminRole = await prisma.role.findFirst({ where: { code: 'admin' } });
+    if (!adminRole) {
+        adminRole = await prisma.role.create({
+            data: { code: 'admin', name: 'Администратор' }
+        });
+        console.log('🎭 Created admin role');
+    }
+
+    // Create admin user with password '123'
+    const passwordHash = await bcrypt.hash('123', 10);
+    const newAdmin = await prisma.user.create({
+        data: {
+            email: ADMIN_EMAIL,
+            passwordHash,
+            fullName: 'Системный Администратор',
+            organizationId: org.id,
+            isActive: true,
+            isSystem: true,
+            roles: {
+                create: { roleId: adminRole.id }
+            }
+        }
+    });
+
+    console.log('✅ System admin created:', newAdmin.email);
+}

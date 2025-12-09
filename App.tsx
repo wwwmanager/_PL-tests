@@ -1,5 +1,6 @@
 // App.tsx
 import React, { Suspense, lazy } from 'react';
+import * as Sentry from '@sentry/react';
 import { AuthProvider, useAuth } from './services/auth';
 import { ToastProvider } from './contexts/ToastContext';
 import LoadingSpinner from './components/common/LoadingSpinner';
@@ -112,15 +113,33 @@ const AppContent: React.FC = () => {
   );
 };
 
+// Error fallback component for Sentry
+const ErrorFallback: React.FC = () => (
+  <div className="flex items-center justify-center h-screen bg-gray-100">
+    <div className="text-center p-8 bg-white rounded-lg shadow-xl">
+      <h1 className="text-2xl font-bold text-red-600 mb-4">Произошла ошибка</h1>
+      <p className="text-gray-600 mb-4">Приложение столкнулось с непредвиденной ошибкой.</p>
+      <button
+        onClick={() => window.location.reload()}
+        className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+      >
+        Перезагрузить страницу
+      </button>
+    </div>
+  </div>
+);
+
 const App: React.FC = () => {
   return (
-    <ToastProvider>
-      <AuthProvider>
-        <Suspense fallback={<LoadingSpinner />}>
-          <AppContent />
-        </Suspense>
-      </AuthProvider>
-    </ToastProvider>
+    <Sentry.ErrorBoundary fallback={<ErrorFallback />}>
+      <ToastProvider>
+        <AuthProvider>
+          <Suspense fallback={<LoadingSpinner />}>
+            <AppContent />
+          </Suspense>
+        </AuthProvider>
+      </ToastProvider>
+    </Sentry.ErrorBoundary>
   );
 };
 

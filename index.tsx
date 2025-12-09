@@ -1,7 +1,11 @@
 
 import React from 'react';
 import ReactDOM from 'react-dom/client';
+import { initSentry } from './sentry.config';
 import App from './App';
+
+// Initialize Sentry BEFORE React
+initSentry();
 
 // 🔍 ENV DIAGNOSTIC
 console.log('='.repeat(60));
