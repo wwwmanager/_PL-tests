@@ -35,6 +35,8 @@ export async function getEmployees(filters: EmployeeFilters = {}) {
         where.isActive = isActive;
     }
 
+    console.log('📊 [employeeService] Filters:', JSON.stringify(where, null, 2));
+
     const skip = (page - 1) * limit;
 
     const [employees, total] = await Promise.all([
@@ -162,6 +164,7 @@ export async function updateEmployee(id: string, data: any) {
     if (data.dispatcherId !== undefined) updateData.dispatcherId = data.dispatcherId;
     if (data.controllerId !== undefined) updateData.controllerId = data.controllerId;
     if (data.notes !== undefined) updateData.notes = data.notes;
+    if (data.organizationId !== undefined) updateData.organizationId = data.organizationId;
 
     return prisma.employee.update({
         where: { id },

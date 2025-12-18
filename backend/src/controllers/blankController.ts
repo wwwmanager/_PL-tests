@@ -82,9 +82,11 @@ export async function issueBlank(req: Request, res: Response, next: NextFunction
 export async function getDriverSummary(req: Request, res: Response, next: NextFunction) {
     try {
         const { driverId } = req.params;
+        console.log(`🌐 [blankController] GET /summary/driver/${driverId} request received`);
         const summary = await blankService.getDriverSummary(driverId);
         res.json(summary);
     } catch (err) {
+        console.error(`❌ [blankController] getDriverSummary error for driverId ${req.params.driverId}:`, err);
         next(err);
     }
 }

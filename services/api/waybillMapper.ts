@@ -48,10 +48,19 @@ export function mapBackendWaybillToFront(dto: BackendWaybillDto): FrontWaybill {
         odometerEnd: dto.odometerEnd ?? undefined,
 
         // Маршрут
-        routes: [], // Будет загружаться отдельно
+        routes: (dto.routes || []).map(r => ({
+            id: r.id,
+            from: r.fromPoint || '',
+            to: r.toPoint || '',
+            distanceKm: Number(r.distanceKm) || 0,
+            isCityDriving: r.isCityDriving || false,
+            isWarming: r.isWarming || false,
+            comment: r.comment || undefined
+        })),
 
         // Заметки
         notes: dto.notes ?? undefined,
+        fuelCalculationMethod: (dto.fuelCalculationMethod as any) || 'BOILER',
 
         // Обязательные поля для совместимости с mockApi
         dispatcherId: '', // TODO: добавить в backend
@@ -73,7 +82,7 @@ export function mapBackendWaybillToFront(dto: BackendWaybillDto): FrontWaybill {
  * Convert frontend Waybill to backend DTO format for creation
  */
 export function mapFrontWaybillToBackendCreate(waybill: Omit<FrontWaybill, 'id'>): {
-    number: string;
+    number?: string;
     date: string;
     vehicleId: string;
     driverId: string;
@@ -82,6 +91,8 @@ export function mapFrontWaybillToBackendCreate(waybill: Omit<FrontWaybill, 'id'>
     odometerEnd?: number | null;
     plannedRoute?: string | null;
     notes?: string | null;
+    fuelCalculationMethod?: string;
+    routes?: any[];
 } {
     // 🔍 DEBUG: Log input data
     if (import.meta.env.DEV) {
@@ -112,6 +123,16 @@ export function mapFrontWaybillToBackendCreate(waybill: Omit<FrontWaybill, 'id'>
         odometerEnd: waybill.odometerEnd ?? null,
         plannedRoute,
         notes: waybill.notes ?? null,
+        fuelCalculationMethod: waybill.fuelCalculationMethod || 'BOILER',
+        routes: (waybill.routes || []).map((r, index) => ({
+            legOrder: index,
+            fromPoint: r.from,
+            toPoint: r.to,
+            distanceKm: r.distanceKm,
+            isCityDriving: r.isCityDriving || false,
+            isWarming: r.isWarming || false,
+            comment: r.notes || null,
+        }))
     };
 
     // 🔍 DEBUG: Log output data
@@ -127,7 +148,7 @@ export function mapFrontWaybillToBackendCreate(waybill: Omit<FrontWaybill, 'id'>
  * Convert frontend Waybill to backend DTO format for update
  */
 export function mapFrontWaybillToBackendUpdate(waybill: FrontWaybill): {
-    number: string;
+    number?: string;
     date: string;
     vehicleId: string;
     driverId: string;
@@ -137,6 +158,8 @@ export function mapFrontWaybillToBackendUpdate(waybill: FrontWaybill): {
     plannedRoute: string | null;
     notes: string | null;
     status: string;
+    fuelCalculationMethod?: string;
+    routes?: any[];
 } {
     // Преобразуем enum статус в строку
     let statusStr: string;
@@ -173,5 +196,15 @@ export function mapFrontWaybillToBackendUpdate(waybill: FrontWaybill): {
         plannedRoute,
         notes: waybill.notes ?? null,
         status: toBackendStatus(statusStr as any),
+        fuelCalculationMethod: waybill.fuelCalculationMethod || 'BOILER',
+        routes: (waybill.routes || []).map((r, index) => ({
+            legOrder: index,
+            fromPoint: r.from,
+            toPoint: r.to,
+            distanceKm: r.distanceKm,
+            isCityDriving: r.isCityDriving || false,
+            isWarming: r.isWarming || false,
+            comment: r.notes || null,
+        }))
     };
 }

@@ -1,12 +1,21 @@
-// Employee Controller - Handle employee requests
 import { Request, Response, NextFunction } from 'express';
 import * as employeeService from '../services/employeeService';
+import fs from 'fs';
+
+const LOG_FILE = 'c:/_PL-tests/request-logs.txt';
+function logToFile(msg: string) {
+    try {
+        fs.appendFileSync(LOG_FILE, `[${new Date().toISOString()}] ${msg}\n`);
+    } catch { }
+}
 
 export async function listEmployees(req: Request, res: Response, next: NextFunction) {
     try {
         // Extract organizationId from authenticated user (set by auth middleware)
         const organizationId = req.user!.organizationId;
         const { departmentId, isActive, page, limit } = req.query;
+
+        logToFile(`🌐 [employeeController] GET /employees - User Org: ${organizationId}, Query: ${JSON.stringify(req.query)}`);
 
         const filters: employeeService.EmployeeFilters = {
             organizationId,  // Always filter by user's organization
@@ -18,11 +27,14 @@ export async function listEmployees(req: Request, res: Response, next: NextFunct
 
         const result = await employeeService.getEmployees(filters);
 
+        logToFile(`🌐 [employeeController] Found ${result.employees.length} employees`);
+
         res.json({
             success: true,
             data: result,
         });
     } catch (err) {
+        logToFile(`🌐 [employeeController] Error: ${err}`);
         next(err);
     }
 }
@@ -56,7 +68,7 @@ export async function createEmployee(req: Request, res: Response, next: NextFunc
 
         const employee = await employeeService.createEmployee({
             ...req.body,
-            organizationId  // Override/add organizationId from token
+            organizationId: req.body.organizationId || organizationId
         });
 
         res.status(201).json({

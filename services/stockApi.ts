@@ -82,9 +82,13 @@ function mapBackendMovementToFrontend(movement: BackendStockMovement): StockTran
 /**
  * Get all stock items (garage nomenclature)
  */
-export async function getGarageStockItems(): Promise<GarageStockItem[]> {
+export async function getGarageStockItems(isFuel?: boolean): Promise<GarageStockItem[]> {
     console.log('📡 [stockApi] Fetching stock items from backend...');
-    const response = await httpClient.get<ApiResponse<BackendStockItem[]>>('/stock/items');
+    let url = '/stock/items';
+    if (isFuel !== undefined) {
+        url += `?isFuel=${isFuel}`;
+    }
+    const response = await httpClient.get<ApiResponse<BackendStockItem[]>>(url);
     const items = (response.data || []).map(mapBackendItemToFrontend);
     console.log('📡 [stockApi] Received', items.length, 'stock items');
     return items;

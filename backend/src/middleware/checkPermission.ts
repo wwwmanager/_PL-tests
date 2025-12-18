@@ -46,7 +46,7 @@ export function checkPermission(requiredPermission: string) {
             const userRole = req.user.role;
 
             // Admin has all permissions (optional, but good for safety)
-            if (userRole === 'admin') {
+            if (userRole?.toLowerCase() === 'admin') {
                 return next();
             }
 

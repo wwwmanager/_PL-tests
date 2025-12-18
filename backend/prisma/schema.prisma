@@ -46,6 +46,12 @@ enum WaybillStatus {
   CANCELLED
 }
 
+enum FuelCalculationMethod {
+  BOILER
+  MIXED
+  SEGMENTS
+}
+
 enum AuditActionType {
   CREATE
   UPDATE
@@ -138,9 +144,11 @@ model User {
   isSystem       Boolean  @default(false)  // System users cannot be deleted
   createdAt      DateTime @default(now()) @db.Timestamp(6)
   updatedAt      DateTime @default(now()) @updatedAt @db.Timestamp(6)
+  employeeId     String?  @unique @db.Uuid
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   department   Department?  @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  employee     Employee?    @relation(fields: [employeeId], references: [id], onDelete: SetNull)
 
   roles                 UserRole[]
   createdWaybills       Waybill[]       @relation("WaybillCreatedBy")
@@ -245,6 +253,8 @@ model Employee {
   notes                        String?   @db.Text
   isActive                     Boolean   @default(true)
   
+  assignedVehicles Vehicle[] @relation("VehicleDriver")
+  
   createdAt                    DateTime  @default(now()) @db.Timestamp(6)
   updatedAt                    DateTime  @default(now()) @updatedAt @db.Timestamp(6)
 
@@ -256,6 +266,7 @@ model Employee {
   assignedDrivers      Employee[]    @relation("EmployeeDispatcher")
   controlledEmployees  Employee[]    @relation("EmployeeController")
   driver               Driver?
+  user                 User?
 
   @@map("employees")
 }
@@ -286,21 +297,55 @@ model Vehicle {
   organizationId     String   @db.Uuid
   departmentId       String?  @db.Uuid
   code               String?  @db.Text
-  registrationNumber String   @db.Text
+  registrationNumber String   @unique @db.Text
   brand              String?  @db.Text
   model              String?  @db.Text
   vin                String?  @db.Text
   fuelType           String?  @db.Text
+  fuelTypeId         String?  @db.Uuid
   fuelTankCapacity   Decimal? @db.Decimal(10, 2)
   mileage            Decimal  @default(0) @db.Decimal(10, 1) // Added
   currentFuel        Decimal  @default(0) @db.Decimal(10, 2) // Added
   fuelConsumptionRates Json? // Added: { winterRate, summerRate, cityIncreasePercent, warmingIncreasePercent }
+  
+  year               Int?
+  vehicleType        String?  @db.Text
+  assignedDriverId   String?  @db.Uuid
+  
+  ptsType            String?  @db.Text
+  ptsSeries          String?  @db.Text
+  ptsNumber          String?  @db.Text
+  eptsNumber         String?  @db.Text
+  
+  diagnosticCardNumber     String?  @db.Text
+  diagnosticCardIssueDate  String?  @db.Text
+  diagnosticCardExpiryDate String?  @db.Text
+  
+  maintenanceHistory Json?
+  
+  useCityModifier    Boolean  @default(false)
+  useWarmingModifier Boolean  @default(false)
+  
+  osagoSeries        String?  @db.Text
+  osagoNumber        String?  @db.Text
+  osagoStartDate     String?  @db.Text
+  osagoEndDate       String?  @db.Text
+  
+  storageLocationId  String?  @db.Uuid
+  notes              String?  @db.Text
+  disableFuelCapacityCheck Boolean @default(false)
+
   isActive           Boolean  @default(true)
   createdAt          DateTime @default(now()) @db.Timestamp(6)
   updatedAt          DateTime @default(now()) @updatedAt @db.Timestamp(6)
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   department   Department?  @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  
+  assignedDriver  Employee?  @relation("VehicleDriver", fields: [assignedDriverId], references: [id], onDelete: SetNull)
+  fuelTypeRelation FuelType? @relation(fields: [fuelTypeId], references: [id], onDelete: SetNull)
+  storageLocation Warehouse? @relation(fields: [storageLocationId], references: [id], onDelete: SetNull)
+
   waybills     Waybill[]
   fuelCards    FuelCard[]   @relation("FuelCardVehicle")
   blanksIssued Blank[]      @relation("BlankIssuedToVehicle")
@@ -362,6 +407,7 @@ model Warehouse {
   organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   department     Department?     @relation(fields: [departmentId], references: [id], onDelete: SetNull)
   stockMovements StockMovement[]
+  vehicles       Vehicle[]
 
   @@map("warehouses")
 }
@@ -375,6 +421,7 @@ model FuelType {
   updatedAt   DateTime @updatedAt @db.Timestamp(6)
   
   waybillFuels WaybillFuel[]
+  vehicles     Vehicle[]
   
   @@map("fuel_types")
 }
@@ -486,6 +533,7 @@ model Waybill {
   notes             String?       @db.Text
   isCityDriving     Boolean       @default(false) // Added WB-102
   isWarming         Boolean       @default(false) // Added WB-102
+  fuelCalculationMethod FuelCalculationMethod @default(BOILER)
   createdByUserId   String?       @db.Uuid
   approvedByUserId  String?       @db.Uuid
   completedByUserId String?       @db.Uuid
@@ -521,6 +569,8 @@ model WaybillRoute {
   plannedTime String?  @db.Text
   actualTime  String?  @db.Text
   comment     String?  @db.Text
+  isCityDriving Boolean?
+  isWarming     Boolean?
 
   waybill Waybill @relation(fields: [waybillId], references: [id], onDelete: Cascade)
   route   Route?  @relation(fields: [routeId], references: [id], onDelete: SetNull)

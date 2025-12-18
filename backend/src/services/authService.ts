@@ -74,7 +74,8 @@ export async function login(email: string, password: string) {
         id: user.id,
         organizationId: user.organizationId,
         departmentId: user.departmentId,  // NEW: include department
-        role: primaryRole
+        role: primaryRole,
+        employeeId: user.employeeId // WB-905
     });
 
     // Return formatted response for frontend
@@ -88,7 +89,8 @@ export async function login(email: string, password: string) {
                 role: primaryRole,
                 displayName: user.fullName,
                 organizationId: user.organizationId,
-                departmentId: user.departmentId  // NEW: return department info
+                departmentId: user.departmentId,  // NEW: return department info
+                employeeId: user.employeeId // WB-905
             }
         }
     };

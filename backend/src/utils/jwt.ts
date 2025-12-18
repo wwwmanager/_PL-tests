@@ -6,14 +6,16 @@ interface AccessTokenPayload {
     organizationId: string;
     departmentId: string | null;  // NEW: for department-level access control
     role: string;
+    employeeId: string | null; // WB-905
 }
 
-export function signAccessToken(user: { id: string; organizationId: string; departmentId?: string | null; role: string }): string {
+export function signAccessToken(user: { id: string; organizationId: string; departmentId?: string | null; role: string; employeeId?: string | null }): string {
     const payload: AccessTokenPayload = {
         sub: user.id,
         organizationId: user.organizationId,
         departmentId: user.departmentId ?? null,
         role: user.role,
+        employeeId: user.employeeId ?? null,
     };
 
     console.log('[signAccessToken] Signing with:', {
@@ -21,6 +23,7 @@ export function signAccessToken(user: { id: string; organizationId: string; depa
         organizationId: user.organizationId,
         departmentId: user.departmentId ?? null,
         role: user.role,
+        employeeId: user.employeeId ?? null, // WB-905
         expiresIn: env.JWT_EXPIRES_IN,
         secretLength: env.JWT_SECRET.length
     });

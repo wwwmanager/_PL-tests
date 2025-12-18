@@ -42,7 +42,7 @@ export async function listWaybills(req: Request, res: Response, next: NextFuncti
             limit: req.query.limit ? parseInt(req.query.limit as string, 10) : undefined,
         };
 
-        const result = await waybillService.listWaybills(orgId, filters, pagination);
+        const result = await waybillService.listWaybills(req.user as any, filters, pagination);
         res.json(result);
     } catch (err) {
         next(err);
@@ -53,7 +53,7 @@ export async function getWaybillById(req: Request, res: Response, next: NextFunc
     try {
         const orgId = req.user!.organizationId;
         const { id } = req.params;
-        const waybill = await waybillService.getWaybillById(orgId, id);
+        const waybill = await waybillService.getWaybillById(req.user as any, id);
         if (!waybill) return res.status(404).json({ error: 'Не найдено' });
         res.json(waybill);
     } catch (err) {
@@ -87,7 +87,7 @@ export async function createWaybill(req: Request, res: Response, next: NextFunct
         });
 
         // Create waybill with validated data
-        const waybill = await waybillService.createWaybill(orgId, data as any);
+        const waybill = await waybillService.createWaybill(req.user as any, data as any);
 
         console.log('[WB-401] Waybill created:', {
             id: waybill.id,
@@ -117,7 +117,7 @@ export async function updateWaybill(req: Request, res: Response, next: NextFunct
         // Map legacy fuel fields to fuelLines if needed
         mapLegacyFuelFields(data);
 
-        const waybill = await waybillService.updateWaybill(orgId, id, data as any);
+        const waybill = await waybillService.updateWaybill(req.user as any, id, data as any);
         res.json(waybill);
     } catch (err) {
         next(err);
@@ -128,7 +128,7 @@ export async function deleteWaybill(req: Request, res: Response, next: NextFunct
     try {
         const orgId = req.user!.organizationId;
         const { id } = req.params;
-        await waybillService.deleteWaybill(orgId, id);
+        await waybillService.deleteWaybill(req.user as any, id);
         res.json({ message: 'Удалено' });
     } catch (err) {
         next(err);
@@ -154,7 +154,7 @@ export async function changeWaybillStatus(req: Request, res: Response, next: Nex
         // Admin and dispatcher can override norm, others cannot
         const hasOverridePermission = ['admin', 'dispatcher'].includes(userRole);
 
-        const waybill = await waybillService.changeWaybillStatus(orgId, id, status, userId, hasOverridePermission);
+        const waybill = await waybillService.changeWaybillStatus(req.user as any, id, status, userId, hasOverridePermission);
         res.json(waybill);
     } catch (err) {
         next(err);

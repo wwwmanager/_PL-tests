@@ -80,6 +80,8 @@ export enum WaybillStatus {
   COMPLETED = 'Posted',
 }
 
+export type FuelCalculationMethod = 'BOILER' | 'SEGMENTS' | 'MIXED';
+
 export interface Route {
   id: string;
   from: string;
@@ -109,7 +111,7 @@ export interface Attachment {
 // Добавляем нормализованные серия/номер и служебные поля аудита статусов
 export interface Waybill {
   id: string;
-  number: string; // оставляем для печати и совместимости
+  number?: string; // оставляем для печати и совместимости
 
   // НОВОЕ: нормализованный номер
   blankId?: string | null;
@@ -148,6 +150,7 @@ export interface Waybill {
   deviationReason?: string;
   linkedStockTransactionIds?: string[];
   notes?: string;
+  fuelCalculationMethod?: FuelCalculationMethod; // НОВОЕ WB-1001
 }
 
 export interface FuelConsumptionRates {

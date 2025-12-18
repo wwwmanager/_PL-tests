@@ -11,6 +11,20 @@
 import Decimal from 'decimal.js';
 
 /**
+ * Supported fuel calculation methods
+ */
+export type FuelCalculationMethod = 'BOILER' | 'MIXED' | 'SEGMENTS';
+
+/**
+ * Route segment data for fuel calculation
+ */
+export interface FuelSegment {
+    distanceKm: number;
+    isCityDriving?: boolean;
+    isWarming?: boolean;
+}
+
+/**
  * Fuel consumption rates from Vehicle
  */
 export interface FuelConsumptionRates {
@@ -149,6 +163,87 @@ export function calculatePlannedFuel(
     }
 
     return calculateNormConsumption(distanceKm, baseRate, coefficients);
+}
+
+/**
+ * Calculate planned fuel consumption based on chosen method
+ */
+export function calculatePlannedFuelByMethod(params: {
+    method: FuelCalculationMethod;
+    baseRate: number;
+    odometerDistanceKm?: number | null;
+    segments?: FuelSegment[];
+    rates: FuelConsumptionRates;
+}): number {
+    const { method, baseRate, odometerDistanceKm, segments, rates } = params;
+
+    if (baseRate <= 0) return 0;
+
+    switch (method) {
+        case 'BOILER': {
+            if (odometerDistanceKm == null || odometerDistanceKm <= 0) return 0;
+            // Boiler method ignores city/warming modifiers as per spec
+            return calculateNormConsumption(odometerDistanceKm, baseRate, {});
+        }
+
+        case 'SEGMENTS': {
+            if (!segments || segments.length === 0) return 0;
+            let total = 0;
+            for (const seg of segments) {
+                if (seg.distanceKm <= 0) continue;
+                const coeff = getCoefficientsForSegment(seg, rates);
+                const segPlanned = calculateNormConsumption(seg.distanceKm, baseRate, coeff);
+                total += segPlanned;
+            }
+            return Math.round(total * 100) / 100;
+        }
+
+        case 'MIXED': {
+            if (odometerDistanceKm == null || odometerDistanceKm <= 0) return 0;
+            if (!segments || segments.length === 0) return 0;
+
+            let totalConsExact = 0;
+            let totalSegmentsKm = 0;
+
+            for (const seg of segments) {
+                if (seg.distanceKm <= 0) continue;
+                const coeff = getCoefficientsForSegment(seg, rates);
+
+                // Calculate exact (non-rounded) consumption for the segment
+                const totalCoeff = (coeff.winter || 0) + (coeff.city || 0) + (coeff.warming || 0);
+                const segConsRaw = (seg.distanceKm / 100) * baseRate * (1 + totalCoeff);
+
+                totalConsExact += segConsRaw;
+                totalSegmentsKm += seg.distanceKm;
+            }
+
+            if (totalSegmentsKm <= 0) return 0;
+
+            // Average rate in L/100km
+            const avgRate = totalConsExact / (totalSegmentsKm / 100);
+
+            // Apply average rate to odometer distance
+            const finalPlanned = (odometerDistanceKm / 100) * avgRate;
+            return Math.round(finalPlanned * 100) / 100;
+        }
+
+        default:
+            return 0;
+    }
+}
+
+/**
+ * Helper to get coefficients from segment flags and vehicle rates
+ */
+function getCoefficientsForSegment(seg: FuelSegment, rates: FuelConsumptionRates): FuelCoefficients {
+    const coeff: FuelCoefficients = {};
+    if (seg.isCityDriving && rates.cityIncreasePercent) {
+        coeff.city = rates.cityIncreasePercent / 100;
+    }
+    if (seg.isWarming && rates.warmingIncreasePercent) {
+        coeff.warming = rates.warmingIncreasePercent / 100;
+    }
+    return coeff;
 }
 
 /**

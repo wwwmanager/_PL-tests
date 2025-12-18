@@ -13,8 +13,19 @@ export async function listStockItems(req: Request, res: Response, next: NextFunc
         }
 
         const organizationId = req.user.organizationId;
+        const { isFuel, isActive } = req.query;
+
+        const where: any = {};
+        if (organizationId) where.organizationId = organizationId;
+
+        if (isFuel === 'true') where.isFuel = true;
+        if (isFuel === 'false') where.isFuel = false;
+
+        if (isActive === 'true') where.isActive = true;
+        if (isActive === 'false') where.isActive = false;
+
         const items = await prisma.stockItem.findMany({
-            where: organizationId ? { organizationId } : {},
+            where,
             orderBy: { name: 'asc' },
         });
 

@@ -1,7 +1,6 @@
-import { PrismaClient, BlankStatus } from '@prisma/client';
+import { BlankStatus } from '@prisma/client';
 import { v4 as uuidv4 } from 'uuid';
-
-const prisma = new PrismaClient();
+import { prisma } from '../db/prisma';
 
 export interface CreateBatchDto {
     series: string;
@@ -132,7 +131,7 @@ export async function listBlanks(organizationId: string | undefined, filters: { 
         status: filters.status
     };
 
-    const [total, items] = await Promise.all([
+    const [total, rawItems] = await Promise.all([
         prisma.blank.count({ where }),
         prisma.blank.findMany({
             where,
@@ -141,10 +140,27 @@ export async function listBlanks(organizationId: string | undefined, filters: { 
             orderBy: [{ series: 'asc' }, { number: 'asc' }],
             include: {
                 issuedToDriver: { include: { employee: true } },
-                issuedToVehicle: true
+                issuedToVehicle: true,
+                waybills: { select: { id: true, number: true }, take: 1 }
             }
         })
     ]);
+
+    // Map to frontend format
+    const items = rawItems.map(b => ({
+        id: b.id,
+        organizationId: b.organizationId,
+        batchId: b.batchId || '',
+        series: b.series || '',
+        number: b.number,
+        status: b.status.toLowerCase(), // Prisma enum to lowercase
+        // Map Driver.employeeId to ownerEmployeeId for frontend compatibility
+        ownerEmployeeId: b.issuedToDriver?.employeeId || null,
+        ownerName: b.issuedToDriver?.employee?.shortName || b.issuedToDriver?.employee?.fullName || null,
+        usedInWaybillId: b.waybills?.[0]?.number || null,
+        usedAt: b.usedAt?.toISOString() || null,
+        issuedAt: b.issuedAt?.toISOString() || null,
+    }));
 
     return { total, items, page, limit, totalPages: Math.ceil(total / limit) };
 }
@@ -299,17 +315,37 @@ function buildBlankRanges(blanks: { series: string | null; number: number }[]): 
     return ranges;
 }
 
-export async function getDriverSummary(driverId: string): Promise<DriverBlankSummary> {
+export async function getDriverSummary(employeeId: string): Promise<DriverBlankSummary> {
+    console.log(`📊 [blankService] Fetching summary for employeeId: ${employeeId}`);
+
+    // First find the Driver record by employeeId
+    const driver = await prisma.driver.findUnique({
+        where: { employeeId }
+    });
+
+    if (!driver) {
+        console.warn(`⚠️ [blankService] No Driver record found for employeeId: ${employeeId}`);
+        // No driver record means no blanks issued
+        return { active: [], used: [], spoiled: [] };
+    }
+
+    console.log(`✅ [blankService] Found Driver record: ${driver.id} for employeeId: ${employeeId}`);
+
     // Find all blanks issued to this driver
     const blanks = await prisma.blank.findMany({
-        where: { issuedToDriverId: driverId },
+        where: { issuedToDriverId: driver.id },
         select: { series: true, number: true, status: true }
     });
 
+    console.log(`📋 [blankService] Found ${blanks.length} total blanks for driver: ${driver.id}`);
+
     // Categorize by status
-    const activeBlanks = blanks.filter(b => b.status === BlankStatus.ISSUED);
+    // Include both ISSUED and RESERVED in active blanks
+    const activeBlanks = blanks.filter(b => b.status === BlankStatus.ISSUED || b.status === BlankStatus.RESERVED);
     const usedBlanks = blanks.filter(b => b.status === BlankStatus.USED);
     const spoiledBlanks = blanks.filter(b => b.status === BlankStatus.SPOILED);
+
+    console.log(`📈 [blankService] Categorized: active=${activeBlanks.length}, used=${usedBlanks.length}, spoiled=${spoiledBlanks.length}`);
 
     return {
         active: buildBlankRanges(activeBlanks),

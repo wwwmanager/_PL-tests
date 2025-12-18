@@ -21,8 +21,29 @@ export interface BackendWaybillDto {
     odometerEnd: number | null;
     plannedRoute: string | null;
     notes: string | null;
+    fuelCalculationMethod?: string; // BOILER, SEGMENTS, MIXED
     createdAt: string;
     updatedAt: string;
+    routes?: Array<{
+        id: string;
+        legOrder: number;
+        routeId: string | null;
+        fromPoint: string | null;
+        toPoint: string | null;
+        distanceKm: number | null;
+        isCityDriving: boolean | null;
+        isWarming: boolean | null;
+        comment: string | null;
+    }>;
+    fuelLines?: Array<{
+        id: string;
+        stockItemId: string;
+        fuelStart: number | null;
+        fuelReceived: number | null;
+        fuelConsumed: number | null;
+        fuelEnd: number | null;
+        fuelPlanned: number | null;
+    }>;
     // Опционально, если backend включает связанные данные
     vehicle?: {
         id: string;
@@ -48,7 +69,7 @@ export interface BackendWaybillDto {
 export interface FrontWaybill {
     id: string;
     organizationId: string;
-    number: string;
+    number?: string;
     date: string;
     vehicleId: string;
     driverId: string;
@@ -80,6 +101,7 @@ export interface FrontWaybill {
     reviewerComment?: string;
     deviationReason?: string;
     notes?: string;
+    fuelCalculationMethod?: 'BOILER' | 'SEGMENTS' | 'MIXED';
 
     // Аудит
     createdAt?: string;

@@ -9,6 +9,7 @@ declare module 'express-serve-static-core' {
             organizationId: string;
             departmentId: string | null;  // NEW: department-level isolation
             role: string;
+            employeeId: string | null; // WB-905
         };
     }
 }
@@ -34,6 +35,7 @@ export const authMiddleware = (req: Request, res: Response, next: NextFunction) 
             organizationId: payload.organizationId,
             departmentId: payload.departmentId,  // NEW: extract from JWT
             role: payload.role,
+            employeeId: payload.employeeId, // WB-905
         };
         console.log('[authMiddleware] req.user set:', req.user);
         next();

@@ -280,7 +280,8 @@ const BlankList: React.FC<{ key: number }> = () => {
     const enrichedBlanks = useMemo(() => blanks.map(b => ({
         ...b,
         number: String(b.number).padStart(6, '0'),
-        ownerName: b.ownerEmployeeId ? employeeMap.get(b.ownerEmployeeId) || b.ownerEmployeeId : ''
+        // Use ownerName from backend if available, otherwise fallback to employeeMap lookup
+        ownerName: (b as any).ownerName || (b.ownerEmployeeId ? employeeMap.get(b.ownerEmployeeId) : '') || '-'
     })), [blanks, employeeMap]);
 
     type EnrichedBlank = (typeof enrichedBlanks)[0];

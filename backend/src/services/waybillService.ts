@@ -1,14 +1,22 @@
 import { PrismaClient, WaybillStatus, BlankStatus } from '@prisma/client';
 import { BadRequestError, NotFoundError } from '../utils/errors';
-import { validateOdometer, calculateDistanceKm, calculatePlannedFuel, FuelConsumptionRates, DrivingFlags } from '../domain/waybill/fuel';
+import { validateOdometer, calculateDistanceKm, calculatePlannedFuelByMethod, FuelConsumptionRates, FuelCalculationMethod, FuelSegment } from '../domain/waybill/fuel';
 import { isWinterDate } from '../utils/dateUtils';
 import { getSeasonSettings } from './settingsService';
 import { reserveNextBlankForDriver, reserveSpecificBlank, releaseBlank } from './blankService';
 
 const prisma = new PrismaClient();
 
+export interface UserInfo {
+    id: string;
+    organizationId: string;
+    departmentId: string | null;
+    role: string;
+    employeeId: string | null;
+}
+
 interface CreateWaybillInput {
-    number: string;
+    number?: string; // WB-901: Made optional as backend will assign it from blank
     date: string;
     vehicleId: string;
     driverId: string;
@@ -19,6 +27,17 @@ interface CreateWaybillInput {
     isWarming?: boolean;
     plannedRoute?: string;
     notes?: string;
+    fuelCalculationMethod?: FuelCalculationMethod;
+    routes?: Array<{
+        legOrder: number;
+        routeId?: string | null;
+        fromPoint?: string;
+        toPoint?: string;
+        distanceKm?: number;
+        isCityDriving?: boolean;
+        isWarming?: boolean;
+        comment?: string;
+    }>;
     fuelLines?: Array<{
         stockItemId: string;
         fuelStart?: number;
@@ -26,6 +45,7 @@ interface CreateWaybillInput {
         fuelConsumed?: number;
         fuelEnd?: number;
         fuelPlanned?: number;
+        isFuel?: boolean; // Added helper for planned assignment
     }>;
 }
 
@@ -45,13 +65,28 @@ interface PaginationParams {
 }
 
 export async function listWaybills(
-    organizationId: string,
+    userInfo: UserInfo,
     filters?: ListWaybillsFilters,
     pagination?: PaginationParams
 ) {
+    const organizationId = userInfo.organizationId;
     const where: any = {
         organizationId,
     };
+
+    // WB-906: Restriction for driver role
+    if (userInfo.role === 'driver' && userInfo.employeeId) {
+        // Find Driver record for this employee
+        const driver = await prisma.driver.findUnique({
+            where: { employeeId: userInfo.employeeId }
+        });
+        if (driver) {
+            where.driverId = driver.id;
+        } else {
+            // No driver record -> no waybills to see
+            return { data: [], pagination: { total: 0, page: 1, limit: pagination?.limit ?? 50, pages: 0 } };
+        }
+    }
 
     if (filters) {
         if (filters.startDate) {
@@ -97,7 +132,8 @@ export async function listWaybills(
                 include: {
                     employee: true
                 }
-            }
+            },
+            blank: true // WB-901
         }
     });
 
@@ -112,26 +148,65 @@ export async function listWaybills(
     };
 }
 
-export async function getWaybillById(organizationId: string, id: string) {
+export async function getWaybillById(userInfo: UserInfo, id: string) {
+    const organizationId = userInfo.organizationId;
+    const where: any = { id, organizationId };
+
+    // WB-906: Driver can only see their own waybills
+    if (userInfo.role === 'driver' && userInfo.employeeId) {
+        const driver = await prisma.driver.findUnique({
+            where: { employeeId: userInfo.employeeId }
+        });
+        if (driver) {
+            where.driverId = driver.id;
+        } else {
+            return null;
+        }
+    }
+
     return prisma.waybill.findFirst({
-        where: { id, organizationId },
+        where,
         include: {
             vehicle: true,
             driver: {
                 include: {
                     employee: true
                 }
-            }
+            },
+            blank: true, // WB-901
+            fuelLines: true // WB-901
         }
     });
 }
 
-export async function createWaybill(organizationId: string, input: CreateWaybillInput) {
-    console.log('[WB-402] createWaybill service called');
+function formatBlankNumber(series: string | null, number: number): string {
+    const s = series || '';
+    const n = number.toString().padStart(6, '0');
+    return s ? `${s} ${n}` : n;
+}
+
+export async function createWaybill(userInfo: UserInfo, input: CreateWaybillInput) {
+    const organizationId = userInfo.organizationId;
+    console.log('[WB-1005] createWaybill service called');
 
     const date = new Date(input.date);
     if (Number.isNaN(date.getTime())) {
         throw new BadRequestError('Некорректная дата');
+    }
+
+    // WB-906: Driver restrictions
+    let targetDriverId = input.driverId;
+    if (userInfo.role === 'driver') {
+        if (!userInfo.employeeId) {
+            throw new BadRequestError('Конфигурация пользователя неполная (отсутствует связь с сотрудником)');
+        }
+        const driver = await prisma.driver.findUnique({
+            where: { employeeId: userInfo.employeeId }
+        });
+        if (!driver) {
+            throw new BadRequestError('Запись водителя не найдена');
+        }
+        targetDriverId = driver.id; // Force own driverId
     }
 
     // WB-402: Validate odometer - end >= start
@@ -149,95 +224,118 @@ export async function createWaybill(organizationId: string, input: CreateWaybill
     if (!vehicle) throw new BadRequestError('Транспортное средство не найдено');
 
     const driver = await prisma.driver.findFirst({
-        where: { id: input.driverId, employee: { organizationId } }
+        where: { id: targetDriverId, employee: { organizationId } }
     });
     if (!driver) throw new BadRequestError('Водитель не найден');
 
     // BLS-202: Reserve blank for this waybill
     let validatedBlankId: string | null = null;
+    let waybillNumber = '';
 
     try {
         if (input.blankId) {
-            // Reserve specific blank if ID provided
             const result = await reserveSpecificBlank(
                 organizationId,
                 input.blankId,
-                input.driverId,
+                targetDriverId,
                 vehicle.departmentId ?? undefined
             );
             validatedBlankId = result.blank.id;
-            console.log('[BLS-202] Reserved specific blank:', result.blank);
+            waybillNumber = formatBlankNumber(result.blank.series, result.blank.number);
         } else {
-            // Auto-reserve next available blank for driver
-            try {
-                const result = await reserveNextBlankForDriver(
-                    organizationId,
-                    input.driverId,
-                    vehicle.departmentId ?? undefined
-                );
-                validatedBlankId = result.blank.id;
-                console.log('[BLS-202] Auto-reserved blank:', result.blank);
-            } catch (err) {
-                // No available blanks - continue without blank (optional for some workflows)
-                console.warn('[BLS-202] No blanks available for auto-reservation, continuing without blank');
-            }
+            const result = await reserveNextBlankForDriver(
+                organizationId,
+                targetDriverId,
+                vehicle.departmentId ?? undefined
+            );
+            validatedBlankId = result.blank.id;
+            waybillNumber = formatBlankNumber(result.blank.series, result.blank.number);
         }
     } catch (err: any) {
+        if (err.statusCode) throw err;
         throw new BadRequestError(err.message || 'Ошибка резервирования бланка');
     }
 
-    // WB-402: Calculate fuelPlanned if we have odometer data and vehicle rates
-    let calculatedFuelLines = input.fuelLines || [];
-    const distanceKm = calculateDistanceKm(input.odometerStart, input.odometerEnd);
+    // WB-1006: Method-specific validation
+    const method = input.fuelCalculationMethod || 'BOILER';
+    if (method === 'SEGMENTS' || method === 'MIXED') {
+        if (!input.routes || input.routes.length === 0) {
+            throw new BadRequestError('Маршруты обязательны для выбранного метода расчета', 'ROUTES_REQUIRED_FOR_METHOD');
+        }
+        if (input.routes.every(r => (r.distanceKm || 0) <= 0)) {
+            throw new BadRequestError('Хотя бы один участок маршрута должен иметь пробег', 'INVALID_ROUTE_DISTANCE');
+        }
+    }
+    if (method === 'BOILER' || method === 'MIXED') {
+        if (input.odometerStart == null || input.odometerEnd == null) {
+            throw new BadRequestError('Показания одометра обязательны для выбранного метода расчета', 'ODOMETER_REQUIRED_FOR_METHOD');
+        }
+    }
 
-    if (distanceKm !== null && distanceKm > 0 && vehicle.fuelConsumptionRates) {
-        // Get season settings to determine if winter
+    // WB-1005: Calculate fuelPlanned based on method
+    let calculatedFuelLines = input.fuelLines || [];
+    const odometerDistanceKm = calculateDistanceKm(input.odometerStart, input.odometerEnd);
+
+    if (vehicle.fuelConsumptionRates) {
         const seasonSettings = await getSeasonSettings();
         const isWinter = isWinterDate(input.date, seasonSettings);
-
         const rates = vehicle.fuelConsumptionRates as FuelConsumptionRates;
-        const flags: DrivingFlags = {
-            isCityDriving: input.isCityDriving ?? false,
-            isWarming: input.isWarming ?? false
-        };
+        const baseRate = isWinter
+            ? (rates.winterRate ?? rates.summerRate ?? 0)
+            : (rates.summerRate ?? rates.winterRate ?? 0);
 
-        // Calculate planned fuel
-        const fuelPlanned = calculatePlannedFuel(distanceKm, rates, flags, isWinter);
+        const calculationSegments: FuelSegment[] = (input.routes || []).map(r => ({
+            distanceKm: r.distanceKm || 0,
+            isCityDriving: r.isCityDriving || false,
+            isWarming: r.isWarming || false
+        }));
 
-        console.log('[WB-402] Fuel calculation:', {
-            distanceKm,
-            isWinter,
-            isCityDriving: flags.isCityDriving,
-            isWarming: flags.isWarming,
-            fuelPlanned
+        const fuelPlanned = calculatePlannedFuelByMethod({
+            method,
+            baseRate,
+            odometerDistanceKm,
+            segments: calculationSegments,
+            rates
         });
 
-        // If we have fuel lines, add fuelPlanned to first one; otherwise create placeholder
         if (calculatedFuelLines.length > 0) {
             calculatedFuelLines = calculatedFuelLines.map((fl, index) => ({
                 ...fl,
-                fuelPlanned: index === 0 ? fuelPlanned : fl.fuelPlanned
+                fuelPlanned: index === 0 ? fuelPlanned : undefined
             }));
         }
     }
 
-    // Create waybill with fuelLines
+    // Create waybill with fuelLines and routes
     return prisma.waybill.create({
         data: {
             organizationId,
-            departmentId: vehicle.departmentId, // Inherit department from vehicle
-            number: input.number,
+            departmentId: vehicle.departmentId,
+            number: waybillNumber,
             date: date,
             vehicleId: input.vehicleId,
-            driverId: input.driverId,
+            driverId: targetDriverId,
             blankId: validatedBlankId,
             odometerStart: input.odometerStart,
             odometerEnd: input.odometerEnd,
             isCityDriving: input.isCityDriving ?? false,
             isWarming: input.isWarming ?? false,
+            fuelCalculationMethod: method as any,
             plannedRoute: input.plannedRoute,
             notes: input.notes,
             status: WaybillStatus.DRAFT,
+            routes: input.routes && input.routes.length > 0 ? {
+                create: input.routes.map(r => ({
+                    legOrder: r.legOrder,
+                    routeId: r.routeId || null,
+                    fromPoint: r.fromPoint || null,
+                    toPoint: r.toPoint || null,
+                    distanceKm: r.distanceKm || 0,
+                    isCityDriving: r.isCityDriving || false,
+                    isWarming: r.isWarming || false,
+                    comment: r.comment || null
+                }))
+            } : undefined,
             fuelLines: calculatedFuelLines.length > 0 ? {
                 create: calculatedFuelLines.map(fl => ({
                     stockItemId: fl.stockItemId,
@@ -250,62 +348,110 @@ export async function createWaybill(organizationId: string, input: CreateWaybill
             } : undefined
         },
         include: {
-            fuelLines: true
+            fuelLines: true,
+            blank: true,
+            routes: true
         }
-    });
+    } as any);
 }
 
-export async function updateWaybill(organizationId: string, id: string, data: Partial<CreateWaybillInput>) {
+export async function updateWaybill(userInfo: UserInfo, id: string, data: Partial<CreateWaybillInput>) {
+    const organizationId = userInfo.organizationId;
+    const where: any = { id, organizationId };
+
+    if (userInfo.role === 'driver' && userInfo.employeeId) {
+        const driver = await prisma.driver.findUnique({
+            where: { employeeId: userInfo.employeeId }
+        });
+        if (driver) {
+            where.driverId = driver.id;
+        } else {
+            throw new BadRequestError('Запись водителя не найдена');
+        }
+    }
+
     const waybill = await prisma.waybill.findFirst({
-        where: { id, organizationId },
+        where,
         include: { vehicle: true, fuelLines: true }
     });
     if (!waybill) throw new NotFoundError('Путевой лист не найден');
 
-    // WB-403: Forbid editing POSTED waybills
     if (waybill.status === WaybillStatus.POSTED) {
         throw new BadRequestError('Нельзя редактировать проведённый путевой лист');
     }
 
-    // WB-403: Validate odometer if both provided
-    const newOdometerStart = data.odometerStart !== undefined ? data.odometerStart : waybill.odometerStart?.toNumber();
-    const newOdometerEnd = data.odometerEnd !== undefined ? data.odometerEnd : waybill.odometerEnd?.toNumber();
+    const newOdometerStart = data.odometerStart !== undefined ? data.odometerStart : (waybill.odometerStart ? Number(waybill.odometerStart) : null);
+    const newOdometerEnd = data.odometerEnd !== undefined ? data.odometerEnd : (waybill.odometerEnd ? Number(waybill.odometerEnd) : null);
 
-    if (newOdometerStart !== undefined && newOdometerEnd !== undefined) {
+    if (newOdometerStart !== null && newOdometerEnd !== null) {
         const odometerValidation = validateOdometer(newOdometerStart, newOdometerEnd);
         if (!odometerValidation.isValid) {
             throw new BadRequestError(odometerValidation.error!);
         }
     }
 
-    // WB-403: Recalculate fuelPlanned if odometer or flags changed
+    const method = data.fuelCalculationMethod || waybill.fuelCalculationMethod;
+    const hasRoutes = (data.routes && data.routes.length > 0) || (await prisma.waybillRoute.count({ where: { waybillId: id } }) > 0);
+
+    if (method === 'SEGMENTS' || method === 'MIXED') {
+        if (!hasRoutes) {
+            throw new BadRequestError('Маршруты обязательны для выбранного метода расчета', 'ROUTES_REQUIRED_FOR_METHOD');
+        }
+    }
+
+    if (method === 'BOILER' || method === 'MIXED') {
+        if (newOdometerStart == null || newOdometerEnd == null) {
+            throw new BadRequestError('Показания одометра обязательны для выбранного метода расчета', 'ODOMETER_REQUIRED_FOR_METHOD');
+        }
+    }
+
+    // Recalculate fuelPlanned
     let calculatedFuelLines = data.fuelLines;
     const vehicle = data.vehicleId ? await prisma.vehicle.findFirst({ where: { id: data.vehicleId } }) : waybill.vehicle;
     const waybillDate = data.date || waybill.date.toISOString().slice(0, 10);
-    const distanceKm = calculateDistanceKm(newOdometerStart, newOdometerEnd);
+    const odometerDistanceKm = calculateDistanceKm(newOdometerStart, newOdometerEnd);
 
-    if (distanceKm !== null && distanceKm > 0 && vehicle?.fuelConsumptionRates) {
+    if (vehicle?.fuelConsumptionRates) {
         const seasonSettings = await getSeasonSettings();
         const isWinter = isWinterDate(waybillDate, seasonSettings);
-
         const rates = vehicle.fuelConsumptionRates as FuelConsumptionRates;
-        const flags: DrivingFlags = {
-            isCityDriving: data.isCityDriving ?? Boolean(waybill.isCityDriving),
-            isWarming: data.isWarming ?? Boolean(waybill.isWarming)
-        };
+        const baseRate = isWinter
+            ? (rates.winterRate ?? rates.summerRate ?? 0)
+            : (rates.summerRate ?? rates.winterRate ?? 0);
 
-        const fuelPlanned = calculatePlannedFuel(distanceKm, rates, flags, isWinter);
+        let calculationSegments: FuelSegment[] = [];
+        if (data.routes) {
+            calculationSegments = data.routes.map(r => ({
+                distanceKm: r.distanceKm || 0,
+                isCityDriving: r.isCityDriving || false,
+                isWarming: r.isWarming || false
+            }));
+        } else {
+            const existingRoutes = await prisma.waybillRoute.findMany({
+                where: { waybillId: id },
+                orderBy: { legOrder: 'asc' }
+            });
+            calculationSegments = existingRoutes.map(r => ({
+                distanceKm: Number(r.distanceKm) || 0,
+                isCityDriving: r.isCityDriving || false,
+                isWarming: r.isWarming || false
+            }));
+        }
 
-        console.log('[WB-403] Fuel recalculation:', { distanceKm, isWinter, fuelPlanned });
+        const fuelPlanned = calculatePlannedFuelByMethod({
+            method,
+            baseRate,
+            odometerDistanceKm,
+            segments: calculationSegments,
+            rates
+        });
 
-        // Update fuelPlanned in fuel lines
         if (calculatedFuelLines && calculatedFuelLines.length > 0) {
             calculatedFuelLines = calculatedFuelLines.map((fl, index) => ({
                 ...fl,
-                fuelPlanned: index === 0 ? fuelPlanned : fl.fuelPlanned
+                fuelPlanned: index === 0 ? fuelPlanned : undefined
             }));
         } else if (waybill.fuelLines.length > 0) {
-            // Update existing fuelLines[0] with new planned
             await prisma.waybillFuel.update({
                 where: { id: waybill.fuelLines[0].id },
                 data: { fuelPlanned }
@@ -313,14 +459,12 @@ export async function updateWaybill(organizationId: string, id: string, data: Pa
         }
     }
 
-    // WB-403: Replace fuelLines if provided (delete old, create new)
-    if (calculatedFuelLines !== undefined) {
-        await prisma.$transaction(async (tx) => {
-            // Delete existing fuel lines
+    // Use transaction for consistency
+    return await prisma.$transaction(async (tx) => {
+        // Replace fuel lines if provided
+        if (calculatedFuelLines !== undefined) {
             await tx.waybillFuel.deleteMany({ where: { waybillId: id } });
-
-            // Create new ones if provided
-            if (calculatedFuelLines && calculatedFuelLines.length > 0) {
+            if (calculatedFuelLines.length > 0) {
                 await tx.waybillFuel.createMany({
                     data: calculatedFuelLines.map(fl => ({
                         waybillId: id,
@@ -333,31 +477,66 @@ export async function updateWaybill(organizationId: string, id: string, data: Pa
                     }))
                 });
             }
-        });
-    }
+        }
 
-    return prisma.waybill.update({
-        where: { id },
-        data: {
-            number: data.number,
-            date: data.date ? new Date(data.date) : undefined,
-            vehicleId: data.vehicleId,
-            driverId: data.driverId,
-            blankId: data.blankId,
-            odometerStart: data.odometerStart,
-            odometerEnd: data.odometerEnd,
-            isCityDriving: data.isCityDriving,
-            isWarming: data.isWarming,
-            plannedRoute: data.plannedRoute,
-            notes: data.notes
-        },
-        include: { fuelLines: true }
+        // Replace route segments if provided
+        if (data.routes !== undefined) {
+            await tx.waybillRoute.deleteMany({ where: { waybillId: id } });
+            if (data.routes.length > 0) {
+                await tx.waybillRoute.createMany({
+                    data: data.routes.map(r => ({
+                        waybillId: id,
+                        legOrder: r.legOrder,
+                        routeId: r.routeId || null,
+                        fromPoint: r.fromPoint || null,
+                        toPoint: r.toPoint || null,
+                        distanceKm: r.distanceKm || 0,
+                        isCityDriving: r.isCityDriving || false,
+                        isWarming: r.isWarming || false,
+                        comment: r.comment || null
+                    }))
+                });
+            }
+        }
+
+        return tx.waybill.update({
+            where: { id },
+            data: {
+                number: data.number,
+                date: data.date ? new Date(data.date) : undefined,
+                vehicleId: data.vehicleId,
+                driverId: data.driverId,
+                blankId: data.blankId,
+                odometerStart: data.odometerStart,
+                odometerEnd: data.odometerEnd,
+                isCityDriving: data.isCityDriving,
+                isWarming: data.isWarming,
+                fuelCalculationMethod: data.fuelCalculationMethod as any,
+                plannedRoute: data.plannedRoute,
+                notes: data.notes
+            },
+            include: { fuelLines: true, routes: true }
+        } as any);
     });
 }
 
-export async function deleteWaybill(organizationId: string, id: string) {
+export async function deleteWaybill(userInfo: UserInfo, id: string) {
+    const organizationId = userInfo.organizationId;
+    // WB-906: Restriction for driver role
+    const where: any = { id, organizationId };
+    if (userInfo.role === 'driver' && userInfo.employeeId) {
+        const driver = await prisma.driver.findUnique({
+            where: { employeeId: userInfo.employeeId }
+        });
+        if (driver) {
+            where.driverId = driver.id;
+        } else {
+            throw new BadRequestError('Запись водителя не найдена');
+        }
+    }
+
     const waybill = await prisma.waybill.findFirst({
-        where: { id, organizationId },
+        where,
         include: { blank: true }
     });
     if (!waybill) throw new NotFoundError('Путевой лист не найден');
@@ -376,14 +555,28 @@ export async function deleteWaybill(organizationId: string, id: string) {
 }
 
 export async function changeWaybillStatus(
-    organizationId: string,
+    userInfo: UserInfo,
     id: string,
     status: WaybillStatus,
     userId: string,
     hasOverridePermission: boolean = false // WB-701: Permission to override norm excess
 ) {
+    const organizationId = userInfo.organizationId;
+    // WB-906: Restriction for driver role
+    const where: any = { id, organizationId };
+    if (userInfo.role === 'driver' && userInfo.employeeId) {
+        const driver = await prisma.driver.findUnique({
+            where: { employeeId: userInfo.employeeId }
+        });
+        if (driver) {
+            where.driverId = driver.id;
+        } else {
+            throw new BadRequestError('Запись водителя не найдена');
+        }
+    }
+
     const waybill = await prisma.waybill.findFirst({
-        where: { id, organizationId },
+        where,
         include: {
             fuelLines: {
                 include: {

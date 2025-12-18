@@ -6,6 +6,7 @@ import { addWaybill, updateWaybill, changeWaybillStatus, getLastWaybillForVehicl
 import { getSavedRoutes, addSavedRoutesFromWaybill } from '../../services/routeApi';
 import { getFuelTypes } from '../../services/fuelTypeApi';
 import { getSeasonSettings, getAppSettings } from '../../services/settingsApi';
+import { FrontWaybillStatus } from '../../services/api/waybillStatusMap';
 import { getNextBlankForDriver, useBlankForWaybill } from '../../services/blankApi';
 // Utility functions
 import { isWinterDate } from '../../services/dateUtils';
@@ -38,7 +39,7 @@ interface WaybillDetailProps {
 }
 
 const emptyWaybill: Omit<Waybill, 'id'> = {
-  number: '',
+  number: '', // Will be assigned by backend from blank
   date: new Date().toISOString().split('T')[0],
   vehicleId: '',
   driverId: '',
@@ -58,6 +59,7 @@ const emptyWaybill: Omit<Waybill, 'id'> = {
   attachments: [],
   reviewerComment: '',
   deviationReason: '',
+  fuelCalculationMethod: 'BOILER',
 };
 
 const FormField: React.FC<{ label: string; children: React.ReactNode }> = ({ label, children }) => (
@@ -114,6 +116,7 @@ export const WaybillDetail: React.FC<WaybillDetailProps> = ({ waybill, isPrefill
 
   const [linkedTransactions, setLinkedTransactions] = useState<StockTransaction[]>([]);
 
+  const isDriver = useMemo(() => hasRole('driver'), [hasRole]);
   const canEdit = useMemo(() => formData.status !== WaybillStatus.POSTED && formData.status !== WaybillStatus.CANCELLED, [formData.status]);
 
   const isDirty = useMemo(() => {
@@ -166,7 +169,7 @@ export const WaybillDetail: React.FC<WaybillDetailProps> = ({ waybill, isPrefill
         getFuelTypes(),
         getSeasonSettings(),
         getAppSettings(),
-        getGarageStockItems(),
+        getGarageStockItems(true),
         getStockTransactions(),
       ]);
       setVehicles(vehiclesData);
@@ -222,12 +225,7 @@ export const WaybillDetail: React.FC<WaybillDetailProps> = ({ waybill, isPrefill
         setDayMode(fromDate === toDate ? 'single' : 'multi');
       } else { // For new (blank or prefilled)
         setDayMode('multi');
-        // Auto-reserve blank number
-        const driverId = formDataToSet.driverId || (isPrefill && waybill?.driverId);
-        if (driverId) {
-          const driver = employeesData.find(e => e.id === driverId);
-          updateWaybillNumberForDriver(driver || null);
-        }
+        // WB-901: Remove auto-reserve on frontend. Number will be assigned by backend.
       }
     };
     loadData();
@@ -360,29 +358,64 @@ export const WaybillDetail: React.FC<WaybillDetailProps> = ({ waybill, isPrefill
       return;
     }
 
-    // Fallback for vehicles without fuelConsumptionRates (e.g., from backend)
-    const rates = selectedVehicle.fuelConsumptionRates || { winterRate: 0, summerRate: 0 };
-    const { cityIncreasePercent = 0, warmingIncreasePercent = 0 } = rates;
+    const rates = selectedVehicle.fuelConsumptionRates || { winterRate: 0, summerRate: 0, cityIncreasePercent: 0, warmingIncreasePercent: 0 };
+    const method = formData.fuelCalculationMethod || 'BOILER';
+    const isWaybillWinter = isWinterDate(formData.date, seasonSettings);
 
-    let totalConsumption = 0;
-    for (const route of formData.routes) {
-      const routeDate = dayMode === 'multi' && route.date ? route.date : formData.date;
-      const isWinter = isWinterDate(routeDate, seasonSettings);
-      const baseRate = isWinter ? (rates.winterRate || 0) : (rates.summerRate || 0);
+    let totalPlanned = 0;
 
-      let effectiveRate = baseRate;
-      if (route.isCityDriving && selectedVehicle.useCityModifier) {
-        effectiveRate *= (1 + cityIncreasePercent / 100);
+    if (method === 'BOILER') {
+      const baseRate = isWaybillWinter ? (rates.winterRate || rates.summerRate || 0) : (rates.summerRate || rates.winterRate || 0);
+      const distance = totalDistance;
+      totalPlanned = (distance / 100) * baseRate;
+    }
+    else if (method === 'SEGMENTS') {
+      for (const route of formData.routes) {
+        const routeDate = dayMode === 'multi' && route.date ? route.date : formData.date;
+        const isWinter = isWinterDate(routeDate, seasonSettings);
+        const baseRate = isWinter ? (rates.winterRate || rates.summerRate || 0) : (rates.summerRate || rates.winterRate || 0);
+        let effectiveRate = baseRate;
+
+        if (route.isCityDriving && (rates.cityIncreasePercent || 0) > 0) {
+          effectiveRate *= (1 + (rates.cityIncreasePercent || 0) / 100);
+        }
+        if (route.isWarming && (rates.warmingIncreasePercent || 0) > 0) {
+          effectiveRate *= (1 + (rates.warmingIncreasePercent || 0) / 100);
+        }
+        totalPlanned += ((Number(route.distanceKm) || 0) / 100) * effectiveRate;
       }
-      if (route.isWarming && selectedVehicle.useWarmingModifier) {
-        effectiveRate *= (1 + warmingIncreasePercent / 100);
+    }
+    else if (method === 'MIXED') {
+      let totalConsRaw = 0;
+      let segmentsKm = 0;
+
+      for (const route of formData.routes) {
+        const routeDate = dayMode === 'multi' && route.date ? route.date : formData.date;
+        const isWinter = isWinterDate(routeDate, seasonSettings);
+        const baseRate = isWinter ? (rates.winterRate || rates.summerRate || 0) : (rates.summerRate || rates.winterRate || 0);
+
+        let coeffTotal = 0;
+        if (route.isCityDriving && (rates.cityIncreasePercent || 0) > 0) {
+          coeffTotal += (rates.cityIncreasePercent || 0) / 100;
+        }
+        if (route.isWarming && (rates.warmingIncreasePercent || 0) > 0) {
+          coeffTotal += (rates.warmingIncreasePercent || 0) / 100;
+        }
+
+        const dist = Number(route.distanceKm) || 0;
+        totalConsRaw += (dist / 100) * baseRate * (1 + coeffTotal);
+        segmentsKm += dist;
       }
-      totalConsumption += ((Number(route.distanceKm) || 0) / 100) * effectiveRate;
+
+      if (segmentsKm > 0) {
+        const avgRate = totalConsRaw / (segmentsKm / 100);
+        totalPlanned = (totalDistance / 100) * avgRate;
+      }
     }
 
     const startOdo = Number(formData.odometerStart) || 0;
     const newOdoEnd = startOdo + totalDistance;
-    const newFuelPlanned = Math.round(totalConsumption * 100) / 100;
+    const newFuelPlanned = Math.round(totalPlanned * 100) / 100;
 
     const startFuel = Number(formData.fuelAtStart) || 0;
     const filledFuel = Number(formData.fuelFilled) || 0;
@@ -395,7 +428,7 @@ export const WaybillDetail: React.FC<WaybillDetailProps> = ({ waybill, isPrefill
       fuelAtEnd: newFuelAtEnd,
     }));
 
-  }, [totalDistance, formData.odometerStart, formData.fuelAtStart, formData.fuelFilled, selectedVehicle, formData.date, formData.routes, seasonSettings, dayMode]);
+  }, [totalDistance, formData.odometerStart, formData.fuelAtStart, formData.fuelFilled, selectedVehicle, formData.date, formData.routes, formData.fuelCalculationMethod, seasonSettings, dayMode]);
 
   useEffect(() => {
     if (selectedDriver) {
@@ -407,35 +440,7 @@ export const WaybillDetail: React.FC<WaybillDetailProps> = ({ waybill, isPrefill
     }
   }, [selectedDriver]);
 
-  const updateWaybillNumberForDriver = async (driver: Employee | null) => {
-    if (!driver?.id) {
-      setFormData(prev => ({ ...prev, number: '', blankId: null, blankSeries: null, blankNumber: null }));
-      return;
-    }
-
-    if (!('id' in formData) || !formData.id || isPrefill) {
-      const orgId = driver.organizationId;
-      if (!orgId) {
-        showToast('Не удалось определить организацию водителя для подбора бланка.', 'error');
-        return;
-      }
-
-      const nextBlank = await getNextBlankForDriver(driver.id, orgId);
-      if (nextBlank) {
-        const numberStr = String(nextBlank.number).padStart(6, '0');
-        setFormData(prev => ({
-          ...prev,
-          number: `${nextBlank.series}${numberStr}`,
-          blankId: nextBlank.blankId,
-          blankSeries: nextBlank.series,
-          blankNumber: nextBlank.number
-        }));
-      } else {
-        showToast('Внимание: закончились номера бланков для этого водителя!', 'error');
-        setFormData(prev => ({ ...prev, number: 'БЛАНКОВ НЕТ', blankId: null, blankSeries: null, blankNumber: null }));
-      }
-    }
-  };
+  // WB-901: Removed updateWaybillNumberForDriver as number is now assigned by backend
 
 
   const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -452,7 +457,7 @@ export const WaybillDetail: React.FC<WaybillDetailProps> = ({ waybill, isPrefill
         return newFormData;
       });
 
-      updateWaybillNumberForDriver(driver || null);
+      // WB-901: Removed updateWaybillNumberForDriver call
 
       if (value) {
         getFuelCardBalance(value)
@@ -516,10 +521,8 @@ export const WaybillDetail: React.FC<WaybillDetailProps> = ({ waybill, isPrefill
         updates.fuelAtStart = selectedVehicle.currentFuel;
 
         if (assignedDriverId) {
-          const driver = employees.find(e => e.id === assignedDriverId);
-          updateWaybillNumberForDriver(driver || null);
-        } else {
-          updates.number = '';
+          // const driver = employees.find(e => e.id === assignedDriverId);
+          // WB-901: Removed updateWaybillNumberForDriver(driver || null);
         }
 
         let message = `Стартовые значения одометра и топлива загружены из карточки ТС.`;
@@ -693,8 +696,19 @@ export const WaybillDetail: React.FC<WaybillDetailProps> = ({ waybill, isPrefill
       return false;
     }
 
-    if (!formData.number || formData.number === 'БЛАНКОВ НЕТ') {
-      showToast('Невозможно сохранить ПЛ без номера. Проверьте наличие бланков.', 'error');
+    const method = formData.fuelCalculationMethod || 'BOILER';
+    if ((method === 'SEGMENTS' || method === 'MIXED') && (formData.routes || []).length === 0) {
+      showToast('Маршруты обязательны для выбранного метода расчета.', 'error');
+      return false;
+    }
+    if ((method === 'BOILER' || method === 'MIXED') && (formData.odometerStart == null || formData.odometerEnd == null)) {
+      showToast('Показания одометра обязательны для выбранного метода расчета.', 'error');
+      return false;
+    }
+
+    const isNew = !('id' in formData && formData.id);
+    if (!isNew && (!formData.number || formData.number === 'БЛАНКОВ НЕТ')) {
+      showToast('Путевой лист должен иметь номер.', 'error');
       return false;
     }
 
@@ -705,15 +719,19 @@ export const WaybillDetail: React.FC<WaybillDetailProps> = ({ waybill, isPrefill
 
     if (selectedVehicle) {
       if (!selectedVehicle.disableFuelCapacityCheck && selectedVehicle.fuelTankCapacity) {
-        const startFuel = formData.fuelAtStart || 0;
-        if (startFuel > selectedVehicle.fuelTankCapacity) {
-          showToast(`Начальный остаток топлива (${startFuel} л) не может превышать объем бака (${selectedVehicle.fuelTankCapacity} л).`, 'error');
+        const startFuel = Number(formData.fuelAtStart) || 0;
+        const tankCapacity = Number(selectedVehicle.fuelTankCapacity) || 0;
+
+        if (startFuel > tankCapacity) {
+          showToast(`Начальный остаток топлива (${startFuel} л) не может превышать объем бака (${tankCapacity} л).`, 'error');
           return false;
         }
 
-        const endFuel = formData.fuelAtEnd || 0;
-        if (endFuel > selectedVehicle.fuelTankCapacity) {
-          showToast(`Конечный остаток топлива (${endFuel.toFixed(2)} л) не может превышать объем бака (${selectedVehicle.fuelTankCapacity} л).`, 'error');
+        const endFuel = Number(formData.fuelAtEnd) || 0;
+        if (endFuel > tankCapacity) {
+          // Если остаток в конце больше бака, значит в какой-то момент точно было переполнение.
+          // Расход в процессе учитывается в расчете endFuel.
+          showToast(`Конечный остаток топлива (${endFuel.toFixed(2)} л) не может превышать объем бака (${tankCapacity} л).`, 'error');
           return false;
         }
       }
@@ -728,8 +746,8 @@ export const WaybillDetail: React.FC<WaybillDetailProps> = ({ waybill, isPrefill
     }
 
     if ((!('id' in formData) || !formData.id) && formData.vehicleId) {
-      if (selectedVehicle && formData.odometerStart < selectedVehicle.mileage) {
-        showToast(`Начальный пробег (${formData.odometerStart.toFixed(0)}) не может быть меньше последнего в карточке ТС (${selectedVehicle.mileage.toFixed(0)}).`, 'error');
+      if (selectedVehicle && Number(formData.odometerStart) < Number(selectedVehicle.mileage)) {
+        showToast(`Начальный пробег (${Number(formData.odometerStart).toFixed(0)}) не может быть меньше последнего в карточке ТС (${Number(selectedVehicle.mileage).toFixed(0)}).`, 'error');
         return false;
       }
 
@@ -900,12 +918,12 @@ export const WaybillDetail: React.FC<WaybillDetailProps> = ({ waybill, isPrefill
     }
 
     try {
-      const result = await changeWaybillStatus(savedWaybill.id, nextStatus, {
+      const frontStatus = nextStatus.toLowerCase() as FrontWaybillStatus;
+      const updatedWaybill = await changeWaybillStatus(savedWaybill.id, frontStatus, {
         userId: currentUser?.id,
         appMode: appSettings?.appMode || 'driver',
       });
-      const updatedWaybill = result.data as Waybill;
-      setFormData(updatedWaybill);
+      setFormData(updatedWaybill as Waybill);
       setInitialFormData(JSON.parse(JSON.stringify(updatedWaybill)));
       showToast(`Статус изменен на "${WAYBILL_STATUS_TRANSLATIONS[nextStatus]}"`, 'success');
     } catch (e) {
@@ -929,13 +947,12 @@ export const WaybillDetail: React.FC<WaybillDetailProps> = ({ waybill, isPrefill
     }
 
     try {
-      const result = await changeWaybillStatus(formData.id, WaybillStatus.DRAFT, {
+      const updatedWaybill = await changeWaybillStatus(formData.id, 'draft', {
         userId: currentUser?.id,
         appMode: appSettings?.appMode || 'driver',
         reason: reason.trim(),
       });
-      const updatedWaybill = result.data as Waybill;
-      setFormData(updatedWaybill);
+      setFormData(updatedWaybill as Waybill);
       setInitialFormData(JSON.parse(JSON.stringify(updatedWaybill)));
       showToast('Путевой лист возвращен в черновики для корректировки.', 'success');
       setIsCorrectionReasonModalOpen(false);
@@ -1032,7 +1049,9 @@ export const WaybillDetail: React.FC<WaybillDetailProps> = ({ waybill, isPrefill
       <div className="bg-gray-100 dark:bg-gray-800 p-6 rounded-2xl shadow-lg space-y-6">
         <header className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-4">
-            <h2 className="text-2xl font-bold text-gray-800 dark:text-white">{waybill && !isPrefill ? `Путевой лист №${formData.number}` : 'Новый путевой лист'}</h2>
+            <h2 className="text-2xl font-bold text-gray-800 dark:text-white">
+              {('id' in formData && formData.id) ? `Путевой лист №${formData.number}` : 'Новый путевой лист'}
+            </h2>
             <span className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm font-semibold ${statusColors?.bg} ${statusColors?.text}`}>
               {WAYBILL_STATUS_TRANSLATIONS[formData.status]}
             </span>
@@ -1070,8 +1089,16 @@ export const WaybillDetail: React.FC<WaybillDetailProps> = ({ waybill, isPrefill
 
         <CollapsibleSection title="Основная информация" isCollapsed={collapsedSections.basicInfo || false} onToggle={() => toggleSection('basicInfo')}>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <FormField label="Организация"><FormSelect name="organizationId" value={formData.organizationId} onChange={handleChange} disabled={!canEdit}><option value="">Выберите</option>{organizations.map(o => <option key={o.id} value={o.id}>{o.shortName}</option>)}</FormSelect></FormField>
-            <FormField label="Номер ПЛ"><FormInput type="text" name="number" value={formData.number} readOnly /></FormField>
+            <FormField label="Организация"><FormSelect name="organizationId" value={formData.organizationId} onChange={handleChange} disabled={!canEdit || isDriver}><option value="">Выберите</option>{organizations.map(o => <option key={o.id} value={o.id}>{o.shortName}</option>)}</FormSelect></FormField>
+            <FormField label="Номер ПЛ">
+              <FormInput
+                type="text"
+                name="number"
+                value={formData.number || (('id' in formData && formData.id) ? '' : 'Автоматически')}
+                readOnly
+                className="bg-gray-100 font-semibold"
+              />
+            </FormField>
             <div />
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-4">
@@ -1116,7 +1143,7 @@ export const WaybillDetail: React.FC<WaybillDetailProps> = ({ waybill, isPrefill
               {autoFillMessage && <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">{autoFillMessage}</p>}
             </FormField>
             <FormField label="Водитель">
-              <FormSelect name="driverId" value={formData.driverId} onChange={handleChange} disabled={!canEdit}>
+              <FormSelect name="driverId" value={formData.driverId} onChange={handleChange} disabled={!canEdit || isDriver}>
                 <option value="">Выберите водителя</option>
                 {drivers.map(d => <option key={d.id} value={d.id}>{d.fullName}</option>)}
               </FormSelect>
@@ -1129,22 +1156,24 @@ export const WaybillDetail: React.FC<WaybillDetailProps> = ({ waybill, isPrefill
           </div>
         </CollapsibleSection>
 
-        <CollapsibleSection title="Ответственные лица" isCollapsed={collapsedSections.staff || false} onToggle={() => toggleSection('staff')}>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <FormField label="Выезд разрешил (Диспетчер)">
-              <FormSelect name="dispatcherId" value={formData.dispatcherId} onChange={handleChange} disabled={!canEdit}>
-                <option value="">Выберите</option>
-                {employees.map(e => <option key={e.id} value={e.id}>{e.fullName}</option>)}
-              </FormSelect>
-            </FormField>
-            <FormField label="Расчет произвел (Контролер/Бухгалтер)">
-              <FormSelect name="controllerId" value={formData.controllerId || ''} onChange={handleChange} disabled={!canEdit}>
-                <option value="">Выберите</option>
-                {employees.map(e => <option key={e.id} value={e.id}>{e.fullName}</option>)}
-              </FormSelect>
-            </FormField>
-          </div>
-        </CollapsibleSection>
+        {!isDriver && (
+          <CollapsibleSection title="Ответственные лица" isCollapsed={collapsedSections.staff || false} onToggle={() => toggleSection('staff')}>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <FormField label="Выезд разрешил (Диспетчер)">
+                <FormSelect name="dispatcherId" value={formData.dispatcherId} onChange={handleChange} disabled={!canEdit}>
+                  <option value="">Выберите</option>
+                  {employees.map(e => <option key={e.id} value={e.id}>{e.fullName}</option>)}
+                </FormSelect>
+              </FormField>
+              <FormField label="Расчет произвел (Контролер/Бухгалтер)">
+                <FormSelect name="controllerId" value={formData.controllerId || ''} onChange={handleChange} disabled={!canEdit}>
+                  <option value="">Выберите</option>
+                  {employees.map(e => <option key={e.id} value={e.id}>{e.fullName}</option>)}
+                </FormSelect>
+              </FormField>
+            </div>
+          </CollapsibleSection>
+        )}
 
         <CollapsibleSection title="Пробег и топливо" isCollapsed={collapsedSections.fuelMileage || false} onToggle={() => toggleSection('fuelMileage')}>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
@@ -1172,10 +1201,22 @@ export const WaybillDetail: React.FC<WaybillDetailProps> = ({ waybill, isPrefill
             </div>
             <div>
               <p className="text-sm font-medium text-gray-600 dark:text-gray-300 mb-2">Пройдено, км: {totalDistance}</p>
-              <div className="bg-green-100 dark:bg-green-900/50 p-2 rounded-lg text-center">
+              <div className="bg-green-100 dark:bg-green-900/50 p-2 rounded-lg text-center mb-4">
                 <p className="text-xs text-green-700 dark:text-green-300">Расчетная норма</p>
                 <p className="font-bold text-green-800 dark:text-green-200">{calculatedFuelRate.toFixed(2)} л/100км</p>
               </div>
+              <FormField label="Метод расчета">
+                <FormSelect
+                  name="fuelCalculationMethod"
+                  value={formData.fuelCalculationMethod || 'BOILER'}
+                  onChange={handleChange}
+                  disabled={!canEdit}
+                >
+                  <option value="BOILER">По котлу (без коэф.)</option>
+                  <option value="SEGMENTS">По сегментам (с коэф.)</option>
+                  <option value="MIXED">Смешанный (одометр + сегменты)</option>
+                </FormSelect>
+              </FormField>
             </div>
           </div>
           {isOverrun && (
@@ -1193,71 +1234,73 @@ export const WaybillDetail: React.FC<WaybillDetailProps> = ({ waybill, isPrefill
             isCollapsed={collapsedSections.stockLinks || false}
             onToggle={() => toggleSection('stockLinks')}
           >
-            {linkedTransactions.length === 0 ? (
-              <div className="text-sm text-gray-500 dark:text-gray-400">
-                Нет связанных операций на складе.
-              </div>
-            ) : (
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-left">
-                    <th className="p-2">Дата</th>
-                    <th className="p-2">Тип</th>
-                    <th className="p-2">Причина</th>
-                    <th className="p-2">Номенклатура</th>
-                    <th className="p-2">Количество</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {linkedTransactions.flatMap(tx => {
-                    const isIncome = tx.type === 'income';
-                    const reason =
-                      tx.expenseReason === 'waybill'
-                        ? 'Списание по ПЛ'
-                        : tx.expenseReason === 'fuelCardTopUp'
-                          ? 'Пополнение карты'
-                          : tx.type === 'income'
-                            ? 'Приход'
-                            : 'Расход';
-                    const rowCount = tx.items?.length || 1;
+            <div className="bg-white dark:bg-gray-700/50 rounded-xl border border-gray-200 dark:border-gray-600 overflow-hidden shadow-sm">
+              {linkedTransactions.length === 0 ? (
+                <div className="text-sm text-gray-500 dark:text-gray-400">
+                  Нет связанных операций на складе.
+                </div>
+              ) : (
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-left">
+                      <th className="p-2">Дата</th>
+                      <th className="p-2">Тип</th>
+                      <th className="p-2">Причина</th>
+                      <th className="p-2">Номенклатура</th>
+                      <th className="p-2">Количество</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {linkedTransactions.flatMap(tx => {
+                      const isIncome = tx.type === 'income';
+                      const reason =
+                        tx.expenseReason === 'waybill'
+                          ? 'Списание по ПЛ'
+                          : tx.expenseReason === 'fuelCardTopUp'
+                            ? 'Пополнение карты'
+                            : tx.type === 'income'
+                              ? 'Приход'
+                              : 'Расход';
+                      const rowCount = tx.items?.length || 1;
 
-                    if (!tx.items || tx.items.length === 0) {
-                      return (
-                        <tr key={tx.id} className="border-t dark:border-gray-700">
-                          <td className="p-2">{tx.date}</td>
-                          <td className={`p-2 font-semibold ${isIncome ? 'text-green-600' : 'text-red-600'}`}>
-                            {isIncome ? 'Приход' : 'Расход'}
-                          </td>
-                          <td className="p-2">{reason}</td>
-                          <td className="p-2 text-gray-400" colSpan={2}>Нет позиций в документе</td>
-                        </tr>
-                      );
-                    }
+                      if (!tx.items || tx.items.length === 0) {
+                        return (
+                          <tr key={tx.id} className="border-t dark:border-gray-700">
+                            <td className="p-2">{tx.date}</td>
+                            <td className={`p-2 font-semibold ${isIncome ? 'text-green-600' : 'text-red-600'}`}>
+                              {isIncome ? 'Приход' : 'Расход'}
+                            </td>
+                            <td className="p-2">{reason}</td>
+                            <td className="p-2 text-gray-400" colSpan={2}>Нет позиций в документе</td>
+                          </tr>
+                        );
+                      }
 
-                    return tx.items.map((item, itemIndex) => {
-                      const stockItem = stockItems.find(i => i.id === item.stockItemId);
-                      return (
-                        <tr key={`${tx.id}-${itemIndex}`} className="border-t dark:border-gray-700">
-                          {itemIndex === 0 && (
-                            <>
-                              <td className="p-2 align-top" rowSpan={rowCount}>{tx.date}</td>
-                              <td className={`p-2 align-top font-semibold ${isIncome ? 'text-green-600' : 'text-red-600'}`} rowSpan={rowCount}>
-                                {isIncome ? 'Приход' : 'Расход'}
-                              </td>
-                              <td className="p-2 align-top" rowSpan={rowCount}>{reason}</td>
-                            </>
-                          )}
-                          <td className="p-2">{stockItem?.name ?? '—'}</td>
-                          <td className="p-2">
-                            {item.quantity != null ? `${item.quantity} ${stockItem?.unit ?? ''}` : '—'}
-                          </td>
-                        </tr>
-                      );
-                    });
-                  })}
-                </tbody>
-              </table>
-            )}
+                      return tx.items.map((item, itemIndex) => {
+                        const stockItem = stockItems.find(i => i.id === item.stockItemId);
+                        return (
+                          <tr key={`${tx.id}-${itemIndex}`} className="border-t dark:border-gray-700">
+                            {itemIndex === 0 && (
+                              <>
+                                <td className="p-2 align-top" rowSpan={rowCount}>{tx.date}</td>
+                                <td className={`p-2 align-top font-semibold ${isIncome ? 'text-green-600' : 'text-red-600'}`} rowSpan={rowCount}>
+                                  {isIncome ? 'Приход' : 'Расход'}
+                                </td>
+                                <td className="p-2 align-top" rowSpan={rowCount}>{reason}</td>
+                              </>
+                            )}
+                            <td className="p-2">{stockItem?.name ?? '—'}</td>
+                            <td className="p-2">
+                              {item.quantity != null ? `${item.quantity} ${stockItem?.unit ?? ''}` : '—'}
+                            </td>
+                          </tr>
+                        );
+                      });
+                    })}
+                  </tbody>
+                </table>
+              )}
+            </div>
           </CollapsibleSection>
         )}
 
