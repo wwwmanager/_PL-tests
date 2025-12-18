@@ -179,6 +179,75 @@ export async function issueBlank(organizationId: string, data: IssueBlankDto) {
     });
 }
 
+// Issue blanks by range (for bulk issue from frontend)
+export interface IssueBlanksRangeDto {
+    batchId: string;
+    driverId: string;
+    numberFrom: number;
+    numberTo: number;
+}
+
+export async function issueBlanksRange(organizationId: string | undefined, data: IssueBlanksRangeDto) {
+    // Find blanks in the given range that belong to this batch
+    const blanks = await prisma.blank.findMany({
+        where: {
+            batchId: data.batchId,
+            number: {
+                gte: data.numberFrom,
+                lte: data.numberTo
+            },
+            status: BlankStatus.AVAILABLE,
+            ...(organizationId ? { organizationId } : {})
+        }
+    });
+
+    if (blanks.length === 0) {
+        throw new Error('Нет доступных бланков в указанном диапазоне');
+    }
+
+    // Find the driver record for this employee, or create if missing
+    let driver = await prisma.driver.findUnique({
+        where: { employeeId: data.driverId }
+    });
+
+    if (!driver) {
+        // Check if employee exists
+        const employee = await prisma.employee.findUnique({
+            where: { id: data.driverId }
+        });
+
+        if (!employee) {
+            throw new Error('Сотрудник не найден');
+        }
+
+        // Auto-create Driver record for this employee
+        console.log('[issueBlanksRange] Auto-creating Driver record for employee:', data.driverId);
+        driver = await prisma.driver.create({
+            data: {
+                employeeId: data.driverId,
+                licenseNumber: employee.documentNumber || 'НЕ УКАЗАНО'
+            }
+        });
+    }
+
+    // Update all blanks
+    const result = await prisma.blank.updateMany({
+        where: {
+            id: { in: blanks.map(b => b.id) }
+        },
+        data: {
+            status: BlankStatus.ISSUED,
+            issuedToDriverId: driver.id,
+            issuedAt: new Date()
+        }
+    });
+
+    return {
+        issued: result.count,
+        message: `Выдано ${result.count} бланков водителю`
+    };
+}
+
 // --- Driver Blank Summary ---
 
 export interface DriverBlankRange {
@@ -249,3 +318,243 @@ export async function getDriverSummary(driverId: string): Promise<DriverBlankSum
     };
 }
 
+// ============================================================================
+// BLS-201: Atomic Blank Lifecycle Operations
+// ============================================================================
+
+export interface ReserveBlankResult {
+    blank: {
+        id: string;
+        series: string;
+        number: number;
+    };
+    success: boolean;
+}
+
+/**
+ * Reserve the next available blank for a driver atomically.
+ * Uses transaction with row-level locking (FOR UPDATE) to prevent race conditions.
+ * 
+ * @param organizationId - Organization ID
+ * @param driverId - Driver ID (references Driver table, not Employee)
+ * @param departmentId - Optional department filter
+ * @returns Reserved blank info
+ */
+export async function reserveNextBlankForDriver(
+    organizationId: string,
+    driverId: string,
+    departmentId?: string
+): Promise<ReserveBlankResult> {
+    return prisma.$transaction(async (tx) => {
+        // Find the next available blank with row lock (FOR UPDATE)
+        // This raw query locks the row so parallel transactions wait
+        const blanks = await tx.$queryRaw<Array<{ id: string; series: string; number: number }>>`
+            SELECT id, series, number 
+            FROM blanks 
+            WHERE organization_id = ${organizationId}
+              AND status = 'AVAILABLE'
+              ${departmentId ? tx.$queryRaw`AND department_id = ${departmentId}` : tx.$queryRaw``}
+            ORDER BY series ASC, number ASC
+            LIMIT 1
+            FOR UPDATE SKIP LOCKED
+        `;
+
+        if (blanks.length === 0) {
+            throw new Error('Нет доступных бланков для резервирования');
+        }
+
+        const blank = blanks[0];
+
+        // Update blank status to RESERVED
+        await tx.blank.update({
+            where: { id: blank.id },
+            data: {
+                status: BlankStatus.RESERVED,
+                issuedToDriverId: driverId,
+                issuedAt: new Date()
+            }
+        });
+
+        return {
+            blank: {
+                id: blank.id,
+                series: blank.series,
+                number: blank.number
+            },
+            success: true
+        };
+    }, {
+        isolationLevel: 'Serializable', // Highest isolation for atomicity
+        maxWait: 5000, // 5s max wait for lock
+        timeout: 10000 // 10s transaction timeout
+    });
+}
+
+/**
+ * Reserve a specific blank for a driver.
+ */
+export async function reserveSpecificBlank(
+    organizationId: string,
+    blankId: string,
+    driverId: string,
+    departmentId?: string
+): Promise<ReserveBlankResult> {
+    return prisma.$transaction(async (tx) => {
+        // Find blank with lock
+        const blank = await tx.blank.findFirst({
+            where: {
+                id: blankId,
+                organizationId,
+                status: BlankStatus.AVAILABLE,
+                ...(departmentId ? { departmentId } : {})
+            }
+        });
+
+        if (!blank) {
+            throw new Error('Бланк не найден или недоступен');
+        }
+
+        // Reserve it
+        await tx.blank.update({
+            where: { id: blank.id },
+            data: {
+                status: BlankStatus.RESERVED,
+                issuedToDriverId: driverId,
+                issuedAt: new Date()
+            }
+        });
+
+        return {
+            blank: {
+                id: blank.id,
+                series: blank.series || '',
+                number: blank.number
+            },
+            success: true
+        };
+    });
+}
+
+/**
+ * Release a reserved blank back to available.
+ * Only blanks in RESERVED status can be released.
+ */
+export async function releaseBlank(
+    organizationId: string,
+    blankId: string
+): Promise<{ success: boolean; message: string }> {
+    return prisma.$transaction(async (tx) => {
+        const blank = await tx.blank.findFirst({
+            where: {
+                id: blankId,
+                organizationId,
+                status: BlankStatus.RESERVED
+            }
+        });
+
+        if (!blank) {
+            throw new Error('Бланк не найден или не находится в статусе RESERVED');
+        }
+
+        await tx.blank.update({
+            where: { id: blank.id },
+            data: {
+                status: BlankStatus.AVAILABLE,
+                issuedToDriverId: null,
+                issuedAt: null
+            }
+        });
+
+        return { success: true, message: `Бланк ${blank.series}-${blank.number} освобождён` };
+    });
+}
+
+/**
+ * Mark a blank as used (after waybill is created).
+ * Only ISSUED or RESERVED blanks can be marked as used.
+ */
+export async function useBlank(
+    organizationId: string,
+    blankId: string
+): Promise<{ success: boolean; message: string }> {
+    return prisma.$transaction(async (tx) => {
+        const blank = await tx.blank.findFirst({
+            where: {
+                id: blankId,
+                organizationId,
+                status: { in: [BlankStatus.ISSUED, BlankStatus.RESERVED] }
+            }
+        });
+
+        if (!blank) {
+            throw new Error('Бланк не найден или в неподходящем статусе для использования');
+        }
+
+        await tx.blank.update({
+            where: { id: blank.id },
+            data: {
+                status: BlankStatus.USED,
+                usedAt: new Date()
+            }
+        });
+
+        return { success: true, message: `Бланк ${blank.series}-${blank.number} использован` };
+    });
+}
+
+/**
+ * Spoil options
+ */
+export interface SpoilBlankOptions {
+    reason: 'damaged' | 'misprint' | 'lost' | 'other';
+    note?: string;
+    userId?: string;
+}
+
+/**
+ * Spoil a blank (mark as unusable).
+ * Can only spoil AVAILABLE, ISSUED, or RESERVED blanks.
+ */
+export async function spoilBlank(
+    organizationId: string,
+    blankId: string,
+    options: SpoilBlankOptions
+): Promise<{ success: boolean; message: string }> {
+    return prisma.$transaction(async (tx) => {
+        const blank = await tx.blank.findFirst({
+            where: {
+                id: blankId,
+                organizationId,
+                status: { in: [BlankStatus.AVAILABLE, BlankStatus.ISSUED, BlankStatus.RESERVED] }
+            }
+        });
+
+        if (!blank) {
+            throw new Error('Бланк не найден или уже использован/испорчен');
+        }
+
+        await tx.blank.update({
+            where: { id: blank.id },
+            data: {
+                status: BlankStatus.SPOILED,
+                damagedReason: `${options.reason}: ${options.note || ''}`
+            }
+        });
+
+        // Create audit log
+        await tx.auditLog.create({
+            data: {
+                organizationId,
+                userId: options.userId || 'system',
+                actionType: 'STATUS_CHANGE',
+                entityType: 'BLANK',
+                entityId: blank.id,
+                description: `Бланк ${blank.series}-${blank.number} списан: ${options.reason}`,
+                oldValue: { status: blank.status },
+                newValue: { status: BlankStatus.SPOILED, reason: options.reason }
+            }
+        });
+
+        return { success: true, message: `Бланк ${blank.series}-${blank.number} списан` };
+    });
+}

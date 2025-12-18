@@ -33,11 +33,9 @@ export async function createVehicle(data: Partial<Vehicle>): Promise<Vehicle> {
 
 export async function updateVehicle(data: Partial<Vehicle> & { id: string }): Promise<Vehicle> {
     const { id, ...updateData } = data;
-    // Backend returns { message: "Обновлено" }, not the vehicle. This is inconsistent with other endpoints.
-    // For now, we'll need to fetch the updated vehicle separately or update backend to return the vehicle.
-    const response = await httpClient.put<{ message: string }>(`/vehicles/${id}`, updateData);
-    // Fetch the updated vehicle
-    return getVehicleById(id);
+    // Backend now returns the updated vehicle object (updated in WB-201)
+    const vehicle = await httpClient.put<Vehicle>(`/vehicles/${id}`, updateData);
+    return vehicle;
 }
 
 export async function deleteVehicle(id: string): Promise<void> {

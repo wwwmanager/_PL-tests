@@ -1,5 +1,20 @@
 import { Request, Response, NextFunction } from 'express';
+import { ZodError } from 'zod';
 import * as waybillService from '../services/waybillService';
+import {
+    createWaybillSchema,
+    updateWaybillSchema,
+    changeStatusSchema,
+    mapLegacyFuelFields
+} from '../dto/waybillDto';
+import { BadRequestError } from '../utils/errors';
+
+/**
+ * Format Zod validation errors for API response
+ */
+function formatZodError(error: ZodError): string {
+    return error.issues.map((e: any) => `${e.path.join('.')}: ${e.message}`).join('; ');
+}
 
 export async function listWaybills(req: Request, res: Response, next: NextFunction) {
     try {
@@ -49,32 +64,39 @@ export async function getWaybillById(req: Request, res: Response, next: NextFunc
 export async function createWaybill(req: Request, res: Response, next: NextFunction) {
     try {
         const orgId = req.user!.organizationId;
-        const data = req.body;
 
-        // 🔍 DEBUG: Log incoming request
-        console.log('\n📥 POST /api/waybills - Request received');
-        console.log('  👤 User:', {
-            id: req.user!.id,
-            organizationId: req.user!.organizationId,
-            role: req.user!.role
-        });
-        console.log('  📦 Body:', JSON.stringify(data, null, 2));
-
-        // Create waybill
-        console.log('🔄 Creating waybill...');
-        const waybill = await waybillService.createWaybill(orgId, data);
-
-        if (waybill) {
-            console.log('✅ Waybill created successfully:', {
-                id: waybill.id,
-                number: waybill.number,
-                blankId: waybill.blankId
-            });
+        // Validate input with Zod
+        const parseResult = createWaybillSchema.safeParse(req.body);
+        if (!parseResult.success) {
+            throw new BadRequestError(formatZodError(parseResult.error));
         }
+
+        const data = parseResult.data;
+
+        // Map legacy fuel fields to fuelLines if needed
+        mapLegacyFuelFields(data);
+
+        console.log('[WB-401] Validated waybill data:', {
+            number: data.number,
+            date: data.date,
+            vehicleId: data.vehicleId,
+            driverId: data.driverId,
+            fuelLinesCount: data.fuelLines?.length ?? 0,
+            isCityDriving: data.isCityDriving,
+            isWarming: data.isWarming
+        });
+
+        // Create waybill with validated data
+        const waybill = await waybillService.createWaybill(orgId, data as any);
+
+        console.log('[WB-401] Waybill created:', {
+            id: waybill.id,
+            number: waybill.number,
+            blankId: waybill.blankId
+        });
 
         res.status(201).json(waybill);
     } catch (err) {
-        console.error('❌ Error creating waybill:', err);
         next(err);
     }
 }
@@ -83,8 +105,19 @@ export async function updateWaybill(req: Request, res: Response, next: NextFunct
     try {
         const orgId = req.user!.organizationId;
         const { id } = req.params;
-        const data = req.body;
-        const waybill = await waybillService.updateWaybill(orgId, id, data);
+
+        // Validate input with Zod
+        const parseResult = updateWaybillSchema.safeParse(req.body);
+        if (!parseResult.success) {
+            throw new BadRequestError(formatZodError(parseResult.error));
+        }
+
+        const data = parseResult.data;
+
+        // Map legacy fuel fields to fuelLines if needed
+        mapLegacyFuelFields(data);
+
+        const waybill = await waybillService.updateWaybill(orgId, id, data as any);
         res.json(waybill);
     } catch (err) {
         next(err);
@@ -106,9 +139,22 @@ export async function changeWaybillStatus(req: Request, res: Response, next: Nex
     try {
         const orgId = req.user!.organizationId;
         const userId = req.user!.id;
+        const userRole = req.user!.role;
         const { id } = req.params;
-        const { status } = req.body;
-        const waybill = await waybillService.changeWaybillStatus(orgId, id, status, userId);
+
+        // Validate status input
+        const parseResult = changeStatusSchema.safeParse(req.body);
+        if (!parseResult.success) {
+            throw new BadRequestError(formatZodError(parseResult.error));
+        }
+
+        const { status } = parseResult.data;
+
+        // WB-701: Check for override permission
+        // Admin and dispatcher can override norm, others cannot
+        const hasOverridePermission = ['admin', 'dispatcher'].includes(userRole);
+
+        const waybill = await waybillService.changeWaybillStatus(orgId, id, status, userId, hasOverridePermission);
         res.json(waybill);
     } catch (err) {
         next(err);

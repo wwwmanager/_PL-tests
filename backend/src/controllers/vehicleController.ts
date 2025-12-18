@@ -39,8 +39,8 @@ export async function updateVehicle(req: Request, res: Response, next: NextFunct
         const orgId = req.user!.organizationId;
         const { id } = req.params;
         const data = req.body;
-        await vehicleService.updateVehicle(orgId, id, data);
-        res.json({ message: 'Обновлено' });
+        const vehicle = await vehicleService.updateVehicle(orgId, id, data);
+        res.json(vehicle);
     } catch (err) {
         next(err);
     }

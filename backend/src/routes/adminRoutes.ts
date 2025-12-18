@@ -1,5 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { resetDatabase, getDataPreview, selectiveDelete, importData, transferUser, transferOrganizationData } from '../controllers/adminController';
+import { runRecalculation } from '../controllers/recalculationController';
 import { authMiddleware } from '../middleware/authMiddleware';
 
 const router = Router();
@@ -41,5 +42,8 @@ router.post('/transfer-user', authMiddleware, requireRole('admin'), transferUser
 
 // POST /api/admin/transfer-organization - Transfer all data from one org to another
 router.post('/transfer-organization', authMiddleware, requireRole('admin'), transferOrganizationData);
+
+// POST /api/admin/recalculate - Helper for recalculating balances
+router.post('/recalculate', authMiddleware, requireRole('admin'), runRecalculation);
 
 export default router;

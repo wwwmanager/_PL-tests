@@ -89,4 +89,27 @@ export async function getDriverSummary(req: Request, res: Response, next: NextFu
     }
 }
 
+// Issue blanks by range (bulk issue)
+export async function issueBlanksRange(req: Request, res: Response, next: NextFunction) {
+    try {
+        // Admin can issue for any org, others only their org
+        const orgId = req.user!.role === 'admin' ? undefined : req.user!.organizationId;
+        const { batchId, driverId, numberFrom, numberTo } = req.body;
+
+        console.log('📝 [blankController] issueBlanksRange:', { batchId, driverId, numberFrom, numberTo });
+
+        const result = await blankService.issueBlanksRange(orgId, {
+            batchId,
+            driverId,
+            numberFrom,
+            numberTo
+        });
+
+        res.json(result);
+    } catch (err) {
+        console.error('❌ [blankController] issueBlanksRange error:', err);
+        next(err);
+    }
+}
+
 

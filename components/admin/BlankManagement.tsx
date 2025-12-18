@@ -56,22 +56,50 @@ const BatchList: React.FC<{ refreshBlanks: () => void }> = ({ refreshBlanks }) =
     const { currentUser } = useAuth();
 
     const fetchData = useCallback(async () => {
-        try {
-            const [batchData, orgData, empData, blankData] = await Promise.all([getBlankBatches(), getOrganizations(), getEmployees(), getBlanks()]);
-            console.log('📋 [BlankManagement] fetchData results:', {
-                batches: batchData?.length,
-                orgs: orgData?.length,
-                employees: empData?.length,
-                blanks: blankData?.length,
-                orgData: orgData
-            });
-            setBatches(batchData.sort((a, b) => b.series.localeCompare(a.series) || b.startNumber - a.startNumber));
-            setOrganizations(orgData);
-            setEmployees(empData.filter(e => e.employeeType === 'driver'));
-            setAllBlanks(blankData);
-        } catch (err) {
-            console.error('❌ [BlankManagement] fetchData error:', err);
+        // Use allSettled so partial failures don't block other data
+        const results = await Promise.allSettled([
+            getBlankBatches(),
+            getOrganizations(),
+            getEmployees(),
+            getBlanks()
+        ]);
+
+        const batchData = results[0].status === 'fulfilled' ? results[0].value : [];
+        const orgData = results[1].status === 'fulfilled' ? results[1].value : [];
+        const empData = results[2].status === 'fulfilled' ? results[2].value : [];
+        const blankData = results[3].status === 'fulfilled' ? results[3].value : [];
+
+        // Log each result for debugging
+        console.log('📋 [BlankManagement] fetchData results:', {
+            batches: batchData?.length,
+            orgs: orgData?.length,
+            employees: empData?.length,
+            blanks: blankData?.length,
+            batchError: results[0].status === 'rejected' ? (results[0] as PromiseRejectedResult).reason?.message : null,
+            orgError: results[1].status === 'rejected' ? (results[1] as PromiseRejectedResult).reason?.message : null,
+            empError: results[2].status === 'rejected' ? (results[2] as PromiseRejectedResult).reason?.message : null,
+            blankError: results[3].status === 'rejected' ? (results[3] as PromiseRejectedResult).reason?.message : null,
+        });
+
+        // Log full employee data to debug filtering
+        if (empData.length > 0) {
+            console.log('📋 [BlankManagement] Raw employees:', empData.map(e => ({ id: e.id, name: e.shortName, type: e.employeeType })));
         }
+
+        setBatches(batchData.sort((a, b) => b.series.localeCompare(a.series) || b.startNumber - a.startNumber));
+        setOrganizations(orgData);
+        // Filter for drivers - be case-insensitive and accept null/undefined as default driver
+        // Also log all employee types for debugging
+        const allTypes = new Set(empData.map(e => e.employeeType));
+        console.log('📋 [BlankManagement] All employee types:', [...allTypes]);
+        const drivers = empData.filter(e =>
+            !e.employeeType || // null/undefined - treat as driver (default)
+            e.employeeType.toLowerCase() === 'driver' ||
+            e.employeeType.toLowerCase() === 'водитель'
+        );
+        console.log('📋 [BlankManagement] Filtered drivers:', drivers.length, drivers.map(d => d.shortName));
+        setEmployees(drivers);
+        setAllBlanks(blankData);
     }, []);
 
     useEffect(() => { fetchData(); }, [fetchData]);

@@ -502,3 +502,12 @@ export interface WaybillBlank {
   updatedAt: string;
   updatedBy: string;
 }
+
+export interface CalendarEvent {
+  id: string;
+  date: string; // YYYY-MM-DD
+  type: 'holiday' | 'workday' | 'short';
+  note?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}

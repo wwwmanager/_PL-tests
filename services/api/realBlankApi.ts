@@ -62,39 +62,17 @@ export async function createBlankBatch(data: Omit<WaybillBlankBatch, 'id' | 'sta
 }
 
 export async function issueBlanksToDriver(params: { batchId: string, ownerEmployeeId: string, ranges: { from: number, to: number }[] }, ctx: any): Promise<void> {
-    // The backend expects { series, number, driverId } for single issue.
-    // The frontend sends ranges. I need to adapt this or update backend to support ranges.
-    // Updating backend to support ranges is better for performance.
-    // But for now, let's loop in the frontend client or backend?
-    // The frontend `issueBlanksToDriver` in mockApi takes ranges.
-    // My backend `issueBlank` takes single blank.
-    // I should probably update backend to `issueBatch` or `issueRange`.
-    // Or I can loop here. Looping here is easier for now to match the signature.
-
-    // Wait, `issueBlanksToDriver` in mockApi:
-    // export async function issueBlanksToDriver(params: { batchId: string, ownerEmployeeId: string, ranges: { from: number, to: number }[] }, ctx: any)
-
-    // My backend `issueBlank`:
-    // export interface IssueBlankDto { series: string; number: number; driverId?: string; vehicleId?: string; }
-
-    // I need to fetch the batch first to get the series? 
-    // Or pass series from frontend?
-    // The frontend `issueModalBatch` has the series.
-    // But `issueBlanksToDriver` params only have `batchId`.
-    // I might need to fetch batch details or change the frontend call to include series.
-
-    // Let's assume for now I'll implement a bulk issue endpoint on backend later, 
-    // or loop here if I can get the series.
-    // Actually, `getBlankBatches` returns batches with series.
-    // The frontend component `BlankManagement` has `issueModalBatch` which has `series`.
-    // But it passes `batchId` to the service.
-
-    // Let's implement a `bulkIssue` on backend? 
-    // Or just change the frontend service signature to accept `series`.
-    // Changing frontend service signature is safer.
-
-    // For now, let's just define the interface.
-    return Promise.resolve();
+    // Call the backend issue-range endpoint for each range
+    for (const range of params.ranges) {
+        const payload = {
+            batchId: params.batchId,
+            driverId: params.ownerEmployeeId,
+            numberFrom: range.from,
+            numberTo: range.to
+        };
+        console.log('📡 [realBlankApi] Issuing blanks:', payload);
+        await httpClient.post('/blanks/issue-range', payload);
+    }
 }
 
 export async function searchBlanks(filters: BlankFilters): Promise<{ items: WaybillBlank[], total: number }> {

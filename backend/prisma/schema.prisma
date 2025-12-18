@@ -292,6 +292,9 @@ model Vehicle {
   vin                String?  @db.Text
   fuelType           String?  @db.Text
   fuelTankCapacity   Decimal? @db.Decimal(10, 2)
+  mileage            Decimal  @default(0) @db.Decimal(10, 1) // Added
+  currentFuel        Decimal  @default(0) @db.Decimal(10, 2) // Added
+  fuelConsumptionRates Json? // Added: { winterRate, summerRate, cityIncreasePercent, warmingIncreasePercent }
   isActive           Boolean  @default(true)
   createdAt          DateTime @default(now()) @db.Timestamp(6)
   updatedAt          DateTime @default(now()) @updatedAt @db.Timestamp(6)
@@ -335,6 +338,7 @@ model StockItem {
   name           String   @db.Text
   unit           String   @db.Text
   isFuel         Boolean  @default(false)
+  balance        Decimal  @default(0) @db.Decimal(14, 3) // Added for caching
   isActive       Boolean  @default(true)
   createdAt      DateTime @default(now()) @db.Timestamp(6)
   updatedAt      DateTime @default(now()) @updatedAt @db.Timestamp(6)
@@ -457,6 +461,7 @@ model Blank {
   waybills        Waybill[]
 
   @@unique([organizationId, series, number])
+  @@index([organizationId, issuedToDriverId, status, series, number]) // Added BLS-101
   @@map("blanks")
 }
 
@@ -473,12 +478,14 @@ model Waybill {
   vehicleId         String        @db.Uuid
   driverId          String        @db.Uuid
   fuelCardId        String?       @db.Uuid
-  blankId           String?       @db.Uuid
+  blankId           String?       @unique @db.Uuid
   status            WaybillStatus @default(DRAFT) // Enum выровнен с frontend
   odometerStart     Decimal?      @db.Decimal(10, 1)
   odometerEnd       Decimal?      @db.Decimal(10, 1)
   plannedRoute      String?       @db.Text
   notes             String?       @db.Text
+  isCityDriving     Boolean       @default(false) // Added WB-102
+  isWarming         Boolean       @default(false) // Added WB-102
   createdByUserId   String?       @db.Uuid
   approvedByUserId  String?       @db.Uuid
   completedByUserId String?       @db.Uuid
@@ -530,6 +537,7 @@ model WaybillFuel {
   fuelReceived Decimal? @db.Decimal(10, 2)
   fuelConsumed Decimal? @db.Decimal(10, 2)
   fuelEnd      Decimal? @db.Decimal(10, 2)
+  fuelPlanned  Decimal? @db.Decimal(10, 2) // Added WB-102
   comment      String?  @db.Text
 
   waybill   Waybill    @relation(fields: [waybillId], references: [id], onDelete: Cascade)
@@ -581,5 +589,16 @@ model Setting {
   updatedAt DateTime @default(now()) @updatedAt @db.Timestamp(6)
 
   @@map("settings")
+}
+
+model CalendarEvent {
+  id        String   @id @default(uuid()) @db.Uuid
+  date      String   @unique // YYYY-MM-DD
+  type      String   // holiday, workday, short
+  note      String?
+  createdAt DateTime @default(now()) @db.Timestamp(6)
+  updatedAt DateTime @default(now()) @updatedAt @db.Timestamp(6)
+
+  @@map("calendar_events")
 }
 

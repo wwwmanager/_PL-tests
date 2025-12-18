@@ -25,6 +25,10 @@ router.post('/batches/:id/materialize', checkPermission('blank.create'), blankCo
 // Assuming 'blank.issue' is a specific permission, or reusing 'blank.update'
 router.post('/issue', checkPermission('blank.update'), blankController.issueBlank);
 
+// Issue blanks by range (bulk issue)
+router.post('/issue-range', checkPermission('blank.update'), blankController.issueBlanksRange);
+
 // Get driver blank summary (read permission)
 router.get('/summary/driver/:driverId', checkPermission('blank.read'), blankController.getDriverSummary);
+
 

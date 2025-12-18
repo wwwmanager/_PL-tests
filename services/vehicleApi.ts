@@ -4,6 +4,21 @@
 
 import { http } from './httpClient';
 
+/**
+ * Нормы расхода топлива для транспортного средства
+ * Соответствует backend Vehicle.fuelConsumptionRates (WB-101, WB-201)
+ */
+export interface FuelConsumptionRates {
+    /** Норма расхода зимой (л/100км) */
+    winterRate?: number;
+    /** Норма расхода летом (л/100км) */
+    summerRate?: number;
+    /** Процент увеличения при городской езде */
+    cityIncreasePercent?: number;
+    /** Процент увеличения при прогреве */
+    warmingIncreasePercent?: number;
+}
+
 export interface VehicleDto {
     id: string;
     organizationId: string;
@@ -16,6 +31,7 @@ export interface VehicleDto {
     year: number | null;
     fuelType: string | null;
     fuelTankCapacity: number | null;
+    fuelConsumptionRates: FuelConsumptionRates | null;
     notes: string | null;
     isActive: boolean;
     createdAt: string;
@@ -32,6 +48,7 @@ export interface CreateVehicleInput {
     year?: number;
     fuelType?: string;
     fuelTankCapacity?: number;
+    fuelConsumptionRates?: FuelConsumptionRates;
     notes?: string;
     isActive?: boolean;
 }
@@ -46,6 +63,7 @@ export interface UpdateVehicleInput {
     year?: number;
     fuelType?: string;
     fuelTankCapacity?: number;
+    fuelConsumptionRates?: FuelConsumptionRates | null;
     notes?: string;
     isActive?: boolean;
 }
