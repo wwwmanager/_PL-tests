@@ -1,0 +1,502 @@
+{
+    "meta": {
+        "version": 2,
+        "exportedAt": "2025-12-08T20:00:00.000Z",
+        "appVersion": "1.0.0",
+        "description": "Реалистичные тестовые данные для демонстрации"
+    },
+    "organizations": [
+        {
+            "id": "org-001",
+            "name": "ООО \"ТрансЛогистик\"",
+            "shortName": "ТрансЛогистик",
+            "fullName": "Общество с ограниченной ответственностью \"ТрансЛогистик\"",
+            "inn": "7453123456",
+            "kpp": "745301001",
+            "ogrn": "1027400012345",
+            "address": "г. Челябинск, ул. Промышленная, д. 15",
+            "phone": "+7 (351) 777-12-34",
+            "email": "office@translogistic.ru",
+            "group": "Перевозчик",
+            "status": "Active",
+            "bankName": "ПАО Сбербанк",
+            "bankBik": "047501602",
+            "bankAccount": "40702810555000001234",
+            "correspondentAccount": "30101810500000000602"
+        },
+        {
+            "id": "org-002",
+            "name": "АО \"ПетроТрейд\"",
+            "shortName": "ПетроТрейд",
+            "fullName": "Акционерное общество \"ПетроТрейд\"",
+            "inn": "7451987654",
+            "kpp": "745101001",
+            "ogrn": "1027400098765",
+            "address": "г. Челябинск, ул. Нефтяников, д. 42",
+            "phone": "+7 (351) 555-99-88",
+            "email": "sales@petrotrade.ru",
+            "group": "Поставщик",
+            "status": "Active",
+            "bankName": "АО Альфа-Банк",
+            "bankBik": "046015207",
+            "bankAccount": "40702810701000005678",
+            "correspondentAccount": "30101810200000000207"
+        },
+        {
+            "id": "org-003",
+            "name": "ГБУЗ \"Городская поликлиника №7\"",
+            "shortName": "Поликлиника №7",
+            "fullName": "Государственное бюджетное учреждение здравоохранения \"Городская поликлиника №7\"",
+            "inn": "7452000111",
+            "kpp": "745201001",
+            "ogrn": "1027400111222",
+            "address": "г. Челябинск, ул. Медицинская, д. 3",
+            "phone": "+7 (351) 200-07-07",
+            "email": "info@gp7.zdrav74.ru",
+            "group": "Мед. учреждение",
+            "status": "Active"
+        }
+    ],
+    "employees": [
+        {
+            "id": "emp-001",
+            "organizationId": "org-001",
+            "fullName": "Петров Алексей Владимирович",
+            "position": "Водитель категории С",
+            "phone": "+7 912 345-67-01",
+            "email": "petrov.av@translogistic.ru",
+            "hireDate": "2020-03-15",
+            "birthDate": "1985-07-22",
+            "passportSeries": "7505",
+            "passportNumber": "123456",
+            "driverLicense": {
+                "number": "74 05 567890",
+                "category": "B, C, CE",
+                "validTo": "2028-07-22"
+            },
+            "medicalCertificate": {
+                "number": "МС-2024-001234",
+                "validTo": "2026-03-15"
+            }
+        },
+        {
+            "id": "emp-002",
+            "organizationId": "org-001",
+            "fullName": "Сидоров Михаил Петрович",
+            "position": "Водитель категории В",
+            "phone": "+7 912 345-67-02",
+            "email": "sidorov.mp@translogistic.ru",
+            "hireDate": "2021-06-01",
+            "birthDate": "1990-11-08",
+            "passportSeries": "7510",
+            "passportNumber": "654321",
+            "driverLicense": {
+                "number": "74 10 112233",
+                "category": "B, C",
+                "validTo": "2029-11-08"
+            },
+            "medicalCertificate": {
+                "number": "МС-2024-005678",
+                "validTo": "2026-06-01"
+            }
+        },
+        {
+            "id": "emp-003",
+            "organizationId": "org-001",
+            "fullName": "Козлов Игорь Сергеевич",
+            "position": "Механик",
+            "phone": "+7 912 345-67-03",
+            "email": "kozlov.is@translogistic.ru",
+            "hireDate": "2018-01-10",
+            "birthDate": "1978-04-30"
+        },
+        {
+            "id": "emp-004",
+            "organizationId": "org-001",
+            "fullName": "Иванова Елена Николаевна",
+            "position": "Диспетчер",
+            "phone": "+7 912 345-67-04",
+            "email": "ivanova.en@translogistic.ru",
+            "hireDate": "2019-09-01",
+            "birthDate": "1992-12-15"
+        },
+        {
+            "id": "emp-005",
+            "organizationId": "org-001",
+            "fullName": "Кузнецов Андрей Викторович",
+            "position": "Водитель категории D",
+            "phone": "+7 912 345-67-05",
+            "email": "kuznetsov.av@translogistic.ru",
+            "hireDate": "2022-02-14",
+            "birthDate": "1988-05-20",
+            "driverLicense": {
+                "number": "74 08 445566",
+                "category": "B, C, D, DE",
+                "validTo": "2030-05-20"
+            },
+            "medicalCertificate": {
+                "number": "МС-2024-009012",
+                "validTo": "2026-02-14"
+            }
+        }
+    ],
+    "vehicles": [
+        {
+            "id": "veh-001",
+            "organizationId": "org-001",
+            "code": "А-001",
+            "registrationNumber": "В123АВ174",
+            "brand": "КАМАЗ",
+            "model": "65115",
+            "vin": "XTC65115N2345678",
+            "year": 2021,
+            "fuelType": "Дизель",
+            "fuelTankCapacity": 350,
+            "fuelConsumptionNorm": 32.5,
+            "odometerCurrent": 145230,
+            "status": "Active",
+            "ptsNumber": "74 УО 123456",
+            "stsNumber": "74 45 789012"
+        },
+        {
+            "id": "veh-002",
+            "organizationId": "org-001",
+            "code": "А-002",
+            "registrationNumber": "С456СД174",
+            "brand": "ГАЗель NEXT",
+            "model": "A21R22",
+            "vin": "X96A21R22L1234567",
+            "year": 2022,
+            "fuelType": "АИ-92",
+            "fuelTankCapacity": 64,
+            "fuelConsumptionNorm": 11.5,
+            "odometerCurrent": 78450,
+            "status": "Active",
+            "ptsNumber": "74 УН 234567",
+            "stsNumber": "74 46 890123"
+        },
+        {
+            "id": "veh-003",
+            "organizationId": "org-001",
+            "code": "А-003",
+            "registrationNumber": "Е789ЕК174",
+            "brand": "МАЗ",
+            "model": "5340С2",
+            "vin": "Y3M5340C2L0012345",
+            "year": 2020,
+            "fuelType": "Дизель",
+            "fuelTankCapacity": 300,
+            "fuelConsumptionNorm": 28.0,
+            "odometerCurrent": 212890,
+            "status": "Active",
+            "ptsNumber": "74 УМ 345678",
+            "stsNumber": "74 47 901234"
+        },
+        {
+            "id": "veh-004",
+            "organizationId": "org-001",
+            "code": "Л-001",
+            "registrationNumber": "К012КМ174",
+            "brand": "Volkswagen",
+            "model": "Polo",
+            "vin": "WVWZZZ6RZLY123456",
+            "year": 2023,
+            "fuelType": "АИ-92",
+            "fuelTankCapacity": 45,
+            "fuelConsumptionNorm": 6.8,
+            "odometerCurrent": 15200,
+            "status": "Active",
+            "ptsNumber": "74 УП 456789",
+            "stsNumber": "74 48 012345"
+        }
+    ],
+    "fuelTypes": [
+        {
+            "id": "fuel-001",
+            "code": "AI-92",
+            "name": "АИ-92",
+            "density": 0.735,
+            "unit": "л"
+        },
+        {
+            "id": "fuel-002",
+            "code": "AI-95",
+            "name": "АИ-95",
+            "density": 0.750,
+            "unit": "л"
+        },
+        {
+            "id": "fuel-003",
+            "code": "DT",
+            "name": "Дизельное топливо",
+            "density": 0.840,
+            "unit": "л"
+        }
+    ],
+    "routes": [
+        {
+            "id": "route-001",
+            "name": "Челябинск — Екатеринбург",
+            "distance": 210,
+            "estimatedTime": 180
+        },
+        {
+            "id": "route-002",
+            "name": "Челябинск — Магнитогорск",
+            "distance": 320,
+            "estimatedTime": 240
+        },
+        {
+            "id": "route-003",
+            "name": "Челябинск — Курган",
+            "distance": 260,
+            "estimatedTime": 200
+        },
+        {
+            "id": "route-004",
+            "name": "Городской маршрут (внутри Челябинска)",
+            "distance": 45,
+            "estimatedTime": 60
+        }
+    ],
+    "waybills": [
+        {
+            "id": "wb-001",
+            "organizationId": "org-001",
+            "number": "ПЛ-2025/001",
+            "series": "ЧБ",
+            "blankNumber": 1,
+            "date": "2025-12-05",
+            "vehicleId": "veh-002",
+            "driverId": "emp-002",
+            "status": "COMPLETED",
+            "plannedRoute": "Доставка товаров по г. Челябинску",
+            "odometerStart": 78200,
+            "odometerEnd": 78295,
+            "fuelStart": 32.5,
+            "fuelReceived": 40.0,
+            "fuelConsumed": 10.9,
+            "fuelEnd": 61.6,
+            "departureTime": "2025-12-05T08:00:00",
+            "returnTime": "2025-12-05T14:30:00",
+            "dispatcher": "emp-004",
+            "mechanic": "emp-003",
+            "routes": [
+                {
+                    "legOrder": 1,
+                    "fromPoint": "База ТрансЛогистик, ул. Промышленная 15",
+                    "toPoint": "ТЦ Космос, ул. Воровского 6",
+                    "distanceKm": 12,
+                    "cargo": "Электроника",
+                    "cargoWeight": 450
+                },
+                {
+                    "legOrder": 2,
+                    "fromPoint": "ТЦ Космос",
+                    "toPoint": "Склад Озон, ул. Бажова 91",
+                    "distanceKm": 18,
+                    "cargo": "Возврат",
+                    "cargoWeight": 120
+                },
+                {
+                    "legOrder": 3,
+                    "fromPoint": "Склад Озон",
+                    "toPoint": "База ТрансЛогистик",
+                    "distanceKm": 15
+                }
+            ],
+            "preTripInspection": {
+                "medicalExam": true,
+                "technicalCheck": true,
+                "medicalExamTime": "2025-12-05T07:45:00",
+                "medicalOrganization": "org-003"
+            }
+        },
+        {
+            "id": "wb-002",
+            "organizationId": "org-001",
+            "number": "ПЛ-2025/002",
+            "series": "ЧБ",
+            "blankNumber": 2,
+            "date": "2025-12-06",
+            "vehicleId": "veh-001",
+            "driverId": "emp-001",
+            "status": "COMPLETED",
+            "plannedRoute": "Рейс Челябинск — Екатеринбург — Челябинск",
+            "odometerStart": 145000,
+            "odometerEnd": 145420,
+            "fuelStart": 180.0,
+            "fuelReceived": 150.0,
+            "fuelConsumed": 136.5,
+            "fuelEnd": 193.5,
+            "departureTime": "2025-12-06T05:00:00",
+            "returnTime": "2025-12-06T16:30:00",
+            "dispatcher": "emp-004",
+            "mechanic": "emp-003",
+            "routes": [
+                {
+                    "legOrder": 1,
+                    "fromPoint": "г. Челябинск, ул. Промышленная 15",
+                    "toPoint": "г. Екатеринбург, ул. Логистическая 8",
+                    "distanceKm": 210,
+                    "cargo": "Металлоконструкции",
+                    "cargoWeight": 12500
+                },
+                {
+                    "legOrder": 2,
+                    "fromPoint": "г. Екатеринбург, ул. Логистическая 8",
+                    "toPoint": "г. Челябинск, ул. Промышленная 15",
+                    "distanceKm": 210,
+                    "cargo": "Порожний рейс"
+                }
+            ],
+            "fuelStops": [
+                {
+                    "station": "АЗС Лукойл №1234, г. Екатеринбург",
+                    "fuelType": "Дизель",
+                    "quantity": 150.0,
+                    "costPerLiter": 62.50,
+                    "totalCost": 9375.00
+                }
+            ],
+            "preTripInspection": {
+                "medicalExam": true,
+                "technicalCheck": true,
+                "medicalExamTime": "2025-12-06T04:30:00",
+                "medicalOrganization": "org-003"
+            }
+        },
+        {
+            "id": "wb-003",
+            "organizationId": "org-001",
+            "number": "ПЛ-2025/003",
+            "series": "ЧБ",
+            "blankNumber": 3,
+            "date": "2025-12-07",
+            "vehicleId": "veh-003",
+            "driverId": "emp-005",
+            "status": "SUBMITTED",
+            "plannedRoute": "Рейс Челябинск — Магнитогорск",
+            "odometerStart": 212890,
+            "odometerEnd": 213530,
+            "fuelStart": 200.0,
+            "fuelReceived": 0.0,
+            "fuelConsumed": 179.2,
+            "fuelEnd": 20.8,
+            "departureTime": "2025-12-07T06:00:00",
+            "returnTime": "2025-12-07T18:00:00",
+            "dispatcher": "emp-004",
+            "mechanic": "emp-003",
+            "routes": [
+                {
+                    "legOrder": 1,
+                    "fromPoint": "г. Челябинск, ул. Промышленная 15",
+                    "toPoint": "г. Магнитогорск, ул. Индустриальная 25",
+                    "distanceKm": 320,
+                    "cargo": "Стройматериалы",
+                    "cargoWeight": 15000
+                },
+                {
+                    "legOrder": 2,
+                    "fromPoint": "г. Магнитогорск, ул. Индустриальная 25",
+                    "toPoint": "г. Челябинск, ул. Промышленная 15",
+                    "distanceKm": 320,
+                    "cargo": "Порожний рейс"
+                }
+            ],
+            "preTripInspection": {
+                "medicalExam": true,
+                "technicalCheck": true,
+                "medicalExamTime": "2025-12-07T05:30:00",
+                "medicalOrganization": "org-003"
+            }
+        },
+        {
+            "id": "wb-004",
+            "organizationId": "org-001",
+            "number": "ПЛ-2025/004",
+            "series": "ЧБ",
+            "blankNumber": 4,
+            "date": "2025-12-08",
+            "vehicleId": "veh-004",
+            "driverId": "emp-002",
+            "status": "DRAFT",
+            "plannedRoute": "Служебная поездка (встреча с клиентом)",
+            "odometerStart": 15200,
+            "fuelStart": 28.0,
+            "departureTime": "2025-12-08T09:00:00",
+            "dispatcher": "emp-004"
+        },
+        {
+            "id": "wb-005",
+            "organizationId": "org-001",
+            "number": "ПЛ-2025/005",
+            "series": "ЧБ",
+            "blankNumber": 5,
+            "date": "2025-12-08",
+            "vehicleId": "veh-002",
+            "driverId": "emp-001",
+            "status": "ISSUED",
+            "plannedRoute": "Доставка по Курганской области",
+            "odometerStart": 78450,
+            "fuelStart": 61.6,
+            "fuelReceived": 64.0,
+            "departureTime": "2025-12-08T07:00:00",
+            "dispatcher": "emp-004",
+            "mechanic": "emp-003",
+            "routes": [
+                {
+                    "legOrder": 1,
+                    "fromPoint": "г. Челябинск, ул. Промышленная 15",
+                    "toPoint": "г. Курган, ул. Складская 12",
+                    "distanceKm": 260,
+                    "cargo": "Продукты питания",
+                    "cargoWeight": 1800
+                },
+                {
+                    "legOrder": 2,
+                    "fromPoint": "г. Курган",
+                    "toPoint": "г. Челябинск",
+                    "distanceKm": 260
+                }
+            ],
+            "fuelStops": [
+                {
+                    "station": "АЗС Газпром №567, г. Челябинск",
+                    "fuelType": "АИ-92",
+                    "quantity": 64.0,
+                    "costPerLiter": 54.20,
+                    "totalCost": 3468.80
+                }
+            ],
+            "preTripInspection": {
+                "medicalExam": true,
+                "technicalCheck": true,
+                "medicalExamTime": "2025-12-08T06:30:00",
+                "medicalOrganization": "org-003"
+            }
+        }
+    ],
+    "fuelCards": [
+        {
+            "id": "fc-001",
+            "organizationId": "org-001",
+            "cardNumber": "7000-1234-5678-9012",
+            "provider": "Лукойл",
+            "assignedToDriverId": "emp-001",
+            "assignedToVehicleId": "veh-001",
+            "status": "Active",
+            "monthlyLimit": 50000
+        },
+        {
+            "id": "fc-002",
+            "organizationId": "org-001",
+            "cardNumber": "7100-9876-5432-1098",
+            "provider": "Газпром",
+            "assignedToDriverId": "emp-002",
+            "assignedToVehicleId": "veh-002",
+            "status": "Active",
+            "monthlyLimit": 25000
+        }
+    ]
+}

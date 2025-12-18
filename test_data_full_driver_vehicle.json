@@ -1,0 +1,572 @@
+{
+    "organizations": [
+        {
+            "id": "org-1",
+            "fullName": "Общество с ограниченной ответственностью «Южно-Уральская Логистика»",
+            "shortName": "ООО «ЮУ-Логистика»",
+            "inn": "7453123456",
+            "kpp": "745301001",
+            "ogrn": "1157453012345",
+            "address": "454080, Челябинская область, г. Челябинск, ул. Труда, д. 156, офис 301",
+            "phone": "+7 (351) 222-33-44",
+            "email": "info@yulogistics.ru",
+            "status": "Active",
+            "bankName": "ПАО Сбербанк, Челябинское отделение №8597",
+            "bankBik": "047501602",
+            "bankAccount": "40702810407450001234",
+            "correspondentAccount": "30101810400000000602"
+        },
+        {
+            "id": "org-2",
+            "fullName": "Индивидуальный предприниматель Смирнов Алексей Викторович",
+            "shortName": "ИП Смирнов А.В.",
+            "inn": "745312987654",
+            "kpp": "",
+            "ogrn": "315745300012345",
+            "address": "456200, Челябинская область, г. Златоуст, ул. Аникеева, д. 15",
+            "phone": "+7 (3513) 65-78-90",
+            "email": "smirnov.av@mail.ru",
+            "status": "Active",
+            "bankName": "Уральский банк ПАО Сбербанк",
+            "bankBik": "047501602",
+            "bankAccount": "40802810500000098765",
+            "correspondentAccount": "30101810400000000602"
+        }
+    ],
+    "fuelTypes": [
+        {
+            "id": "fuel-92",
+            "name": "АИ-92",
+            "code": "AI92",
+            "density": 0.74,
+            "unit": "л"
+        },
+        {
+            "id": "fuel-95",
+            "name": "АИ-95",
+            "code": "AI95",
+            "density": 0.75,
+            "unit": "л"
+        },
+        {
+            "id": "fuel-dt",
+            "name": "ДТ",
+            "code": "DT",
+            "density": 0.85,
+            "unit": "л"
+        }
+    ],
+    "employees": [
+        {
+            "id": "emp-1",
+            "fullName": "Кузнецов Дмитрий Александрович",
+            "shortName": "Кузнецов Д.А.",
+            "employeeType": "driver",
+            "organizationId": "org-1",
+            "status": "Active",
+            "phone": "+7 (912) 345-67-89",
+            "licenseCategory": "B, C, D",
+            "documentNumber": "7412 654321",
+            "documentExpiry": "2029-08-15",
+            "personnelNumber": "DRV-001",
+            "fuelCardNumber": "7453001234567890",
+            "dateOfBirth": "1988-03-22",
+            "snils": "145-678-901 23",
+            "fuelCardBalance": 500
+        },
+        {
+            "id": "emp-2",
+            "fullName": "Волков Сергей Николаевич",
+            "shortName": "Волков С.Н.",
+            "employeeType": "driver",
+            "organizationId": "org-1",
+            "status": "Active",
+            "phone": "+7 (912) 456-78-90",
+            "licenseCategory": "B, C",
+            "documentNumber": "7412 789012",
+            "documentExpiry": "2028-11-20",
+            "personnelNumber": "DRV-002",
+            "fuelCardNumber": "7453001234567891",
+            "dateOfBirth": "1985-07-10",
+            "snils": "156-789-012 34",
+            "fuelCardBalance": 350
+        },
+        {
+            "id": "emp-3",
+            "fullName": "Морозов Андрей Петрович",
+            "shortName": "Морозов А.П.",
+            "employeeType": "driver",
+            "organizationId": "org-2",
+            "status": "Active",
+            "phone": "+7 (919) 123-45-67",
+            "licenseCategory": "B, C, E",
+            "documentNumber": "7412 345678",
+            "documentExpiry": "2030-05-12",
+            "personnelNumber": "DRV-101",
+            "fuelCardNumber": "7453001234567892",
+            "dateOfBirth": "1990-12-05",
+            "snils": "167-890-123 45",
+            "fuelCardBalance": 600
+        },
+        {
+            "id": "emp-disp-1",
+            "fullName": "Соколова Елена Владимировна",
+            "shortName": "Соколова Е.В.",
+            "employeeType": "dispatcher",
+            "organizationId": "org-1",
+            "status": "Active",
+            "phone": "+7 (351) 222-33-45",
+            "personnelNumber": "DISP-001"
+        },
+        {
+            "id": "emp-mech-1",
+            "fullName": "Новиков Игорь Сергеевич",
+            "shortName": "Новиков И.С.",
+            "employeeType": "mechanic",
+            "organizationId": "org-1",
+            "status": "Active",
+            "phone": "+7 (351) 222-33-46",
+            "personnelNumber": "MECH-001"
+        }
+    ],
+    "vehicles": [
+        {
+            "id": "veh-1",
+            "plateNumber": "Т456ОР174",
+            "brand": "ГАЗель Next",
+            "model": "A21R22",
+            "vin": "X9GA21R22LG123456",
+            "year": 2021,
+            "mileage": 48500,
+            "fuelTypeId": "fuel-92",
+            "fuelConsumptionRates": {
+                "summerRate": 11.5,
+                "winterRate": 13.8,
+                "cityIncreasePercent": 15,
+                "warmingIncreasePercent": 10
+            },
+            "assignedDriverId": "emp-1",
+            "organizationId": "org-1",
+            "currentFuel": 35,
+            "fuelTankCapacity": 75,
+            "status": "Active",
+            "vehicleType": "Грузовой фургон",
+            "ptsSeries": "74 УУ",
+            "ptsNumber": "234567",
+            "osagoSeries": "ЕЕЕ",
+            "osagoNumber": "0234567890",
+            "osagoStartDate": "2024-01-15",
+            "osagoEndDate": "2025-01-14",
+            "useCityModifier": true,
+            "useWarmingModifier": true
+        },
+        {
+            "id": "veh-2",
+            "plateNumber": "В123МК174",
+            "brand": "УАЗ Патриот",
+            "model": "3163",
+            "vin": "XTT31630070123456",
+            "year": 2020,
+            "mileage": 62300,
+            "fuelTypeId": "fuel-92",
+            "fuelConsumptionRates": {
+                "summerRate": 13.0,
+                "winterRate": 15.5,
+                "cityIncreasePercent": 12,
+                "warmingIncreasePercent": 8
+            },
+            "assignedDriverId": "emp-2",
+            "organizationId": "org-1",
+            "currentFuel": 42,
+            "fuelTankCapacity": 68,
+            "status": "Active",
+            "vehicleType": "Внедорожник",
+            "ptsSeries": "74 ТТ",
+            "ptsNumber": "345678",
+            "osagoSeries": "ЕЕЕ",
+            "osagoNumber": "0345678901",
+            "osagoStartDate": "2024-03-10",
+            "osagoEndDate": "2025-03-09",
+            "useCityModifier": true,
+            "useWarmingModifier": true
+        },
+        {
+            "id": "veh-3",
+            "plateNumber": "Н789АВ174",
+            "brand": "КАМАЗ",
+            "model": "65117",
+            "vin": "XTC65117070123456",
+            "year": 2019,
+            "mileage": 125400,
+            "fuelTypeId": "fuel-dt",
+            "fuelConsumptionRates": {
+                "summerRate": 28.0,
+                "winterRate": 32.5,
+                "cityIncreasePercent": 20,
+                "warmingIncreasePercent": 15
+            },
+            "assignedDriverId": "emp-3",
+            "organizationId": "org-2",
+            "currentFuel": 180,
+            "fuelTankCapacity": 350,
+            "status": "Active",
+            "vehicleType": "Грузовой самосвал",
+            "ptsSeries": "74 РР",
+            "ptsNumber": "456789",
+            "osagoSeries": "ЕЕЕ",
+            "osagoNumber": "0456789012",
+            "osagoStartDate": "2024-02-20",
+            "osagoEndDate": "2025-02-19",
+            "useCityModifier": true,
+            "useWarmingModifier": true
+        }
+    ],
+    "storages": [
+        {
+            "id": "store-1",
+            "organizationId": "org-1",
+            "type": "centralWarehouse",
+            "name": "Центральный склад ГСМ",
+            "address": "454007, г. Челябинск, Копейское шоссе, д. 64",
+            "responsiblePerson": "Новиков И.С.",
+            "status": "active",
+            "createdAt": "2023-01-01T00:00:00Z",
+            "updatedAt": "2024-01-01T00:00:00Z"
+        },
+        {
+            "id": "store-2",
+            "organizationId": "org-2",
+            "type": "centralWarehouse",
+            "name": "Склад ГСМ Златоуст",
+            "address": "456200, г. Златоуст, ул. Промышленная, д. 12",
+            "responsiblePerson": "Морозов А.П.",
+            "status": "active",
+            "createdAt": "2023-06-01T00:00:00Z",
+            "updatedAt": "2024-01-01T00:00:00Z"
+        }
+    ],
+    "garageStockItems": [
+        {
+            "id": "item-fuel-92",
+            "name": "Бензин АИ-92 (л)",
+            "itemType": "Товар",
+            "group": "ГСМ",
+            "unit": "л",
+            "balance": 8500,
+            "storageType": "centralWarehouse",
+            "storageLocation": "store-1",
+            "fuelTypeId": "fuel-92",
+            "isActive": true,
+            "organizationId": "org-1"
+        },
+        {
+            "id": "item-fuel-95",
+            "name": "Бензин АИ-95 (л)",
+            "itemType": "Товар",
+            "group": "ГСМ",
+            "unit": "л",
+            "balance": 3200,
+            "storageType": "centralWarehouse",
+            "storageLocation": "store-1",
+            "fuelTypeId": "fuel-95",
+            "isActive": true,
+            "organizationId": "org-1"
+        },
+        {
+            "id": "item-fuel-dt",
+            "name": "Дизельное топливо (л)",
+            "itemType": "Товар",
+            "group": "ГСМ",
+            "unit": "л",
+            "balance": 12000,
+            "storageType": "centralWarehouse",
+            "storageLocation": "store-2",
+            "fuelTypeId": "fuel-dt",
+            "isActive": true,
+            "organizationId": "org-2"
+        },
+        {
+            "id": "item-oil-motor",
+            "name": "Масло моторное 10W-40 (л)",
+            "itemType": "Товар",
+            "group": "Запчасти и расходники",
+            "unit": "л",
+            "balance": 45,
+            "storageType": "centralWarehouse",
+            "storageLocation": "store-1",
+            "isActive": true,
+            "organizationId": "org-1"
+        }
+    ],
+    "waybillBlanks": [
+        {
+            "id": "blank-1001",
+            "organizationId": "org-1",
+            "batchId": "batch-2024-01",
+            "series": "ЧБ",
+            "number": 1001,
+            "status": "used",
+            "ownerEmployeeId": "emp-1",
+            "usedInWaybillId": "wb-1",
+            "usedAt": "2024-11-20T07:30:00Z",
+            "version": 1,
+            "updatedAt": "2024-11-20T07:30:00Z",
+            "updatedBy": "emp-disp-1"
+        },
+        {
+            "id": "blank-1002",
+            "organizationId": "org-1",
+            "batchId": "batch-2024-01",
+            "series": "ЧБ",
+            "number": 1002,
+            "status": "used",
+            "ownerEmployeeId": "emp-2",
+            "usedInWaybillId": "wb-2",
+            "usedAt": "2024-11-21T07:00:00Z",
+            "version": 1,
+            "updatedAt": "2024-11-21T07:00:00Z",
+            "updatedBy": "emp-disp-1"
+        },
+        {
+            "id": "blank-1003",
+            "organizationId": "org-1",
+            "batchId": "batch-2024-01",
+            "series": "ЧБ",
+            "number": 1003,
+            "status": "issued",
+            "ownerEmployeeId": "emp-1",
+            "version": 1,
+            "updatedAt": "2024-11-22T06:00:00Z",
+            "updatedBy": "emp-disp-1"
+        },
+        {
+            "id": "blank-1004",
+            "organizationId": "org-1",
+            "batchId": "batch-2024-01",
+            "series": "ЧБ",
+            "number": 1004,
+            "status": "available",
+            "ownerEmployeeId": null,
+            "version": 0,
+            "updatedAt": "2024-01-15T10:00:00Z",
+            "updatedBy": "system"
+        },
+        {
+            "id": "blank-2001",
+            "organizationId": "org-2",
+            "batchId": "batch-2024-zl",
+            "series": "ЗЛ",
+            "number": 2001,
+            "status": "used",
+            "ownerEmployeeId": "emp-3",
+            "usedInWaybillId": "wb-3",
+            "usedAt": "2024-11-20T06:00:00Z",
+            "version": 1,
+            "updatedAt": "2024-11-20T06:00:00Z",
+            "updatedBy": "emp-3"
+        }
+    ],
+    "waybills": [
+        {
+            "id": "wb-1",
+            "number": "ЧБ 001001",
+            "blankId": "blank-1001",
+            "blankSeries": "ЧБ",
+            "blankNumber": 1001,
+            "date": "2024-11-20",
+            "organizationId": "org-1",
+            "vehicleId": "veh-1",
+            "driverId": "emp-1",
+            "dispatcherId": "emp-disp-1",
+            "status": "Posted",
+            "validFrom": "2024-11-20T07:30:00",
+            "validTo": "2024-11-20T18:00:00",
+            "odometerStart": 48200,
+            "odometerEnd": 48350,
+            "fuelAtStart": 25,
+            "fuelFilled": 30,
+            "fuelAtEnd": 38,
+            "fuelPlanned": 17.25,
+            "routes": [
+                {
+                    "id": "r-1-1",
+                    "from": "Гараж (ул. Труда, 156)",
+                    "to": "ТЦ Алмаз (пр. Ленина, 35)",
+                    "distanceKm": 12,
+                    "isCityDriving": true,
+                    "departureTime": "2024-11-20T08:00:00",
+                    "arrivalTime": "2024-11-20T08:30:00"
+                },
+                {
+                    "id": "r-1-2",
+                    "from": "ТЦ Алмаз (пр. Ленина, 35)",
+                    "to": "Склад Меридиан (Копейское шоссе, 64)",
+                    "distanceKm": 18,
+                    "isCityDriving": false,
+                    "departureTime": "2024-11-20T09:00:00",
+                    "arrivalTime": "2024-11-20T09:40:00"
+                },
+                {
+                    "id": "r-1-3",
+                    "from": "Склад Меридиан (Копейское шоссе, 64)",
+                    "to": "ТЦ Фокус (ул. Братьев Кашириных, 129)",
+                    "distanceKm": 25,
+                    "isCityDriving": false,
+                    "departureTime": "2024-11-20T10:30:00",
+                    "arrivalTime": "2024-11-20T11:20:00"
+                },
+                {
+                    "id": "r-1-4",
+                    "from": "ТЦ Фокус (ул. Братьев Кашириных, 129)",
+                    "to": "Магазин Пятёрочка (ул. Комсомольский пр., 45)",
+                    "distanceKm": 8,
+                    "isCityDriving": true,
+                    "departureTime": "2024-11-20T12:00:00",
+                    "arrivalTime": "2024-11-20T12:20:00"
+                },
+                {
+                    "id": "r-1-5",
+                    "from": "Магазин Пятёрочка (ул. Комсомольский пр., 45)",
+                    "to": "Гараж (ул. Труда, 156)",
+                    "distanceKm": 87,
+                    "isCityDriving": true,
+                    "departureTime": "2024-11-20T13:00:00",
+                    "arrivalTime": "2024-11-20T17:30:00"
+                }
+            ],
+            "postedAt": "2024-11-20T18:00:00Z",
+            "postedBy": "emp-disp-1"
+        },
+        {
+            "id": "wb-2",
+            "number": "ЧБ 001002",
+            "blankId": "blank-1002",
+            "blankSeries": "ЧБ",
+            "blankNumber": 1002,
+            "date": "2024-11-21",
+            "organizationId": "org-1",
+            "vehicleId": "veh-2",
+            "driverId": "emp-2",
+            "dispatcherId": "emp-disp-1",
+            "status": "Posted",
+            "validFrom": "2024-11-21T07:00:00",
+            "validTo": "2024-11-21T19:00:00",
+            "odometerStart": 62100,
+            "odometerEnd": 62280,
+            "fuelAtStart": 30,
+            "fuelFilled": 35,
+            "fuelAtEnd": 42,
+            "fuelPlanned": 23.4,
+            "routes": [
+                {
+                    "id": "r-2-1",
+                    "from": "Гараж (ул. Труда, 156)",
+                    "to": "Аэропорт Баландино (аэропорт)",
+                    "distanceKm": 22,
+                    "isCityDriving": false,
+                    "departureTime": "2024-11-21T07:30:00",
+                    "arrivalTime": "2024-11-21T08:10:00"
+                },
+                {
+                    "id": "r-2-2",
+                    "from": "Аэропорт Баландино (аэропорт)",
+                    "to": "Офис Газпром (ул. Воровского, 54)",
+                    "distanceKm": 28,
+                    "isCityDriving": false,
+                    "departureTime": "2024-11-21T09:00:00",
+                    "arrivalTime": "2024-11-21T09:50:00"
+                },
+                {
+                    "id": "r-2-3",
+                    "from": "Офис Газпром (ул. Воровского, 54)",
+                    "to": "Завод ЧТЗ (ул. 2-я Павелецкая, 18)",
+                    "distanceKm": 15,
+                    "isCityDriving": true,
+                    "departureTime": "2024-11-21T11:00:00",
+                    "arrivalTime": "2024-11-21T11:35:00"
+                },
+                {
+                    "id": "r-2-4",
+                    "from": "Завод ЧТЗ (ул. 2-я Павелецкая, 18)",
+                    "to": "Склад Меридиан (Копейское шоссе, 64)",
+                    "distanceKm": 32,
+                    "isCityDriving": false,
+                    "departureTime": "2024-11-21T14:00:00",
+                    "arrivalTime": "2024-11-21T15:00:00"
+                },
+                {
+                    "id": "r-2-5",
+                    "from": "Склад Меридиан (Копейское шоссе, 64)",
+                    "to": "Гараж (ул. Труда, 156)",
+                    "distanceKm": 83,
+                    "isCityDriving": false,
+                    "departureTime": "2024-11-21T16:00:00",
+                    "arrivalTime": "2024-11-21T18:30:00"
+                }
+            ],
+            "postedAt": "2024-11-21T19:00:00Z",
+            "postedBy": "emp-disp-1"
+        },
+        {
+            "id": "wb-3",
+            "number": "ЗЛ 002001",
+            "blankId": "blank-2001",
+            "blankSeries": "ЗЛ",
+            "blankNumber": 2001,
+            "date": "2024-11-20",
+            "organizationId": "org-2",
+            "vehicleId": "veh-3",
+            "driverId": "emp-3",
+            "dispatcherId": "emp-3",
+            "status": "Posted",
+            "validFrom": "2024-11-20T06:00:00",
+            "validTo": "2024-11-20T20:00:00",
+            "odometerStart": 125200,
+            "odometerEnd": 125450,
+            "fuelAtStart": 150,
+            "fuelFilled": 100,
+            "fuelAtEnd": 180,
+            "fuelPlanned": 70,
+            "routes": [
+                {
+                    "id": "r-3-1",
+                    "from": "База Златоуст (ул. Аникеева, 15)",
+                    "to": "Карьер Миасс (Миасс, промзона)",
+                    "distanceKm": 45,
+                    "isCityDriving": false,
+                    "departureTime": "2024-11-20T06:30:00",
+                    "arrivalTime": "2024-11-20T07:45:00"
+                },
+                {
+                    "id": "r-3-2",
+                    "from": "Карьер Миасс (Миасс, промзона)",
+                    "to": "Завод Челябинск (Копейское шоссе, 2)",
+                    "distanceKm": 95,
+                    "isCityDriving": false,
+                    "departureTime": "2024-11-20T09:00:00",
+                    "arrivalTime": "2024-11-20T11:30:00"
+                },
+                {
+                    "id": "r-3-3",
+                    "from": "Завод Челябинск (Копейское шоссе, 2)",
+                    "to": "Карьер Миасс (Миасс, промзона)",
+                    "distanceKm": 95,
+                    "isCityDriving": false,
+                    "departureTime": "2024-11-20T13:00:00",
+                    "arrivalTime": "2024-11-20T15:30:00"
+                },
+                {
+                    "id": "r-3-4",
+                    "from": "Карьер Миасс (Миасс, промзона)",
+                    "to": "База Златоуст (ул. Аникеева, 15)",
+                    "distanceKm": 15,
+                    "isCityDriving": false,
+                    "departureTime": "2024-11-20T17:00:00",
+                    "arrivalTime": "2024-11-20T19:30:00"
+                }
+            ],
+            "postedAt": "2024-11-20T20:00:00Z",
+            "postedBy": "emp-3"
+        }
+    ]
+}

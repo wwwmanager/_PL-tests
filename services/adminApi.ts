@@ -1,0 +1,179 @@
+import { httpClient } from './httpClient';
+
+/**
+ * Admin API - Administrative operations
+ */
+
+// Types for data preview
+export interface TablePreview {
+    count: number;
+    items: Array<{ id: string; label: string; subLabel?: string }>;
+}
+
+export interface DataPreviewResponse {
+    documents: {
+        waybills: TablePreview;
+        blanks: TablePreview;
+        blankBatches: TablePreview;
+    };
+    dictionaries: {
+        employees: TablePreview;
+        drivers: TablePreview;
+        vehicles: TablePreview;
+        routes: TablePreview;
+        fuelTypes: TablePreview;
+        fuelCards: TablePreview;
+        warehouses: TablePreview;
+    };
+    stock: {
+        stockItems: TablePreview;
+        stockMovements: TablePreview;
+    };
+    settings: {
+        departments: TablePreview;
+        settings: TablePreview;
+    };
+    logs: {
+        auditLogs: TablePreview;
+    };
+}
+
+export interface SelectiveDeleteRequest {
+    tables?: string[];
+    items?: Record<string, string[]>;
+}
+
+export interface SelectiveDeleteResponse {
+    success: boolean;
+    message: string;
+    deletedCounts: Record<string, number>;
+}
+
+interface ResetDatabaseResponse {
+    success: boolean;
+    message: string;
+    preservedTables?: string[];
+}
+
+/**
+ * Get preview of all data in database grouped by category
+ */
+export async function getDataPreview(): Promise<DataPreviewResponse> {
+    return httpClient.get<DataPreviewResponse>('/admin/data-preview');
+}
+
+/**
+ * Selectively delete data from specified tables or items
+ */
+export async function selectiveDelete(request: SelectiveDeleteRequest): Promise<SelectiveDeleteResponse> {
+    return httpClient.post<SelectiveDeleteResponse>('/admin/selective-delete', request);
+}
+
+/**
+ * Reset all data in the PostgreSQL database.
+ * WARNING: This is a destructive operation.
+ */
+export async function resetDatabase(): Promise<ResetDatabaseResponse> {
+    return httpClient.delete<ResetDatabaseResponse>('/admin/reset-database');
+}
+
+// Types for import
+export interface ImportDataRequest {
+    organizations?: any[];
+    employees?: any[];
+    vehicles?: any[];
+    fuelTypes?: any[];
+    routes?: any[];
+    waybills?: any[];
+    fuelCards?: any[];
+}
+
+export interface ImportResult {
+    table: string;
+    created: number;
+    updated: number;
+    errors: string[];
+}
+
+export interface ImportDataResponse {
+    success: boolean;
+    message: string;
+    results: ImportResult[];
+}
+
+/**
+ * Import JSON data into PostgreSQL database
+ * Uses upsert logic (create new or update existing)
+ */
+export async function importData(data: ImportDataRequest): Promise<ImportDataResponse> {
+    return httpClient.post<ImportDataResponse>('/admin/import', data);
+}
+
+// Types for user transfer
+export interface TransferUserRequest {
+    userId: string;
+    targetOrganizationId?: string;
+    createOrganization?: {
+        name: string;
+        shortName?: string;
+    };
+    transferAllData?: boolean;
+}
+
+export interface TransferUserResponse {
+    success: boolean;
+    message: string;
+    data?: {
+        userId: string;
+        userEmail: string;
+        fromOrganizationId: string;
+        fromOrganizationName: string;
+        toOrganizationId: string;
+        toOrganizationName: string;
+        sourceOrganizationEmpty: boolean;
+        canDeleteSourceOrg: boolean;
+        transferCounts?: Record<string, number>;
+        remainingInSourceOrg?: {
+            users: number;
+            employees: number;
+            vehicles: number;
+            blanks: number;
+            waybills: number;
+        };
+    };
+}
+
+/**
+ * Transfer a user to a different organization
+ * Can either move to existing org or create a new one
+ */
+export async function transferUser(data: TransferUserRequest): Promise<TransferUserResponse> {
+    return httpClient.post<TransferUserResponse>('/admin/transfer-user', data);
+}
+
+// Types for organization data transfer
+export interface TransferOrganizationDataRequest {
+    sourceOrganizationId: string;
+    targetOrganizationId: string;
+}
+
+export interface TransferOrganizationDataResponse {
+    success: boolean;
+    message: string;
+    data?: {
+        sourceOrganizationId: string;
+        sourceOrganizationName: string;
+        targetOrganizationId: string;
+        targetOrganizationName: string;
+        transferCounts: Record<string, number>;
+        canDeleteSourceOrg: boolean;
+    };
+}
+
+/**
+ * Transfer ALL data from one organization to another
+ * This allows cleaning up an org before deletion
+ */
+export async function transferOrganizationData(data: TransferOrganizationDataRequest): Promise<TransferOrganizationDataResponse> {
+    return httpClient.post<TransferOrganizationDataResponse>('/admin/transfer-organization', data);
+}

@@ -1,0 +1,177 @@
+[22.11.25 20:05:41,36] Начало выполнения скрипта 
+[22.11.25 20:05:41,36] ============================================== 
+[22.11.25 20:05:41,37]   Автоматическая установка Node.js + Vite 
+[22.11.25 20:05:41,38] ============================================== 
+[22.11.25 20:05:41,39]  
+[22.11.25 20:05:41,40] [0/6] Поиск архива проекта... 
+[22.11.25 20:05:41,40] [OK] Найден архив: путевые-листы (61).zip 
+[22.11.25 20:05:41,41] Выбран архив: путевые-листы (61).zip 
+[22.11.25 20:05:41,42] Создание временной папки: c:\_PL-tests\temp_extract_13350 
+[22.11.25 20:05:41,43] Распаковка архива... 
+[22.11.25 20:05:41,71] Поиск папки проекта... 
+[22.11.25 20:05:41,72] Проект найден в корне архива 
+[22.11.25 20:05:41,73] Перемещение файлов проекта в текущую папку... 
+C:\_PL-tests\temp_extract_13350\.env.local
+C:\_PL-tests\temp_extract_13350\.gitignore
+C:\_PL-tests\temp_extract_13350\App.tsx
+C:\_PL-tests\temp_extract_13350\constants.ts
+C:\_PL-tests\temp_extract_13350\context-pack.skeleton.json
+C:\_PL-tests\temp_extract_13350\import-data.json
+C:\_PL-tests\temp_extract_13350\index.html
+C:\_PL-tests\temp_extract_13350\index.tsx
+C:\_PL-tests\temp_extract_13350\metadata.json
+C:\_PL-tests\temp_extract_13350\package.json
+C:\_PL-tests\temp_extract_13350\README.md
+C:\_PL-tests\temp_extract_13350\setupTests.ts
+C:\_PL-tests\temp_extract_13350\TESTING_GUIDE.md
+C:\_PL-tests\temp_extract_13350\tsconfig.json
+C:\_PL-tests\temp_extract_13350\types.ts
+C:\_PL-tests\temp_extract_13350\vite.config.ts
+C:\_PL-tests\temp_extract_13350\vitest.config.ts
+C:\_PL-tests\temp_extract_13350\components\Icons.tsx
+C:\_PL-tests\temp_extract_13350\components\about\About.tsx
+C:\_PL-tests\temp_extract_13350\components\admin\Admin.tsx
+C:\_PL-tests\temp_extract_13350\components\admin\BlankManagement.tsx
+C:\_PL-tests\temp_extract_13350\components\admin\BusinessAuditLog.tsx
+C:\_PL-tests\temp_extract_13350\components\admin\ControllerManagement.tsx
+C:\_PL-tests\temp_extract_13350\components\admin\Diagnostics.tsx
+C:\_PL-tests\temp_extract_13350\components\admin\DispatcherManagement.tsx
+C:\_PL-tests\temp_extract_13350\components\admin\ExportContextPackButton.tsx
+C:\_PL-tests\temp_extract_13350\components\admin\FuelTypeManagement.tsx
+C:\_PL-tests\temp_extract_13350\components\admin\ImportAuditLog.tsx
+C:\_PL-tests\temp_extract_13350\components\admin\MedicalInstitutionManagement.tsx
+C:\_PL-tests\temp_extract_13350\components\admin\OrganizationManagement.tsx
+C:\_PL-tests\temp_extract_13350\components\admin\RoleManagement.tsx
+C:\_PL-tests\temp_extract_13350\components\admin\UserManagement.tsx
+C:\_PL-tests\temp_extract_13350\components\admin\__tests__\Admin.test.tsx
+C:\_PL-tests\temp_extract_13350\components\admin\__tests__\AppSettingsComponent.test.tsx
+C:\_PL-tests\temp_extract_13350\components\auth\Login.tsx
+C:\_PL-tests\temp_extract_13350\components\dashboard\Dashboard.tsx
+C:\_PL-tests\temp_extract_13350\components\dictionaries\Dictionaries.tsx
+C:\_PL-tests\temp_extract_13350\components\dictionaries\GarageManagement.tsx
+C:\_PL-tests\temp_extract_13350\components\dictionaries\RouteImportModal.tsx
+C:\_PL-tests\temp_extract_13350\components\dictionaries\RouteManagement.tsx
+C:\_PL-tests\temp_extract_13350\components\dictionaries\StorageManagement.tsx
+C:\_PL-tests\temp_extract_13350\components\drivers\DriverList.tsx
+C:\_PL-tests\temp_extract_13350\components\employees\EmployeeList.tsx
+C:\_PL-tests\temp_extract_13350\components\help\AdminGuide.tsx
+C:\_PL-tests\temp_extract_13350\components\help\BusinessLogicGuide.md
+C:\_PL-tests\temp_extract_13350\components\help\BusinessLogicGuide.tsx
+C:\_PL-tests\temp_extract_13350\components\help\CapabilitiesGuide.tsx
+C:\_PL-tests\temp_extract_13350\components\help\DeveloperGuide.tsx
+C:\_PL-tests\temp_extract_13350\components\help\EmployeeList.tsx
+C:\_PL-tests\temp_extract_13350\components\help\TestingGuide.md
+C:\_PL-tests\temp_extract_13350\components\help\TestingGuide.tsx
+C:\_PL-tests\temp_extract_13350\components\help\UserGuide.tsx
+C:\_PL-tests\temp_extract_13350\components\help\UserGuideAdmin.md
+C:\_PL-tests\temp_extract_13350\components\reports\Reports.tsx
+C:\_PL-tests\temp_extract_13350\components\shared\CollapsibleSection.tsx
+C:\_PL-tests\temp_extract_13350\components\shared\ConfirmationModal.tsx
+C:\_PL-tests\temp_extract_13350\components\shared\Modal.tsx
+C:\_PL-tests\temp_extract_13350\components\vehicles\VehicleList.tsx
+C:\_PL-tests\temp_extract_13350\components\waybills\CorrectionModal.tsx
+C:\_PL-tests\temp_extract_13350\components\waybills\CorrectionReasonModal.tsx
+C:\_PL-tests\temp_extract_13350\components\waybills\PrintableWaybill.tsx
+C:\_PL-tests\temp_extract_13350\components\waybills\SeasonSettingsModal.tsx
+C:\_PL-tests\temp_extract_13350\components\waybills\WaybillCheckModal.tsx
+C:\_PL-tests\temp_extract_13350\components\waybills\WaybillDetail.tsx
+C:\_PL-tests\temp_extract_13350\components\waybills\WaybillList.tsx
+C:\_PL-tests\temp_extract_13350\contexts\AuthContext.tsx
+C:\_PL-tests\temp_extract_13350\contexts\ToastContext.tsx
+C:\_PL-tests\temp_extract_13350\hooks\useTable.ts
+C:\_PL-tests\temp_extract_13350\hooks\useToast.ts
+C:\_PL-tests\temp_extract_13350\services\auditBusiness.test.ts
+C:\_PL-tests\temp_extract_13350\services\auditBusiness.ts
+C:\_PL-tests\temp_extract_13350\services\auditLog.test.ts
+C:\_PL-tests\temp_extract_13350\services\auditLog.ts
+C:\_PL-tests\temp_extract_13350\services\auth.tsx
+C:\_PL-tests\temp_extract_13350\services\bus.ts
+C:\_PL-tests\temp_extract_13350\services\dbKeys.ts
+C:\_PL-tests\temp_extract_13350\services\faker.ts
+C:\_PL-tests\temp_extract_13350\services\geminiService.ts
+C:\_PL-tests\temp_extract_13350\services\htmlParserService.ts
+C:\_PL-tests\temp_extract_13350\services\mockApi.test.ts
+C:\_PL-tests\temp_extract_13350\services\mockApi.ts
+C:\_PL-tests\temp_extract_13350\services\rbac.ts
+C:\_PL-tests\temp_extract_13350\services\repo.ts
+C:\_PL-tests\temp_extract_13350\services\routeParserService.test.ts
+C:\_PL-tests\temp_extract_13350\services\routeParserService.ts
+C:\_PL-tests\temp_extract_13350\services\schemas.ts
+C:\_PL-tests\temp_extract_13350\services\storage.ts
+C:\_PL-tests\temp_extract_13350\services\waybillStatusMachine.ts
+C:\_PL-tests\temp_extract_13350\src\entities\audit-log\lib\constants.ts
+C:\_PL-tests\temp_extract_13350\src\entities\audit-log\lib\index.ts
+C:\_PL-tests\temp_extract_13350\src\entities\audit-log\lib\storage.ts
+C:\_PL-tests\temp_extract_13350\src\tests\smoke.test.ts
+C:\_PL-tests\temp_extract_13350\utils\clone.ts
+C:\_PL-tests\temp_extract_13350\utils\safeJSON.ts
+94 File(s) copied
+[22.11.25 20:05:41,80] [OK] Архив успешно распакован в текущую папку 
+[22.11.25 20:05:41,81]  
+[22.11.25 20:05:41,82] [1/6] Проверка Node.js... 
+[22.11.25 20:05:41,84] [OK] Найден Node.js v20.19.5 
+[22.11.25 20:05:41,85]  
+[22.11.25 20:05:41,86] [2/6] Проверка npm... 
+[22.11.25 20:05:42,09] [OK] npm версия 10.8.2 
+[22.11.25 20:05:42,10]  
+[22.11.25 20:05:42,11] [3/6] Установка зависимостей проекта... 
+[22.11.25 20:05:42,12] [OK] Найден package.json, устанавливаю зависимости... 
+
+added 258 packages in 41s
+
+44 packages are looking for funding
+  run `npm fund` for details
+[22.11.25 20:06:23,70] [OK] Зависимости установлены 
+[22.11.25 20:06:23,71]  
+[22.11.25 20:06:23,72] [4/6] Проверка Vite... 
+[22.11.25 20:06:24,26] [OK] Vite установлен 
+[22.11.25 20:06:24,27]  
+[22.11.25 20:06:24,28] [5/6] Обновление скриптов в package.json... 
+[22.11.25 20:06:24,90] [OK] Скрипты обновлены 
+[22.11.25 20:06:24,91]  
+[22.11.25 20:06:24,92] [6/6] Выполнение сборки (npm run build)... 
+
+> waybill-app@1.0.0 build
+> vite build
+
+[36mvite v5.4.21 [32mbuilding for production...[36m[39m
+
+/index.css doesn't exist at build time, it will remain unchanged to be resolved at runtime
+transforming...
+[32m✓[39m 903 modules transformed.
+rendering chunks...
+computing gzip size...
+[2mdist/[22m[32mindex.html                             [39m[1m[2m  2.28 kB[22m[1m[22m[2m │ gzip:   0.84 kB[22m
+[2mdist/[22m[36massets/useToast-C4E7UBhH.js            [39m[1m[2m  0.24 kB[22m[1m[22m[2m │ gzip:   0.21 kB[22m[2m │ map:     0.60 kB[22m
+[2mdist/[22m[36massets/useTable-B6PQnuv0.js            [39m[1m[2m  0.84 kB[22m[1m[22m[2m │ gzip:   0.51 kB[22m[2m │ map:     4.16 kB[22m
+[2mdist/[22m[36massets/CollapsibleSection-CF0Qh4dZ.js  [39m[1m[2m  0.95 kB[22m[1m[22m[2m │ gzip:   0.50 kB[22m[2m │ map:     1.89 kB[22m
+[2mdist/[22m[36massets/About-DuGJjgUN.js               [39m[1m[2m  1.13 kB[22m[1m[22m[2m │ gzip:   0.73 kB[22m[2m │ map:     1.93 kB[22m
+[2mdist/[22m[36massets/BusinessAuditLog-B3HU5sK5.js    [39m[1m[2m  1.51 kB[22m[1m[22m[2m │ gzip:   0.76 kB[22m[2m │ map:     3.86 kB[22m
+[2mdist/[22m[36massets/CapabilitiesGuide-B70yjbFC.js   [39m[1m[2m  1.53 kB[22m[1m[22m[2m │ gzip:   0.76 kB[22m[2m │ map:     3.84 kB[22m
+[2mdist/[22m[36massets/ConfirmationModal-CgC9fisK.js   [39m[1m[2m  3.61 kB[22m[1m[22m[2m │ gzip:   1.59 kB[22m[2m │ map:     8.79 kB[22m
+[2mdist/[22m[36massets/RoleManagement-CPKJdt9G.js      [39m[1m[2m  3.86 kB[22m[1m[22m[2m │ gzip:   1.73 kB[22m[2m │ map:    11.84 kB[22m
+[2mdist/[22m[36massets/UserManagement-tj-Uvyo5.js      [39m[1m[2m  4.90 kB[22m[1m[22m[2m │ gzip:   2.16 kB[22m[2m │ map:    13.81 kB[22m
+[2mdist/[22m[36massets/AdminGuide-BaaKn9Ka.js          [39m[1m[2m  5.60 kB[22m[1m[22m[2m │ gzip:   3.34 kB[22m[2m │ map:     7.52 kB[22m
+[2mdist/[22m[36massets/Reports-BqBtKE7v.js             [39m[1m[2m  7.01 kB[22m[1m[22m[2m │ gzip:   2.91 kB[22m[2m │ map:    21.89 kB[22m
+[2mdist/[22m[36massets/UserGuide-Ci6aW3yH.js           [39m[1m[2m  7.33 kB[22m[1m[22m[2m │ gzip:   3.10 kB[22m[2m │ map:    12.67 kB[22m
+[2mdist/[22m[36massets/TestingGuide-CP05Cr-Z.js        [39m[1m[2m  7.48 kB[22m[1m[22m[2m │ gzip:   4.33 kB[22m[2m │ map:     9.73 kB[22m
+[2mdist/[22m[36massets/DeveloperGuide-CbtOpiJF.js      [39m[1m[2m  8.72 kB[22m[1m[22m[2m │ gzip:   3.96 kB[22m[2m │ map:    13.60 kB[22m
+[2mdist/[22m[36massets/BusinessLogicGuide-C4n1XCK4.js  [39m[1m[2m  8.84 kB[22m[1m[22m[2m │ gzip:   4.65 kB[22m[2m │ map:    10.53 kB[22m
+[2mdist/[22m[36massets/StorageManagement-rTcrPirw.js   [39m[1m[2m  9.17 kB[22m[1m[22m[2m │ gzip:   3.28 kB[22m[2m │ map:    25.26 kB[22m
+[2mdist/[22m[36massets/WaybillList-CkWVZ-79.js         [39m[1m[2m 15.31 kB[22m[1m[22m[2m │ gzip:   4.45 kB[22m[2m │ map:    39.97 kB[22m
+[2mdist/[22m[36massets/BlankManagement-Dh_tXdWf.js     [39m[1m[2m 17.14 kB[22m[1m[22m[2m │ gzip:   5.88 kB[22m[2m │ map:    52.83 kB[22m
+[2mdist/[22m[36massets/GarageManagement-x94LcSXq.js    [39m[1m[2m 18.14 kB[22m[1m[22m[2m │ gzip:   5.83 kB[22m[2m │ map:    55.49 kB[22m
+[2mdist/[22m[36massets/zod-wwrgPRIi.js                 [39m[1m[2m 32.25 kB[22m[1m[22m[2m │ gzip:  11.81 kB[22m[2m │ map:   173.23 kB[22m
+[2mdist/[22m[36massets/Dictionaries-DKXXXcSG.js        [39m[1m[2m 54.18 kB[22m[1m[22m[2m │ gzip:  12.44 kB[22m[2m │ map:   150.59 kB[22m
+[2mdist/[22m[36massets/Admin-RTiXawTe.js               [39m[1m[2m 70.61 kB[22m[1m[22m[2m │ gzip:  20.73 kB[22m[2m │ map:   204.85 kB[22m
+[2mdist/[22m[36massets/WaybillDetail-BFTSpHD_.js       [39m[1m[2m106.97 kB[22m[1m[22m[2m │ gzip:  29.73 kB[22m[2m │ map:   315.96 kB[22m
+[2mdist/[22m[36massets/index-BZpJbZ00.js               [39m[1m[2m328.84 kB[22m[1m[22m[2m │ gzip:  98.50 kB[22m[2m │ map: 1,398.08 kB[22m
+[2mdist/[22m[36massets/Dashboard-CVGRK1O5.js           [39m[1m[2m379.33 kB[22m[1m[22m[2m │ gzip: 105.77 kB[22m[2m │ map: 1,672.19 kB[22m
+[32m✓ built in 2.98s[39m
+[22.11.25 20:06:28,45] [OK] Готово к запуску 
+[22.11.25 20:06:28,46]  
+[22.11.25 20:06:28,47] ============================================== 
+[22.11.25 20:06:28,47]   Запуск dev-сервера Vite 
+[22.11.25 20:06:28,48] ============================================== 
+[22.11.25 20:06:28,49]  
+[22.11.25 20:06:28,50] Запуск npm run dev... 

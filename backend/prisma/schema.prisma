@@ -1,0 +1,585 @@
+// ============================================================================
+// Prisma Schema - Минимальные критичные исправления
+// ============================================================================
+// Версия: 2.1 (safe migration)
+// Изменения от v2.0:
+//   - UUID: uuid() вместо gen_random_uuid() (не требует pgcrypto)
+//   - WaybillStatus: выровнен с frontend
+//   - BlankStatus: выровнен с frontend
+//   - onDelete: explicit Restrict/SetNull policies
+// ============================================================================
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// ============================================================================
+// ENUMS - Выровнены с frontend types.ts
+// ============================================================================
+
+enum StockMovementType {
+  INCOME
+  EXPENSE
+  ADJUSTMENT
+}
+
+/// Выровнено с frontend: AVAILABLE вместо FREE, добавлены RESERVED/RETURNED
+enum BlankStatus {
+  AVAILABLE // было: FREE
+  ISSUED
+  RESERVED // добавлено
+  USED
+  RETURNED // добавлено
+  SPOILED // было: DAMAGED/LOST
+}
+
+/// Выровнено с frontend: SUBMITTED вместо APPROVED, POSTED вместо COMPLETED
+enum WaybillStatus {
+  DRAFT
+  SUBMITTED // было: APPROVED
+  POSTED // было: COMPLETED/IN_PROGRESS/ISSUED
+  CANCELLED
+}
+
+enum AuditActionType {
+  CREATE
+  UPDATE
+  DELETE
+  STATUS_CHANGE
+  LOGIN
+  LOGOUT
+}
+
+// ============================================================================
+// ОРГАНИЗАЦИИ И ПОДРАЗДЕЛЕНИЯ
+// ============================================================================
+
+model Organization {
+  id        String   @id @default(uuid()) @db.Uuid // Изменено: uuid() вместо gen_random_uuid()
+  name      String   @db.Text  // Deprecated, use shortName
+  shortName String?  @db.Text
+  fullName  String?  @db.Text
+  inn       String?  @db.VarChar(12)
+  kpp       String?  @db.VarChar(9)
+  ogrn      String?  @db.VarChar(15)
+  address   String?  @db.Text
+  registrationDate String? @db.Text
+  contactPerson String? @db.Text
+  phone     String?  @db.Text
+  email     String?  @db.Text
+  bankAccount String? @db.Text
+  bankName  String?  @db.Text
+  bankBik   String?  @db.VarChar(9)
+  correspondentAccount String? @db.Text
+  accountCurrency String? @db.Text
+  paymentPurpose String? @db.Text
+  status    String   @default("Active") @db.Text
+  group     String?  @db.Text
+  notes     String?  @db.Text
+  medicalLicenseNumber String? @db.Text
+  medicalLicenseIssueDate String? @db.Text
+  createdAt DateTime @default(now()) @db.Timestamp(6)
+  updatedAt DateTime @default(now()) @updatedAt @db.Timestamp(6)
+
+  departments    Department[]
+  users          User[]
+  employees      Employee[]
+  vehicles       Vehicle[]
+  fuelCards      FuelCard[]
+  stockItems     StockItem[]
+  warehouses     Warehouse[]
+  blankBatches   BlankBatch[]
+  blanks         Blank[]
+  waybills       Waybill[]
+  stockMovements StockMovement[]
+  auditLogs      AuditLog[]
+
+  @@map("organizations")
+}
+
+model Department {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @db.Uuid
+  code           String?  @db.Text
+  name           String   @db.Text
+  address        String?  @db.Text
+  createdAt      DateTime @default(now()) @db.Timestamp(6)
+  updatedAt      DateTime @default(now()) @updatedAt @db.Timestamp(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  users        User[]
+  employees    Employee[]
+  vehicles     Vehicle[]
+  warehouses   Warehouse[]
+  blankBatches BlankBatch[]
+  blanks       Blank[]
+  waybills     Waybill[]
+
+  @@map("departments")
+}
+
+// ============================================================================
+// ПОЛЬЗОВАТЕЛИ И RBAC
+// ============================================================================
+
+model User {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @db.Uuid
+  departmentId   String?  @db.Uuid
+  email          String   @unique @db.Text
+  passwordHash   String   @db.Text
+  fullName       String   @db.Text
+  isActive       Boolean  @default(true)
+  isSystem       Boolean  @default(false)  // System users cannot be deleted
+  createdAt      DateTime @default(now()) @db.Timestamp(6)
+  updatedAt      DateTime @default(now()) @updatedAt @db.Timestamp(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  department   Department?  @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+
+  roles                 UserRole[]
+  createdWaybills       Waybill[]       @relation("WaybillCreatedBy")
+  approvedWaybills      Waybill[]       @relation("WaybillApprovedBy")
+  completedWaybills     Waybill[]       @relation("WaybillCompletedBy")
+  createdStockMovements StockMovement[] @relation("StockMovementCreatedBy")
+  createdBlankBatches   BlankBatch[]
+  auditLogs             AuditLog[]
+  refreshTokens         RefreshToken[]
+
+  @@map("users")
+}
+
+model Role {
+  id          String  @id @default(uuid()) @db.Uuid
+  code        String  @unique @db.Text
+  name        String  @db.Text
+  description String? @db.Text
+
+  rolePermissions RolePermission[]
+  userRoles       UserRole[]
+
+  @@map("roles")
+}
+
+model Permission {
+  id          String  @id @default(uuid()) @db.Uuid
+  code        String  @unique @db.Text
+  description String? @db.Text
+
+  rolePermissions RolePermission[]
+
+  @@map("permissions")
+}
+
+model RolePermission {
+  roleId       String @db.Uuid
+  permissionId String @db.Uuid
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+model UserRole {
+  userId String @db.Uuid
+  roleId String @db.Uuid
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+  @@map("user_roles")
+}
+
+// ============================================================================
+// СОТРУДНИКИ И ВОДИТЕЛИ
+// ============================================================================
+
+model Employee {
+  id                           String    @id @default(uuid()) @db.Uuid
+  organizationId               String    @db.Uuid
+  departmentId                 String?   @db.Uuid
+  
+  fullName                     String    @db.Text
+  shortName                    String?   @db.Text
+  employeeType                 String    @default("driver") @db.Text  // driver, dispatcher, controller, etc.
+  position                     String?   @db.Text
+  status                       String    @default("Active") @db.Text  // Active, Inactive
+  
+  phone                        String?   @db.Text
+  address                      String?   @db.Text
+  email                        String?   @db.Text
+  dateOfBirth                  String?   @db.Text  // stored as string in frontend
+  
+  personnelNumber              String?   @db.Text
+  snils                        String?   @db.Text
+  
+  licenseCategory              String?   @db.Text
+  documentNumber               String?   @db.Text
+  documentExpiry               String?   @db.Text  // date as string
+  
+  medicalCertificateSeries     String?   @db.Text
+  medicalCertificateNumber     String?   @db.Text
+  medicalCertificateIssueDate  String?   @db.Text  // date as string
+  medicalCertificateExpiryDate String?   @db.Text  // date as string
+  medicalInstitutionId         String?   @db.Uuid
+  
+  driverCardType               String?   @db.Text
+  driverCardNumber             String?   @db.Text
+  driverCardStartDate          String?   @db.Text  // date as string
+  driverCardExpiryDate         String?   @db.Text  // date as string
+  
+  fuelCardNumber               String?   @db.Text
+  fuelCardBalance              Float     @default(0) @db.DoublePrecision
+  
+  dispatcherId                 String?   @db.Uuid
+  controllerId                 String?   @db.Uuid
+  
+  notes                        String?   @db.Text
+  isActive                     Boolean   @default(true)
+  
+  createdAt                    DateTime  @default(now()) @db.Timestamp(6)
+  updatedAt                    DateTime  @default(now()) @updatedAt @db.Timestamp(6)
+
+  organization         Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  department           Department?   @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  dispatcher           Employee?     @relation("EmployeeDispatcher", fields: [dispatcherId], references: [id], onDelete: SetNull)
+  controller           Employee?     @relation("EmployeeController", fields: [controllerId], references: [id], onDelete: SetNull)
+  
+  assignedDrivers      Employee[]    @relation("EmployeeDispatcher")
+  controlledEmployees  Employee[]    @relation("EmployeeController")
+  driver               Driver?
+
+  @@map("employees")
+}
+
+model Driver {
+  id              String    @id @default(uuid()) @db.Uuid
+  employeeId      String    @unique @db.Uuid
+  licenseNumber   String    @db.Text
+  licenseCategory String?   @db.Text
+  licenseValidTo  DateTime? @db.Date
+  createdAt       DateTime  @default(now()) @db.Timestamp(6)
+  updatedAt       DateTime  @default(now()) @updatedAt @db.Timestamp(6)
+
+  employee     Employee   @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  waybills     Waybill[]
+  fuelCards    FuelCard[] @relation("FuelCardDriver")
+  blanksIssued Blank[]    @relation("BlankIssuedToDriver")
+
+  @@map("drivers")
+}
+
+// ============================================================================
+// ТРАНСПОРТ И ТОПЛИВНЫЕ КАРТЫ
+// ============================================================================
+
+model Vehicle {
+  id                 String   @id @default(uuid()) @db.Uuid
+  organizationId     String   @db.Uuid
+  departmentId       String?  @db.Uuid
+  code               String?  @db.Text
+  registrationNumber String   @db.Text
+  brand              String?  @db.Text
+  model              String?  @db.Text
+  vin                String?  @db.Text
+  fuelType           String?  @db.Text
+  fuelTankCapacity   Decimal? @db.Decimal(10, 2)
+  isActive           Boolean  @default(true)
+  createdAt          DateTime @default(now()) @db.Timestamp(6)
+  updatedAt          DateTime @default(now()) @updatedAt @db.Timestamp(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  department   Department?  @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  waybills     Waybill[]
+  fuelCards    FuelCard[]   @relation("FuelCardVehicle")
+  blanksIssued Blank[]      @relation("BlankIssuedToVehicle")
+
+  @@map("vehicles")
+}
+
+model FuelCard {
+  id                  String   @id @default(uuid()) @db.Uuid
+  organizationId      String   @db.Uuid
+  cardNumber          String   @unique @db.Text
+  provider            String?  @db.Text
+  isActive            Boolean  @default(true)
+  assignedToDriverId  String?  @db.Uuid
+  assignedToVehicleId String?  @db.Uuid
+  createdAt           DateTime @default(now()) @db.Timestamp(6)
+  updatedAt           DateTime @default(now()) @updatedAt @db.Timestamp(6)
+
+  organization      Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  assignedToDriver  Driver?      @relation("FuelCardDriver", fields: [assignedToDriverId], references: [id], onDelete: SetNull)
+  assignedToVehicle Vehicle?     @relation("FuelCardVehicle", fields: [assignedToVehicleId], references: [id], onDelete: SetNull)
+  waybills          Waybill[]
+
+  @@map("fuel_cards")
+}
+
+// ============================================================================
+// СКЛАДСКОЙ УЧЁТ
+// ============================================================================
+
+model StockItem {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @db.Uuid
+  code           String?  @db.Text
+  name           String   @db.Text
+  unit           String   @db.Text
+  isFuel         Boolean  @default(false)
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now()) @db.Timestamp(6)
+  updatedAt      DateTime @default(now()) @updatedAt @db.Timestamp(6)
+
+  organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  stockMovements StockMovement[]
+  waybillFuel    WaybillFuel[]
+
+  @@map("stock_items")
+}
+
+model Warehouse {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @db.Uuid
+  departmentId   String?  @db.Uuid
+  name           String   @db.Text
+  address        String?  @db.Text
+  createdAt      DateTime @default(now()) @db.Timestamp(6)
+  updatedAt      DateTime @default(now()) @updatedAt @db.Timestamp(6)
+
+  organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  department     Department?     @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  stockMovements StockMovement[]
+
+  @@map("warehouses")
+}
+
+model FuelType {
+  id          String   @id @default(uuid()) @db.Uuid
+  code        String   @unique @db.VarChar(20)  // AI-92, DT
+  name        String   @db.Text                  // Бензин АИ-92
+  density     Float?   @db.DoublePrecision       // плотность
+  createdAt   DateTime @default(now()) @db.Timestamp(6)
+  updatedAt   DateTime @updatedAt @db.Timestamp(6)
+  
+  waybillFuels WaybillFuel[]
+  
+  @@map("fuel_types")
+}
+
+model Route {
+  id              String   @id @default(uuid()) @db.Uuid
+  name            String   @db.Text              // "Москва - Санкт-Петербург"
+  startPoint      String?  @db.Text
+  endPoint        String?  @db.Text
+  distance        Float?   @db.DoublePrecision   // км
+  estimatedTime   Int?                           // минуты
+  createdAt       DateTime @default(now()) @db.Timestamp(6)
+  updatedAt       DateTime @updatedAt @db.Timestamp(6)
+  
+  waybillRoutes WaybillRoute[]
+  
+  @@map("routes")
+}
+
+model StockMovement {
+  id              String            @id @default(uuid()) @db.Uuid
+  organizationId  String            @db.Uuid
+  warehouseId     String?           @db.Uuid
+  stockItemId     String            @db.Uuid
+  movementType    StockMovementType
+  quantity        Decimal           @db.Decimal(14, 3)
+  documentType    String?           @db.Text
+  documentId      String?           @db.Uuid
+  comment         String?           @db.Text
+  createdByUserId String?           @db.Uuid
+  createdAt       DateTime          @default(now()) @db.Timestamp(6)
+
+  organization  Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  warehouse     Warehouse?   @relation(fields: [warehouseId], references: [id], onDelete: SetNull)
+  stockItem     StockItem    @relation(fields: [stockItemId], references: [id], onDelete: Restrict)
+  createdByUser User?        @relation("StockMovementCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+
+  @@map("stock_movements")
+}
+
+// ============================================================================
+// БЛАНКИ БСО
+// ============================================================================
+
+model BlankBatch {
+  id              String   @id @default(uuid()) @db.Uuid
+  organizationId  String   @db.Uuid
+  departmentId    String?  @db.Uuid
+  series          String?  @db.Text
+  numberFrom      Int
+  numberTo        Int
+  createdByUserId String?  @db.Uuid
+  createdAt       DateTime @default(now()) @db.Timestamp(6)
+
+  organization  Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  department    Department?  @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  createdByUser User?        @relation(fields: [createdByUserId], references: [id], onDelete: SetNull)
+  blanks        Blank[]
+
+  @@map("blank_batches")
+}
+
+model Blank {
+  id                String      @id @default(uuid()) @db.Uuid
+  organizationId    String      @db.Uuid
+  departmentId      String?     @db.Uuid
+  batchId           String?     @db.Uuid
+  series            String?     @db.Text
+  number            Int
+  status            BlankStatus @default(AVAILABLE) // Изменено: AVAILABLE вместо FREE
+  issuedToDriverId  String?     @db.Uuid
+  issuedToVehicleId String?     @db.Uuid
+  issuedAt          DateTime?   @db.Timestamp(6)
+  usedAt            DateTime?   @db.Timestamp(6)
+  damagedReason     String?     @db.Text
+  createdAt         DateTime    @default(now()) @db.Timestamp(6)
+  updatedAt         DateTime    @default(now()) @updatedAt @db.Timestamp(6)
+
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  department      Department?  @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  batch           BlankBatch?  @relation(fields: [batchId], references: [id], onDelete: SetNull)
+  issuedToDriver  Driver?      @relation("BlankIssuedToDriver", fields: [issuedToDriverId], references: [id], onDelete: SetNull)
+  issuedToVehicle Vehicle?     @relation("BlankIssuedToVehicle", fields: [issuedToVehicleId], references: [id], onDelete: SetNull)
+  waybills        Waybill[]
+
+  @@unique([organizationId, series, number])
+  @@map("blanks")
+}
+
+// ============================================================================
+// ПУТЕВЫЕ ЛИСТЫ
+// ============================================================================
+
+model Waybill {
+  id                String        @id @default(uuid()) @db.Uuid
+  organizationId    String        @db.Uuid
+  departmentId      String?       @db.Uuid
+  number            String        @db.Text
+  date              DateTime      @db.Date
+  vehicleId         String        @db.Uuid
+  driverId          String        @db.Uuid
+  fuelCardId        String?       @db.Uuid
+  blankId           String?       @db.Uuid
+  status            WaybillStatus @default(DRAFT) // Enum выровнен с frontend
+  odometerStart     Decimal?      @db.Decimal(10, 1)
+  odometerEnd       Decimal?      @db.Decimal(10, 1)
+  plannedRoute      String?       @db.Text
+  notes             String?       @db.Text
+  createdByUserId   String?       @db.Uuid
+  approvedByUserId  String?       @db.Uuid
+  completedByUserId String?       @db.Uuid
+  createdAt         DateTime      @default(now()) @db.Timestamp(6)
+  updatedAt         DateTime      @default(now()) @updatedAt @db.Timestamp(6)
+
+  // Изменено: explicit onDelete policies
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  department      Department?  @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  vehicle         Vehicle      @relation(fields: [vehicleId], references: [id], onDelete: Restrict)
+  driver          Driver       @relation(fields: [driverId], references: [id], onDelete: Restrict)
+  fuelCard        FuelCard?    @relation(fields: [fuelCardId], references: [id], onDelete: SetNull)
+  blank           Blank?       @relation(fields: [blankId], references: [id], onDelete: SetNull)
+  createdByUser   User?        @relation("WaybillCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  approvedByUser  User?        @relation("WaybillApprovedBy", fields: [approvedByUserId], references: [id], onDelete: SetNull)
+  completedByUser User?        @relation("WaybillCompletedBy", fields: [completedByUserId], references: [id], onDelete: SetNull)
+
+  routes    WaybillRoute[]
+  fuelLines WaybillFuel[]
+
+  @@unique([organizationId, departmentId, number, date])
+  @@map("waybills")
+}
+
+model WaybillRoute {
+  id          String   @id @default(uuid()) @db.Uuid
+  waybillId   String   @db.Uuid
+  routeId     String?  @db.Uuid
+  legOrder    Int
+  fromPoint   String?  @db.Text
+  toPoint     String?  @db.Text
+  distanceKm  Decimal? @db.Decimal(10, 2)
+  plannedTime String?  @db.Text
+  actualTime  String?  @db.Text
+  comment     String?  @db.Text
+
+  waybill Waybill @relation(fields: [waybillId], references: [id], onDelete: Cascade)
+  route   Route?  @relation(fields: [routeId], references: [id], onDelete: SetNull)
+
+  @@map("waybill_routes")
+}
+
+model WaybillFuel {
+  id           String   @id @default(uuid()) @db.Uuid
+  waybillId    String   @db.Uuid
+  stockItemId  String   @db.Uuid
+  fuelTypeId   String?  @db.Uuid
+  fuelStart    Decimal? @db.Decimal(10, 2)
+  fuelReceived Decimal? @db.Decimal(10, 2)
+  fuelConsumed Decimal? @db.Decimal(10, 2)
+  fuelEnd      Decimal? @db.Decimal(10, 2)
+  comment      String?  @db.Text
+
+  waybill   Waybill    @relation(fields: [waybillId], references: [id], onDelete: Cascade)
+  stockItem StockItem  @relation(fields: [stockItemId], references: [id], onDelete: Restrict)
+  fuelType  FuelType?  @relation(fields: [fuelTypeId], references: [id], onDelete: SetNull)
+
+  @@map("waybill_fuel")
+}
+
+// ============================================================================
+// АУДИТ И АУТЕНТИФИКАЦИЯ
+// ============================================================================
+
+model AuditLog {
+  id             String          @id @default(uuid()) @db.Uuid
+  organizationId String?         @db.Uuid
+  userId         String?         @db.Uuid
+  actionType     AuditActionType
+  entityType     String          @db.Text
+  entityId       String?         @db.Uuid
+  description    String?         @db.Text
+  oldValue       Json?
+  newValue       Json?
+  createdAt      DateTime        @default(now()) @db.Timestamp(6)
+
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  user         User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@map("audit_log")
+}
+
+model RefreshToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @db.Uuid
+  tokenHash String    @db.Text
+  createdAt DateTime  @default(now()) @db.Timestamp(6)
+  expiresAt DateTime  @db.Timestamp(6)
+  revokedAt DateTime? @db.Timestamp(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("refresh_tokens")
+}
+
+/// Настройки приложения (key-value с JSON значением)
+model Setting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @default(now()) @updatedAt @db.Timestamp(6)
+
+  @@map("settings")
+}
+
