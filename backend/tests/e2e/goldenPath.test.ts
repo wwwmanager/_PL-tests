@@ -286,4 +286,118 @@ describe('Golden Path: Blanks → Waybill → Posted', () => {
 
         console.log('✅ Golden path test passed!');
     }, 30000); // 30 second timeout
+
+    /**
+     * GP-03: Cancel/Delete DRAFT returns blank to ISSUED
+     * Critical: Prevents "blanks stuck in RESERVED" issue
+     */
+    it('GP-03: should return blank to ISSUED status when deleting DRAFT waybill', async () => {
+        const testSuffix = Date.now().toString() + '-gp03';
+
+        // Setup: Create minimal entities for this test
+        const org = await prisma.organization.create({
+            data: { name: `E2E GP03 ${testSuffix}`, shortName: `GP03-${testSuffix}` }
+        });
+        createdIds.organizationId = org.id;
+
+        const dept = await prisma.department.create({
+            data: { organizationId: org.id, name: `GP03 Dept` }
+        });
+        createdIds.departmentId = dept.id;
+
+        const employee = await prisma.employee.create({
+            data: {
+                organizationId: org.id,
+                departmentId: dept.id,
+                fullName: `GP03 Driver ${testSuffix}`,
+                employeeType: 'driver',
+                isActive: true
+            }
+        });
+        createdIds.employeeId = employee.id;
+
+        const driver = await prisma.driver.create({
+            data: {
+                employeeId: employee.id,
+                licenseNumber: `GP03-${testSuffix}`,
+                licenseCategory: 'B'
+            }
+        });
+        createdIds.driverId = driver.id;
+
+        const vehicle = await prisma.vehicle.create({
+            data: {
+                organizationId: org.id,
+                departmentId: dept.id,
+                registrationNumber: `GP03-${testSuffix}`,
+                fuelConsumptionRates: { summerRate: 10, winterRate: 12 }
+            }
+        });
+        createdIds.vehicleId = vehicle.id;
+
+        // Create blank batch with one blank
+        const batch = await prisma.blankBatch.create({
+            data: {
+                organizationId: org.id,
+                departmentId: dept.id,
+                series: 'GP03',
+                numberFrom: 1,
+                numberTo: 1
+            }
+        });
+        createdIds.batchId = batch.id;
+
+        // Create and issue blank to driver
+        const blank = await prisma.blank.create({
+            data: {
+                organizationId: org.id,
+                batchId: batch.id,
+                series: 'GP03',
+                number: 1,
+                status: BlankStatus.ISSUED,
+                issuedToDriverId: driver.id,
+                issuedAt: new Date()
+            }
+        });
+
+        // Create waybill (blank becomes RESERVED)
+        const userInfo: UserInfo = {
+            id: 'test-user-gp03',
+            organizationId: org.id,
+            departmentId: dept.id,
+            role: 'dispatcher',
+            employeeId: null
+        };
+
+        const waybill = await createWaybill(userInfo, {
+            vehicleId: vehicle.id,
+            driverId: driver.id,
+            date: new Date().toISOString().slice(0, 10),
+            odometerStart: 1000,
+            odometerEnd: 1100
+        });
+        createdIds.waybillId = waybill.id;
+
+        // Verify blank is RESERVED
+        const blankAfterCreate = await prisma.blank.findUnique({ where: { id: blank.id } });
+        expect(blankAfterCreate?.status).toBe(BlankStatus.RESERVED);
+
+        // Delete the waybill
+        await prisma.waybillFuel.deleteMany({ where: { waybillId: waybill.id } });
+        await prisma.waybillRoute.deleteMany({ where: { waybillId: waybill.id } });
+
+        // Import deleteWaybill service or call releaseBlank directly
+        const { releaseBlank } = await import('../../src/services/blankService');
+        await releaseBlank(org.id, blank.id);
+
+        await prisma.waybill.delete({ where: { id: waybill.id } });
+        createdIds.waybillId = undefined;
+
+        // CRITICAL CHECK: Blank should be back to ISSUED (not AVAILABLE)
+        const blankAfterDelete = await prisma.blank.findUnique({ where: { id: blank.id } });
+        expect(blankAfterDelete?.status).toBe(BlankStatus.ISSUED);
+        expect(blankAfterDelete?.issuedToDriverId).toBe(driver.id);
+
+        console.log('✅ GP-03: Blank correctly returned to ISSUED status');
+    }, 30000);
 });

@@ -571,16 +571,17 @@ export async function releaseBlank(
             throw new Error('Бланк не найден или не находится в статусе RESERVED');
         }
 
+        // GP-03: Return blank to ISSUED status (back to driver), NOT AVAILABLE
+        // This allows the driver to use the blank for a new waybill
         await tx.blank.update({
             where: { id: blank.id },
             data: {
-                status: BlankStatus.AVAILABLE,
-                issuedToDriverId: null,
-                issuedAt: null
+                status: BlankStatus.ISSUED,
+                // Keep issuedToDriverId - blank stays with the driver
             }
         });
 
-        return { success: true, message: `Бланк ${blank.series} -${blank.number} освобождён` };
+        return { success: true, message: `Бланк ${blank.series}-${blank.number} возвращён водителю` };
     });
 }
 
