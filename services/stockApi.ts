@@ -201,6 +201,25 @@ export async function getFuelCardBalance(driverId: string): Promise<number> {
 }
 
 /**
+ * REL-602: Get fuel cards assigned to a driver
+ */
+export interface FuelCardInfo {
+    id: string;
+    cardNumber: string;
+    provider: string | null;
+}
+
+export async function getFuelCardsForDriver(driverId: string): Promise<FuelCardInfo[]> {
+    try {
+        const response = await httpClient.get<{ data: FuelCardInfo[] }>(`/fuel-cards/driver/${driverId}`);
+        return response.data || [];
+    } catch {
+        console.error('[stockApi] getFuelCardsForDriver error');
+        return [];
+    }
+}
+
+/**
  * Get available fuel expenses for a driver
  */
 export async function getAvailableFuelExpenses(

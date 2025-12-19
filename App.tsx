@@ -3,8 +3,11 @@ import React, { Suspense, lazy } from 'react';
 import * as Sentry from '@sentry/react';
 import { AuthProvider, useAuth } from './services/auth';
 import { ToastProvider } from './contexts/ToastContext';
+import { MeProvider } from './contexts/MeContext';
 import LoadingSpinner from './components/common/LoadingSpinner';
+import { ContextBar } from './components/common/ContextBar';
 import Login from './components/auth/Login';
+
 
 const Dashboard = lazy(() => import('./components/dashboard/Dashboard'));
 const WaybillList = lazy(() => import('./components/waybills/WaybillList'));
@@ -26,7 +29,7 @@ type Page =
   | 'admin';
 
 const AppContent: React.FC = () => {
-  const { currentUser, logout, appSettings } = useAuth();
+  const { currentUser, logout, logoutAll, appSettings } = useAuth();
   const [currentPage, setCurrentPage] = React.useState<Page>('dashboard');
   const [selectedWaybillId, setSelectedWaybillId] = React.useState<string | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = React.useState(true);
@@ -85,8 +88,18 @@ const AppContent: React.FC = () => {
             <li><button onClick={() => setCurrentPage('admin')} className={`w-full text-left px-6 py-3 hover:bg-gray-100 dark:hover:bg-gray-700 ${currentPage === 'admin' ? 'bg-blue-50 dark:bg-blue-900 border-r-4 border-blue-500' : ''}`}>Настройки</button></li>
           </ul>
         </nav>
-        <div className="p-4 border-t dark:border-gray-700">
-          <button onClick={logout} className="w-full px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600">Выйти</button>
+        <div className="p-4 border-t dark:border-gray-700 space-y-2">
+          <button onClick={logout} className="w-full px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600">Выйти</button>
+          <button
+            onClick={() => {
+              if (window.confirm('Это завершит все ваши активные сессии на других устройствах. Текущее устройство тоже будет разлогинено. Продолжить?')) {
+                logoutAll();
+              }
+            }}
+            className="w-full px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 text-xs"
+          >
+            Выйти со всех устройств
+          </button>
         </div>
       </aside>
 
@@ -103,11 +116,15 @@ const AppContent: React.FC = () => {
             {currentUser.displayName} ({currentUser.role})
           </div>
         </header>
+        {/* REL-001: Context Bar showing organization, department, role */}
+        <ContextBar />
         <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-100 dark:bg-gray-900 p-4 sm:p-6 lg:p-8">
+
           <Suspense fallback={<LoadingSpinner />}>
             {renderPage()}
           </Suspense>
         </main>
+
       </div>
     </div>
   );
@@ -134,13 +151,16 @@ const App: React.FC = () => {
     <Sentry.ErrorBoundary fallback={<ErrorFallback />}>
       <ToastProvider>
         <AuthProvider>
-          <Suspense fallback={<LoadingSpinner />}>
-            <AppContent />
-          </Suspense>
+          <MeProvider>
+            <Suspense fallback={<LoadingSpinner />}>
+              <AppContent />
+            </Suspense>
+          </MeProvider>
         </AuthProvider>
       </ToastProvider>
     </Sentry.ErrorBoundary>
   );
 };
+
 
 export default App;

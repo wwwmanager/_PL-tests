@@ -235,6 +235,27 @@ export async function assignFuelCard(
 }
 
 /**
+ * REL-601: Get fuel cards assigned to a specific driver
+ * @param driverId - Driver ID (references Driver table)
+ * @returns List of fuel cards
+ */
+export async function getFuelCardsForDriver(organizationId: string, driverId: string) {
+    return prisma.fuelCard.findMany({
+        where: {
+            organizationId,
+            assignedToDriverId: driverId,
+            isActive: true
+        },
+        select: {
+            id: true,
+            cardNumber: true,
+            provider: true
+        },
+        orderBy: { cardNumber: 'asc' }
+    });
+}
+
+/**
  * Проверяет, что карта принадлежит организации пользователя
  */
 async function ensureSameOrg(user: AuthUser, id: string) {

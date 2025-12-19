@@ -324,3 +324,657 @@
 [2025-12-18T14:47:33.677Z] 🌐 [employeeController] GET /employees - User Org: 9f8f0970-34fa-49d9-a507-b4177f2bab0b, Query: {}
 [2025-12-18T14:47:33.681Z] 🌐 Found 1 vehicles for org 9f8f0970-34fa-49d9-a507-b4177f2bab0b
 [2025-12-18T14:47:33.683Z] 🌐 [employeeController] Found 3 employees
+[2025-12-18T15:02:00.796Z] 🌐 GET /vehicles - User Org: 9f8f0970-34fa-49d9-a507-b4177f2bab0b, Dept: null
+[2025-12-18T15:02:00.805Z] 🌐 [employeeController] GET /employees - User Org: 9f8f0970-34fa-49d9-a507-b4177f2bab0b, Query: {}
+[2025-12-18T15:02:00.857Z] 🌐 Found 1 vehicles for org 9f8f0970-34fa-49d9-a507-b4177f2bab0b
+[2025-12-18T15:02:00.866Z] 🌐 GET /vehicles - User Org: 9f8f0970-34fa-49d9-a507-b4177f2bab0b, Dept: null
+[2025-12-18T15:02:00.871Z] 🌐 [employeeController] Found 3 employees
+[2025-12-18T15:02:00.872Z] 🌐 Found 1 vehicles for org 9f8f0970-34fa-49d9-a507-b4177f2bab0b
+[2025-12-18T15:02:00.879Z] 🌐 [employeeController] GET /employees - User Org: 9f8f0970-34fa-49d9-a507-b4177f2bab0b, Query: {}
+[2025-12-18T15:02:00.884Z] 🌐 [employeeController] Found 3 employees
+[2025-12-18T15:03:06.725Z] 🌐 GET /vehicles - User Org: 9f8f0970-34fa-49d9-a507-b4177f2bab0b, Dept: null
+[2025-12-18T15:03:06.732Z] 🌐 [employeeController] GET /employees - User Org: 9f8f0970-34fa-49d9-a507-b4177f2bab0b, Query: {}
+[2025-12-18T15:03:06.735Z] 🌐 Found 1 vehicles for org 9f8f0970-34fa-49d9-a507-b4177f2bab0b
+[2025-12-18T15:03:06.737Z] 🌐 [employeeController] Found 3 employees
+[2025-12-18T15:03:07.962Z] 🌐 [employeeController] GET /employees - User Org: 9f8f0970-34fa-49d9-a507-b4177f2bab0b, Query: {"isActive":"true"}
+[2025-12-18T15:03:07.967Z] 🌐 [employeeController] Found 1 employees
+[2025-12-18T15:03:07.970Z] 🌐 [employeeController] GET /employees - User Org: 9f8f0970-34fa-49d9-a507-b4177f2bab0b, Query: {"isActive":"true"}
+[2025-12-18T15:03:07.973Z] 🌐 [employeeController] Found 1 employees
+[2025-12-18T15:03:20.564Z] 🌐 [employeeController] GET /employees - User Org: 9f8f0970-34fa-49d9-a507-b4177f2bab0b, Query: {"isActive":"true"}
+[2025-12-18T15:03:20.572Z] 🌐 [employeeController] Found 1 employees
+[2025-12-18T15:03:21.635Z] 🌐 GET /vehicles - User Org: 9f8f0970-34fa-49d9-a507-b4177f2bab0b, Dept: null
+[2025-12-18T15:03:21.640Z] 🌐 [employeeController] GET /employees - User Org: 9f8f0970-34fa-49d9-a507-b4177f2bab0b, Query: {}
+[2025-12-18T15:03:21.641Z] 🌐 Found 1 vehicles for org 9f8f0970-34fa-49d9-a507-b4177f2bab0b
+[2025-12-18T15:03:21.645Z] 🌐 GET /vehicles - User Org: 9f8f0970-34fa-49d9-a507-b4177f2bab0b, Dept: null
+[2025-12-18T15:03:21.646Z] 🌐 [employeeController] Found 3 employees
+[2025-12-18T15:03:21.653Z] 🌐 Found 1 vehicles for org 9f8f0970-34fa-49d9-a507-b4177f2bab0b
+[2025-12-18T15:03:21.657Z] 🌐 [employeeController] GET /employees - User Org: 9f8f0970-34fa-49d9-a507-b4177f2bab0b, Query: {}
+[2025-12-18T15:03:21.660Z] 🌐 [employeeController] Found 3 employees
+[2025-12-18T15:03:27.643Z] 🌐 GET /vehicles - User Org: 9f8f0970-34fa-49d9-a507-b4177f2bab0b, Dept: null
+[2025-12-18T15:03:27.647Z] 🌐 Found 1 vehicles for org 9f8f0970-34fa-49d9-a507-b4177f2bab0b
+[2025-12-18T15:03:27.651Z] 🌐 GET /vehicles - User Org: 9f8f0970-34fa-49d9-a507-b4177f2bab0b, Dept: null
+[2025-12-18T15:03:27.654Z] 🌐 Found 1 vehicles for org 9f8f0970-34fa-49d9-a507-b4177f2bab0b
+[2025-12-18T15:03:29.109Z] 🌐 GET /vehicles - User Org: 9f8f0970-34fa-49d9-a507-b4177f2bab0b, Dept: null
+[2025-12-18T15:03:29.113Z] 🌐 Found 1 vehicles for org 9f8f0970-34fa-49d9-a507-b4177f2bab0b
+[2025-12-18T15:03:29.116Z] 🌐 GET /vehicles - User Org: 9f8f0970-34fa-49d9-a507-b4177f2bab0b, Dept: null
+[2025-12-18T15:03:29.120Z] 🌐 Found 1 vehicles for org 9f8f0970-34fa-49d9-a507-b4177f2bab0b
+[2025-12-18T15:03:30.280Z] 🌐 [employeeController] GET /employees - User Org: 9f8f0970-34fa-49d9-a507-b4177f2bab0b, Query: {}
+[2025-12-18T15:03:30.285Z] 🌐 [employeeController] Found 3 employees
+[2025-12-18T15:03:30.298Z] 🌐 [employeeController] GET /employees - User Org: 9f8f0970-34fa-49d9-a507-b4177f2bab0b, Query: {}
+[2025-12-18T15:03:30.302Z] 🌐 [employeeController] Found 3 employees
+[2025-12-18T15:03:32.449Z] 🌐 [employeeController] GET /employees - User Org: 9f8f0970-34fa-49d9-a507-b4177f2bab0b, Query: {}
+[2025-12-18T15:03:32.453Z] 🌐 [employeeController] Found 3 employees
+[2025-12-18T15:03:32.458Z] 🌐 [employeeController] GET /employees - User Org: 9f8f0970-34fa-49d9-a507-b4177f2bab0b, Query: {}
+[2025-12-18T15:03:32.463Z] 🌐 [employeeController] Found 3 employees
+[2025-12-18T15:03:35.912Z] 🌐 [employeeController] GET /employees - User Org: 9f8f0970-34fa-49d9-a507-b4177f2bab0b, Query: {"isActive":"true"}
+[2025-12-18T15:03:35.914Z] 🌐 [employeeController] Found 1 employees
+[2025-12-18T15:03:35.918Z] 🌐 [employeeController] GET /employees - User Org: 9f8f0970-34fa-49d9-a507-b4177f2bab0b, Query: {"isActive":"true"}
+[2025-12-18T15:03:35.921Z] 🌐 [employeeController] Found 1 employees
+[2025-12-18T15:04:44.568Z] 🌐 [employeeController] GET /employees - User Org: 9f8f0970-34fa-49d9-a507-b4177f2bab0b, Query: {}
+[2025-12-18T15:04:44.575Z] 🌐 [employeeController] Found 3 employees
+[2025-12-18T15:04:44.582Z] 🌐 [employeeController] GET /employees - User Org: 9f8f0970-34fa-49d9-a507-b4177f2bab0b, Query: {}
+[2025-12-18T15:04:44.588Z] 🌐 [employeeController] Found 3 employees
+[2025-12-18T15:04:45.923Z] 🌐 [employeeController] GET /employees - User Org: 9f8f0970-34fa-49d9-a507-b4177f2bab0b, Query: {}
+[2025-12-18T15:04:45.926Z] 🌐 [employeeController] Found 3 employees
+[2025-12-18T15:04:45.933Z] 🌐 [employeeController] GET /employees - User Org: 9f8f0970-34fa-49d9-a507-b4177f2bab0b, Query: {}
+[2025-12-18T15:04:45.938Z] 🌐 [employeeController] Found 3 employees
+[2025-12-18T15:06:08.548Z] 🌐 GET /vehicles - User Org: 9f8f0970-34fa-49d9-a507-b4177f2bab0b, Dept: null
+[2025-12-18T15:06:08.552Z] 🌐 Found 1 vehicles for org 9f8f0970-34fa-49d9-a507-b4177f2bab0b
+[2025-12-18T15:06:08.560Z] 🌐 GET /vehicles - User Org: 9f8f0970-34fa-49d9-a507-b4177f2bab0b, Dept: null
+[2025-12-18T15:06:08.567Z] 🌐 Found 1 vehicles for org 9f8f0970-34fa-49d9-a507-b4177f2bab0b
+[2025-12-18T15:06:16.320Z] 🌐 GET /vehicles - User Org: 9f8f0970-34fa-49d9-a507-b4177f2bab0b, Dept: null
+[2025-12-18T15:06:16.324Z] 🌐 Found 1 vehicles for org 9f8f0970-34fa-49d9-a507-b4177f2bab0b
+[2025-12-18T15:06:16.329Z] 🌐 GET /vehicles - User Org: 9f8f0970-34fa-49d9-a507-b4177f2bab0b, Dept: null
+[2025-12-18T15:06:16.333Z] 🌐 Found 1 vehicles for org 9f8f0970-34fa-49d9-a507-b4177f2bab0b
+[2025-12-18T15:06:19.043Z] 🌐 GET /vehicles - User Org: 9f8f0970-34fa-49d9-a507-b4177f2bab0b, Dept: null
+[2025-12-18T15:06:19.050Z] 🌐 Found 1 vehicles for org 9f8f0970-34fa-49d9-a507-b4177f2bab0b
+[2025-12-18T15:06:19.057Z] 🌐 [employeeController] GET /employees - User Org: 9f8f0970-34fa-49d9-a507-b4177f2bab0b, Query: {}
+[2025-12-18T15:06:19.062Z] 🌐 GET /vehicles - User Org: 9f8f0970-34fa-49d9-a507-b4177f2bab0b, Dept: null
+[2025-12-18T15:06:19.071Z] 🌐 [employeeController] Found 3 employees
+[2025-12-18T15:06:19.072Z] 🌐 Found 1 vehicles for org 9f8f0970-34fa-49d9-a507-b4177f2bab0b
+[2025-12-18T15:06:19.076Z] 🌐 [employeeController] GET /employees - User Org: 9f8f0970-34fa-49d9-a507-b4177f2bab0b, Query: {}
+[2025-12-18T15:06:19.078Z] 🌐 [employeeController] Found 3 employees
+[2025-12-18T15:06:20.033Z] 🌐 [employeeController] GET /employees - User Org: 9f8f0970-34fa-49d9-a507-b4177f2bab0b, Query: {"isActive":"true"}
+[2025-12-18T15:06:20.036Z] 🌐 [employeeController] Found 1 employees
+[2025-12-18T15:06:20.046Z] 🌐 [employeeController] GET /employees - User Org: 9f8f0970-34fa-49d9-a507-b4177f2bab0b, Query: {"isActive":"true"}
+[2025-12-18T15:06:20.049Z] 🌐 [employeeController] Found 1 employees
+[2025-12-18T15:19:43.487Z] 🌐 GET /vehicles - User Org: 9f8f0970-34fa-49d9-a507-b4177f2bab0b, Dept: null
+[2025-12-18T15:19:43.528Z] 🌐 Found 1 vehicles for org 9f8f0970-34fa-49d9-a507-b4177f2bab0b
+[2025-12-18T15:19:43.531Z] 🌐 GET /vehicles - User Org: 9f8f0970-34fa-49d9-a507-b4177f2bab0b, Dept: null
+[2025-12-18T15:19:43.534Z] 🌐 Found 1 vehicles for org 9f8f0970-34fa-49d9-a507-b4177f2bab0b
+[2025-12-18T15:19:45.951Z] 🌐 GET /vehicles - User Org: 9f8f0970-34fa-49d9-a507-b4177f2bab0b, Dept: null
+[2025-12-18T15:19:45.956Z] 🌐 Found 1 vehicles for org 9f8f0970-34fa-49d9-a507-b4177f2bab0b
+[2025-12-18T15:19:45.960Z] 🌐 [employeeController] GET /employees - User Org: 9f8f0970-34fa-49d9-a507-b4177f2bab0b, Query: {}
+[2025-12-18T15:19:45.967Z] 🌐 GET /vehicles - User Org: 9f8f0970-34fa-49d9-a507-b4177f2bab0b, Dept: null
+[2025-12-18T15:19:45.973Z] 🌐 Found 1 vehicles for org 9f8f0970-34fa-49d9-a507-b4177f2bab0b
+[2025-12-18T15:19:46.013Z] 🌐 [employeeController] Found 3 employees
+[2025-12-18T15:19:46.016Z] 🌐 [employeeController] GET /employees - User Org: 9f8f0970-34fa-49d9-a507-b4177f2bab0b, Query: {}
+[2025-12-18T15:19:46.019Z] 🌐 [employeeController] Found 3 employees
+[2025-12-18T15:20:02.063Z] 🌐 GET /vehicles - User Org: 9f8f0970-34fa-49d9-a507-b4177f2bab0b, Dept: null
+[2025-12-18T15:20:02.068Z] 🌐 [employeeController] GET /employees - User Org: 9f8f0970-34fa-49d9-a507-b4177f2bab0b, Query: {}
+[2025-12-18T15:20:02.072Z] 🌐 Found 1 vehicles for org 9f8f0970-34fa-49d9-a507-b4177f2bab0b
+[2025-12-18T15:20:02.074Z] 🌐 [employeeController] Found 3 employees
+[2025-12-18T15:20:18.646Z] 🌐 [employeeController] GET /employees - User Org: 9f8f0970-34fa-49d9-a507-b4177f2bab0b, Query: {"isActive":"true"}
+[2025-12-18T15:20:18.650Z] 🌐 [employeeController] Found 1 employees
+[2025-12-18T15:20:18.654Z] 🌐 [employeeController] GET /employees - User Org: 9f8f0970-34fa-49d9-a507-b4177f2bab0b, Query: {"isActive":"true"}
+[2025-12-18T15:20:18.658Z] 🌐 [employeeController] Found 1 employees
+[2025-12-18T15:24:28.745Z] 🌐 [employeeController] GET /employees - User Org: 9f8f0970-34fa-49d9-a507-b4177f2bab0b, Query: {"isActive":"true"}
+[2025-12-18T15:24:28.748Z] 🌐 [employeeController] Found 1 employees
+[2025-12-18T15:25:26.137Z] 🌐 GET /vehicles - User Org: 9f8f0970-34fa-49d9-a507-b4177f2bab0b, Dept: null
+[2025-12-18T15:25:26.142Z] 🌐 [employeeController] GET /employees - User Org: 9f8f0970-34fa-49d9-a507-b4177f2bab0b, Query: {}
+[2025-12-18T15:25:26.197Z] 🌐 Found 1 vehicles for org 9f8f0970-34fa-49d9-a507-b4177f2bab0b
+[2025-12-18T15:25:26.204Z] 🌐 GET /vehicles - User Org: 9f8f0970-34fa-49d9-a507-b4177f2bab0b, Dept: null
+[2025-12-18T15:25:26.208Z] 🌐 [employeeController] Found 3 employees
+[2025-12-18T15:25:26.210Z] 🌐 Found 1 vehicles for org 9f8f0970-34fa-49d9-a507-b4177f2bab0b
+[2025-12-18T15:25:26.217Z] 🌐 [employeeController] GET /employees - User Org: 9f8f0970-34fa-49d9-a507-b4177f2bab0b, Query: {}
+[2025-12-18T15:25:26.224Z] 🌐 [employeeController] Found 3 employees
+[2025-12-18T15:25:27.751Z] 🌐 [employeeController] GET /employees - User Org: 9f8f0970-34fa-49d9-a507-b4177f2bab0b, Query: {"isActive":"true"}
+[2025-12-18T15:25:27.755Z] 🌐 [employeeController] Found 1 employees
+[2025-12-18T15:25:27.759Z] 🌐 [employeeController] GET /employees - User Org: 9f8f0970-34fa-49d9-a507-b4177f2bab0b, Query: {"isActive":"true"}
+[2025-12-18T15:25:27.761Z] 🌐 [employeeController] Found 1 employees
+[2025-12-18T15:25:31.086Z] 🌐 [employeeController] GET /employees - User Org: 9f8f0970-34fa-49d9-a507-b4177f2bab0b, Query: {"isActive":"true"}
+[2025-12-18T15:25:31.089Z] 🌐 [employeeController] Found 0 employees
+[2025-12-18T15:25:34.386Z] 🌐 [employeeController] GET /employees - User Org: 9f8f0970-34fa-49d9-a507-b4177f2bab0b, Query: {}
+[2025-12-18T15:25:34.394Z] 🌐 [employeeController] Found 3 employees
+[2025-12-18T15:25:34.400Z] 🌐 [employeeController] GET /employees - User Org: 9f8f0970-34fa-49d9-a507-b4177f2bab0b, Query: {}
+[2025-12-18T15:25:34.403Z] 🌐 [employeeController] Found 3 employees
+[2025-12-18T15:25:52.424Z] 🌐 GET /vehicles - User Org: d167eaf0-38d5-4f3b-affa-5473985b9a25, Dept: null
+[2025-12-18T15:25:52.426Z] 🌐 Found 0 vehicles for org d167eaf0-38d5-4f3b-affa-5473985b9a25
+[2025-12-18T15:25:52.431Z] 🌐 GET /vehicles - User Org: d167eaf0-38d5-4f3b-affa-5473985b9a25, Dept: null
+[2025-12-18T15:25:52.434Z] 🌐 Found 0 vehicles for org d167eaf0-38d5-4f3b-affa-5473985b9a25
+[2025-12-18T15:25:55.376Z] 🌐 [employeeController] GET /employees - User Org: d167eaf0-38d5-4f3b-affa-5473985b9a25, Query: {}
+[2025-12-18T15:25:55.381Z] 🌐 [employeeController] Found 0 employees
+[2025-12-18T15:25:55.390Z] 🌐 [employeeController] GET /employees - User Org: d167eaf0-38d5-4f3b-affa-5473985b9a25, Query: {}
+[2025-12-18T15:25:55.396Z] 🌐 [employeeController] Found 0 employees
+[2025-12-18T15:25:59.464Z] 🌐 [employeeController] GET /employees - User Org: d167eaf0-38d5-4f3b-affa-5473985b9a25, Query: {"isActive":"true"}
+[2025-12-18T15:25:59.466Z] 🌐 [employeeController] Found 0 employees
+[2025-12-18T15:25:59.471Z] 🌐 [employeeController] GET /employees - User Org: d167eaf0-38d5-4f3b-affa-5473985b9a25, Query: {"isActive":"true"}
+[2025-12-18T15:25:59.473Z] 🌐 [employeeController] Found 0 employees
+[2025-12-18T15:26:21.986Z] 🌐 [employeeController] GET /employees - User Org: d167eaf0-38d5-4f3b-affa-5473985b9a25, Query: {"isActive":"true"}
+[2025-12-18T15:26:21.994Z] 🌐 [employeeController] Found 0 employees
+[2025-12-18T15:26:28.392Z] 🌐 GET /vehicles - User Org: d167eaf0-38d5-4f3b-affa-5473985b9a25, Dept: null
+[2025-12-18T15:26:28.394Z] 🌐 Found 0 vehicles for org d167eaf0-38d5-4f3b-affa-5473985b9a25
+[2025-12-18T15:26:28.398Z] 🌐 GET /vehicles - User Org: d167eaf0-38d5-4f3b-affa-5473985b9a25, Dept: null
+[2025-12-18T15:26:28.402Z] 🌐 Found 0 vehicles for org d167eaf0-38d5-4f3b-affa-5473985b9a25
+[2025-12-18T15:26:31.827Z] 🌐 GET /vehicles - User Org: d167eaf0-38d5-4f3b-affa-5473985b9a25, Dept: null
+[2025-12-18T15:26:31.833Z] 🌐 Found 0 vehicles for org d167eaf0-38d5-4f3b-affa-5473985b9a25
+[2025-12-18T15:26:31.837Z] 🌐 GET /vehicles - User Org: d167eaf0-38d5-4f3b-affa-5473985b9a25, Dept: null
+[2025-12-18T15:26:31.843Z] 🌐 [employeeController] GET /employees - User Org: d167eaf0-38d5-4f3b-affa-5473985b9a25, Query: {}
+[2025-12-18T15:26:31.846Z] 🌐 Found 0 vehicles for org d167eaf0-38d5-4f3b-affa-5473985b9a25
+[2025-12-18T15:26:31.847Z] 🌐 [employeeController] Found 0 employees
+[2025-12-18T15:26:31.851Z] 🌐 [employeeController] GET /employees - User Org: d167eaf0-38d5-4f3b-affa-5473985b9a25, Query: {}
+[2025-12-18T15:26:31.853Z] 🌐 [employeeController] Found 0 employees
+[2025-12-18T15:26:33.809Z] 🌐 [employeeController] GET /employees - User Org: d167eaf0-38d5-4f3b-affa-5473985b9a25, Query: {"isActive":"true"}
+[2025-12-18T15:26:33.813Z] 🌐 [employeeController] Found 0 employees
+[2025-12-18T15:26:33.817Z] 🌐 [employeeController] GET /employees - User Org: d167eaf0-38d5-4f3b-affa-5473985b9a25, Query: {"isActive":"true"}
+[2025-12-18T15:26:33.819Z] 🌐 [employeeController] Found 0 employees
+[2025-12-18T15:26:43.179Z] 🌐 [employeeController] GET /employees - User Org: d167eaf0-38d5-4f3b-affa-5473985b9a25, Query: {"isActive":"true"}
+[2025-12-18T15:26:43.182Z] 🌐 [employeeController] Found 0 employees
+[2025-12-18T15:26:43.185Z] 🌐 [employeeController] GET /employees - User Org: d167eaf0-38d5-4f3b-affa-5473985b9a25, Query: {"isActive":"true"}
+[2025-12-18T15:26:43.190Z] 🌐 [employeeController] Found 0 employees
+[2025-12-18T15:26:59.397Z] 🌐 [employeeController] GET /employees - User Org: d167eaf0-38d5-4f3b-affa-5473985b9a25, Query: {"isActive":"true"}
+[2025-12-18T15:26:59.400Z] 🌐 [employeeController] Found 0 employees
+[2025-12-18T15:26:59.404Z] 🌐 [employeeController] GET /employees - User Org: d167eaf0-38d5-4f3b-affa-5473985b9a25, Query: {"isActive":"true"}
+[2025-12-18T15:26:59.408Z] 🌐 [employeeController] Found 0 employees
+[2025-12-18T15:27:01.606Z] 🌐 [employeeController] GET /employees - User Org: d167eaf0-38d5-4f3b-affa-5473985b9a25, Query: {}
+[2025-12-18T15:27:01.608Z] 🌐 [employeeController] Found 0 employees
+[2025-12-18T15:27:01.612Z] 🌐 [employeeController] GET /employees - User Org: d167eaf0-38d5-4f3b-affa-5473985b9a25, Query: {}
+[2025-12-18T15:27:01.614Z] 🌐 [employeeController] Found 0 employees
+[2025-12-18T15:27:03.195Z] 🌐 [employeeController] GET /employees - User Org: d167eaf0-38d5-4f3b-affa-5473985b9a25, Query: {}
+[2025-12-18T15:27:03.200Z] 🌐 GET /vehicles - User Org: d167eaf0-38d5-4f3b-affa-5473985b9a25, Dept: null
+[2025-12-18T15:27:03.203Z] 🌐 [employeeController] Found 0 employees
+[2025-12-18T15:27:03.204Z] 🌐 Found 0 vehicles for org d167eaf0-38d5-4f3b-affa-5473985b9a25
+[2025-12-18T15:27:03.207Z] 🌐 [employeeController] GET /employees - User Org: d167eaf0-38d5-4f3b-affa-5473985b9a25, Query: {}
+[2025-12-18T15:27:03.213Z] 🌐 GET /vehicles - User Org: d167eaf0-38d5-4f3b-affa-5473985b9a25, Dept: null
+[2025-12-18T15:27:03.216Z] 🌐 [employeeController] Found 0 employees
+[2025-12-18T15:27:03.217Z] 🌐 Found 0 vehicles for org d167eaf0-38d5-4f3b-affa-5473985b9a25
+[2025-12-18T15:27:36.383Z] 🌐 GET /vehicles - User Org: d167eaf0-38d5-4f3b-affa-5473985b9a25, Dept: null
+[2025-12-18T15:27:36.390Z] 🌐 [employeeController] GET /employees - User Org: d167eaf0-38d5-4f3b-affa-5473985b9a25, Query: {}
+[2025-12-18T15:27:36.396Z] 🌐 Found 0 vehicles for org d167eaf0-38d5-4f3b-affa-5473985b9a25
+[2025-12-18T15:27:36.398Z] 🌐 [employeeController] Found 0 employees
+[2025-12-18T15:27:40.133Z] 🌐 [employeeController] GET /employees - User Org: d167eaf0-38d5-4f3b-affa-5473985b9a25, Query: {"isActive":"true"}
+[2025-12-18T15:27:40.135Z] 🌐 [employeeController] Found 0 employees
+[2025-12-18T15:27:40.140Z] 🌐 [employeeController] GET /employees - User Org: d167eaf0-38d5-4f3b-affa-5473985b9a25, Query: {"isActive":"true"}
+[2025-12-18T15:27:40.144Z] 🌐 [employeeController] Found 0 employees
+[2025-12-18T15:27:44.068Z] 🌐 [employeeController] GET /employees - User Org: d167eaf0-38d5-4f3b-affa-5473985b9a25, Query: {}
+[2025-12-18T15:27:44.071Z] 🌐 [employeeController] Found 0 employees
+[2025-12-18T15:27:44.077Z] 🌐 [employeeController] GET /employees - User Org: d167eaf0-38d5-4f3b-affa-5473985b9a25, Query: {}
+[2025-12-18T15:27:44.079Z] 🌐 [employeeController] Found 0 employees
+[2025-12-18T15:27:45.295Z] 🌐 [employeeController] GET /employees - User Org: d167eaf0-38d5-4f3b-affa-5473985b9a25, Query: {}
+[2025-12-18T15:27:45.300Z] 🌐 [employeeController] Found 0 employees
+[2025-12-18T15:27:45.303Z] 🌐 GET /vehicles - User Org: d167eaf0-38d5-4f3b-affa-5473985b9a25, Dept: null
+[2025-12-18T15:27:45.308Z] 🌐 [employeeController] GET /employees - User Org: d167eaf0-38d5-4f3b-affa-5473985b9a25, Query: {}
+[2025-12-18T15:27:45.311Z] 🌐 Found 0 vehicles for org d167eaf0-38d5-4f3b-affa-5473985b9a25
+[2025-12-18T15:27:45.314Z] 🌐 [employeeController] Found 0 employees
+[2025-12-18T15:27:45.317Z] 🌐 GET /vehicles - User Org: d167eaf0-38d5-4f3b-affa-5473985b9a25, Dept: null
+[2025-12-18T15:27:45.322Z] 🌐 Found 0 vehicles for org d167eaf0-38d5-4f3b-affa-5473985b9a25
+[2025-12-18T15:27:51.635Z] 🌐 GET /vehicles - User Org: d167eaf0-38d5-4f3b-affa-5473985b9a25, Dept: null
+[2025-12-18T15:27:51.640Z] 🌐 [employeeController] GET /employees - User Org: d167eaf0-38d5-4f3b-affa-5473985b9a25, Query: {}
+[2025-12-18T15:27:51.642Z] 🌐 Found 0 vehicles for org d167eaf0-38d5-4f3b-affa-5473985b9a25
+[2025-12-18T15:27:51.643Z] 🌐 [employeeController] Found 0 employees
+[2025-12-18T15:27:51.646Z] 🌐 GET /vehicles - User Org: d167eaf0-38d5-4f3b-affa-5473985b9a25, Dept: null
+[2025-12-18T15:27:51.652Z] 🌐 [employeeController] GET /employees - User Org: d167eaf0-38d5-4f3b-affa-5473985b9a25, Query: {}
+[2025-12-18T15:27:51.653Z] 🌐 Found 0 vehicles for org d167eaf0-38d5-4f3b-affa-5473985b9a25
+[2025-12-18T15:27:51.655Z] 🌐 [employeeController] Found 0 employees
+[2025-12-18T15:27:52.262Z] 🌐 [employeeController] GET /employees - User Org: d167eaf0-38d5-4f3b-affa-5473985b9a25, Query: {"isActive":"true"}
+[2025-12-18T15:27:52.264Z] 🌐 [employeeController] Found 0 employees
+[2025-12-18T15:27:52.269Z] 🌐 [employeeController] GET /employees - User Org: d167eaf0-38d5-4f3b-affa-5473985b9a25, Query: {"isActive":"true"}
+[2025-12-18T15:27:52.271Z] 🌐 [employeeController] Found 0 employees
+[2025-12-18T15:28:32.321Z] 🌐 GET /vehicles - User Org: d167eaf0-38d5-4f3b-affa-5473985b9a25, Dept: null
+[2025-12-18T15:28:32.327Z] 🌐 [employeeController] GET /employees - User Org: d167eaf0-38d5-4f3b-affa-5473985b9a25, Query: {}
+[2025-12-18T15:28:32.333Z] 🌐 Found 0 vehicles for org d167eaf0-38d5-4f3b-affa-5473985b9a25
+[2025-12-18T15:28:32.345Z] 🌐 [employeeController] Found 0 employees
+[2025-12-18T15:28:32.350Z] 🌐 GET /vehicles - User Org: d167eaf0-38d5-4f3b-affa-5473985b9a25, Dept: null
+[2025-12-18T15:28:32.355Z] 🌐 [employeeController] GET /employees - User Org: d167eaf0-38d5-4f3b-affa-5473985b9a25, Query: {}
+[2025-12-18T15:28:32.358Z] 🌐 Found 0 vehicles for org d167eaf0-38d5-4f3b-affa-5473985b9a25
+[2025-12-18T15:28:32.361Z] 🌐 [employeeController] Found 0 employees
+[2025-12-18T15:28:36.608Z] 🌐 [employeeController] GET /employees - User Org: d167eaf0-38d5-4f3b-affa-5473985b9a25, Query: {"isActive":"true"}
+[2025-12-18T15:28:36.611Z] 🌐 [employeeController] Found 0 employees
+[2025-12-18T15:28:36.616Z] 🌐 [employeeController] GET /employees - User Org: d167eaf0-38d5-4f3b-affa-5473985b9a25, Query: {"isActive":"true"}
+[2025-12-18T15:28:36.618Z] 🌐 [employeeController] Found 0 employees
+[2025-12-18T15:32:55.657Z] 🌐 GET /vehicles - User Org: d167eaf0-38d5-4f3b-affa-5473985b9a25, Dept: null
+[2025-12-18T15:32:55.665Z] 🌐 [employeeController] GET /employees - User Org: d167eaf0-38d5-4f3b-affa-5473985b9a25, Query: {}
+[2025-12-18T15:32:55.698Z] 🌐 Found 0 vehicles for org d167eaf0-38d5-4f3b-affa-5473985b9a25
+[2025-12-18T15:32:55.703Z] 🌐 GET /vehicles - User Org: d167eaf0-38d5-4f3b-affa-5473985b9a25, Dept: null
+[2025-12-18T15:32:55.705Z] 🌐 Found 0 vehicles for org d167eaf0-38d5-4f3b-affa-5473985b9a25
+[2025-12-18T15:32:55.713Z] 🌐 [employeeController] Found 0 employees
+[2025-12-18T15:32:55.716Z] 🌐 [employeeController] GET /employees - User Org: d167eaf0-38d5-4f3b-affa-5473985b9a25, Query: {}
+[2025-12-18T15:32:55.720Z] 🌐 [employeeController] Found 0 employees
+[2025-12-18T15:32:56.578Z] 🌐 [employeeController] GET /employees - User Org: d167eaf0-38d5-4f3b-affa-5473985b9a25, Query: {"isActive":"true"}
+[2025-12-18T15:32:56.581Z] 🌐 [employeeController] Found 0 employees
+[2025-12-18T15:32:56.585Z] 🌐 [employeeController] GET /employees - User Org: d167eaf0-38d5-4f3b-affa-5473985b9a25, Query: {"isActive":"true"}
+[2025-12-18T15:32:56.589Z] 🌐 [employeeController] Found 0 employees
+[2025-12-18T15:32:58.803Z] 🌐 [employeeController] GET /employees - User Org: d167eaf0-38d5-4f3b-affa-5473985b9a25, Query: {}
+[2025-12-18T15:32:58.808Z] 🌐 [employeeController] Found 0 employees
+[2025-12-18T15:32:58.818Z] 🌐 [employeeController] GET /employees - User Org: d167eaf0-38d5-4f3b-affa-5473985b9a25, Query: {}
+[2025-12-18T15:32:58.820Z] 🌐 [employeeController] Found 0 employees
+[2025-12-18T15:33:22.114Z] 🌐 GET /vehicles - User Org: d167eaf0-38d5-4f3b-affa-5473985b9a25, Dept: null
+[2025-12-18T15:33:22.122Z] 🌐 [employeeController] GET /employees - User Org: d167eaf0-38d5-4f3b-affa-5473985b9a25, Query: {}
+[2025-12-18T15:33:22.123Z] 🌐 Found 0 vehicles for org d167eaf0-38d5-4f3b-affa-5473985b9a25
+[2025-12-18T15:33:22.129Z] 🌐 [employeeController] Found 0 employees
+[2025-12-18T15:33:22.132Z] 🌐 GET /vehicles - User Org: d167eaf0-38d5-4f3b-affa-5473985b9a25, Dept: null
+[2025-12-18T15:33:22.136Z] 🌐 [employeeController] GET /employees - User Org: d167eaf0-38d5-4f3b-affa-5473985b9a25, Query: {}
+[2025-12-18T15:33:22.137Z] 🌐 Found 0 vehicles for org d167eaf0-38d5-4f3b-affa-5473985b9a25
+[2025-12-18T15:33:22.138Z] 🌐 [employeeController] Found 0 employees
+[2025-12-18T15:33:22.729Z] 🌐 [employeeController] GET /employees - User Org: d167eaf0-38d5-4f3b-affa-5473985b9a25, Query: {"isActive":"true"}
+[2025-12-18T15:33:22.733Z] 🌐 [employeeController] Found 0 employees
+[2025-12-18T15:33:22.737Z] 🌐 [employeeController] GET /employees - User Org: d167eaf0-38d5-4f3b-affa-5473985b9a25, Query: {"isActive":"true"}
+[2025-12-18T15:33:22.739Z] 🌐 [employeeController] Found 0 employees
+[2025-12-18T15:33:23.414Z] 🌐 [employeeController] GET /employees - User Org: d167eaf0-38d5-4f3b-affa-5473985b9a25, Query: {}
+[2025-12-18T15:33:23.417Z] 🌐 [employeeController] Found 0 employees
+[2025-12-18T15:33:23.429Z] 🌐 [employeeController] GET /employees - User Org: d167eaf0-38d5-4f3b-affa-5473985b9a25, Query: {}
+[2025-12-18T15:33:23.433Z] 🌐 [employeeController] Found 0 employees
+[2025-12-18T15:33:24.436Z] 🌐 [employeeController] GET /employees - User Org: d167eaf0-38d5-4f3b-affa-5473985b9a25, Query: {"isActive":"true"}
+[2025-12-18T15:33:24.441Z] 🌐 [employeeController] Found 0 employees
+[2025-12-18T15:33:24.445Z] 🌐 [employeeController] GET /employees - User Org: d167eaf0-38d5-4f3b-affa-5473985b9a25, Query: {"isActive":"true"}
+[2025-12-18T15:33:24.448Z] 🌐 [employeeController] Found 0 employees
+[2025-12-18T15:33:24.758Z] 🌐 GET /vehicles - User Org: d167eaf0-38d5-4f3b-affa-5473985b9a25, Dept: null
+[2025-12-18T15:33:24.764Z] 🌐 [employeeController] GET /employees - User Org: d167eaf0-38d5-4f3b-affa-5473985b9a25, Query: {}
+[2025-12-18T15:33:24.769Z] 🌐 Found 0 vehicles for org d167eaf0-38d5-4f3b-affa-5473985b9a25
+[2025-12-18T15:33:24.773Z] 🌐 [employeeController] Found 0 employees
+[2025-12-18T15:33:24.779Z] 🌐 GET /vehicles - User Org: d167eaf0-38d5-4f3b-affa-5473985b9a25, Dept: null
+[2025-12-18T15:33:24.783Z] 🌐 [employeeController] GET /employees - User Org: d167eaf0-38d5-4f3b-affa-5473985b9a25, Query: {}
+[2025-12-18T15:33:24.787Z] 🌐 Found 0 vehicles for org d167eaf0-38d5-4f3b-affa-5473985b9a25
+[2025-12-18T15:33:24.790Z] 🌐 [employeeController] Found 0 employees
+[2025-12-18T15:33:30.448Z] 🌐 [employeeController] GET /employees - User Org: d167eaf0-38d5-4f3b-affa-5473985b9a25, Query: {"isActive":"true"}
+[2025-12-18T15:33:30.452Z] 🌐 [employeeController] Found 0 employees
+[2025-12-18T15:33:30.456Z] 🌐 [employeeController] GET /employees - User Org: d167eaf0-38d5-4f3b-affa-5473985b9a25, Query: {"isActive":"true"}
+[2025-12-18T15:33:30.459Z] 🌐 [employeeController] Found 0 employees
+[2025-12-18T15:33:47.129Z] 🌐 [employeeController] GET /employees - User Org: d167eaf0-38d5-4f3b-affa-5473985b9a25, Query: {"isActive":"true"}
+[2025-12-18T15:33:47.132Z] 🌐 [employeeController] Found 0 employees
+[2025-12-18T15:34:42.633Z] 🌐 [employeeController] GET /employees - User Org: d167eaf0-38d5-4f3b-affa-5473985b9a25, Query: {"isActive":"true"}
+[2025-12-18T15:34:42.636Z] 🌐 [employeeController] Found 0 employees
+[2025-12-18T15:34:42.640Z] 🌐 [employeeController] GET /employees - User Org: d167eaf0-38d5-4f3b-affa-5473985b9a25, Query: {"isActive":"true"}
+[2025-12-18T15:34:42.643Z] 🌐 [employeeController] Found 0 employees
+[2025-12-18T15:35:23.799Z] 🌐 [employeeController] GET /employees - User Org: d167eaf0-38d5-4f3b-affa-5473985b9a25, Query: {"isActive":"true"}
+[2025-12-18T15:35:23.803Z] 🌐 [employeeController] Found 0 employees
+[2025-12-18T15:35:28.228Z] 🌐 [employeeController] GET /employees - User Org: d167eaf0-38d5-4f3b-affa-5473985b9a25, Query: {}
+[2025-12-18T15:35:28.239Z] 🌐 [employeeController] Found 0 employees
+[2025-12-18T15:35:28.249Z] 🌐 [employeeController] GET /employees - User Org: d167eaf0-38d5-4f3b-affa-5473985b9a25, Query: {}
+[2025-12-18T15:35:28.254Z] 🌐 [employeeController] Found 0 employees
+[2025-12-18T15:35:36.957Z] 🌐 [employeeController] GET /employees - User Org: d167eaf0-38d5-4f3b-affa-5473985b9a25, Query: {}
+[2025-12-18T15:35:36.964Z] 🌐 [employeeController] Found 0 employees
+[2025-12-18T15:36:32.294Z] 🌐 GET /vehicles - User Org: d167eaf0-38d5-4f3b-affa-5473985b9a25, Dept: null
+[2025-12-18T15:36:32.298Z] 🌐 Found 0 vehicles for org d167eaf0-38d5-4f3b-affa-5473985b9a25
+[2025-12-18T15:36:32.301Z] 🌐 GET /vehicles - User Org: d167eaf0-38d5-4f3b-affa-5473985b9a25, Dept: null
+[2025-12-18T15:36:32.304Z] 🌐 Found 0 vehicles for org d167eaf0-38d5-4f3b-affa-5473985b9a25
+[2025-12-18T15:37:53.935Z] 🌐 GET /vehicles - User Org: d167eaf0-38d5-4f3b-affa-5473985b9a25, Dept: null
+[2025-12-18T15:37:53.937Z] 🌐 Found 0 vehicles for org d167eaf0-38d5-4f3b-affa-5473985b9a25
+[2025-12-18T15:37:53.941Z] 🌐 GET /vehicles - User Org: d167eaf0-38d5-4f3b-affa-5473985b9a25, Dept: null
+[2025-12-18T15:37:53.943Z] 🌐 Found 0 vehicles for org d167eaf0-38d5-4f3b-affa-5473985b9a25
+[2025-12-18T15:37:55.289Z] 🌐 GET /vehicles - User Org: d167eaf0-38d5-4f3b-affa-5473985b9a25, Dept: null
+[2025-12-18T15:37:55.295Z] 🌐 Found 0 vehicles for org d167eaf0-38d5-4f3b-affa-5473985b9a25
+[2025-12-18T15:37:55.299Z] 🌐 GET /vehicles - User Org: d167eaf0-38d5-4f3b-affa-5473985b9a25, Dept: null
+[2025-12-18T15:37:55.301Z] 🌐 Found 0 vehicles for org d167eaf0-38d5-4f3b-affa-5473985b9a25
+[2025-12-18T15:38:56.679Z] 🌐 [employeeController] GET /employees - User Org: d167eaf0-38d5-4f3b-affa-5473985b9a25, Query: {"isActive":"true"}
+[2025-12-18T15:38:56.719Z] 🌐 [employeeController] Found 0 employees
+[2025-12-18T15:38:56.722Z] 🌐 [employeeController] GET /employees - User Org: d167eaf0-38d5-4f3b-affa-5473985b9a25, Query: {"isActive":"true"}
+[2025-12-18T15:38:56.724Z] 🌐 [employeeController] Found 0 employees
+[2025-12-18T15:39:21.593Z] 🌐 [employeeController] GET /employees - User Org: d167eaf0-38d5-4f3b-affa-5473985b9a25, Query: {"isActive":"true"}
+[2025-12-18T15:39:21.597Z] 🌐 [employeeController] Found 0 employees
+[2025-12-18T15:39:27.859Z] 🌐 GET /vehicles - User Org: d167eaf0-38d5-4f3b-affa-5473985b9a25, Dept: null
+[2025-12-18T15:39:27.864Z] 🌐 [employeeController] GET /employees - User Org: d167eaf0-38d5-4f3b-affa-5473985b9a25, Query: {}
+[2025-12-18T15:39:27.869Z] 🌐 Found 0 vehicles for org d167eaf0-38d5-4f3b-affa-5473985b9a25
+[2025-12-18T15:39:27.871Z] 🌐 [employeeController] Found 0 employees
+[2025-12-18T15:39:27.875Z] 🌐 GET /vehicles - User Org: d167eaf0-38d5-4f3b-affa-5473985b9a25, Dept: null
+[2025-12-18T15:39:27.879Z] 🌐 [employeeController] GET /employees - User Org: d167eaf0-38d5-4f3b-affa-5473985b9a25, Query: {}
+[2025-12-18T15:39:27.883Z] 🌐 Found 0 vehicles for org d167eaf0-38d5-4f3b-affa-5473985b9a25
+[2025-12-18T15:39:27.887Z] 🌐 [employeeController] Found 0 employees
+[2025-12-18T15:40:08.596Z] 🌐 [employeeController] GET /employees - User Org: d167eaf0-38d5-4f3b-affa-5473985b9a25, Query: {"isActive":"true"}
+[2025-12-18T15:40:08.600Z] 🌐 [employeeController] Found 0 employees
+[2025-12-18T15:40:08.605Z] 🌐 [employeeController] GET /employees - User Org: d167eaf0-38d5-4f3b-affa-5473985b9a25, Query: {"isActive":"true"}
+[2025-12-18T15:40:08.608Z] 🌐 [employeeController] Found 0 employees
+[2025-12-18T15:40:09.354Z] 🌐 GET /vehicles - User Org: d167eaf0-38d5-4f3b-affa-5473985b9a25, Dept: null
+[2025-12-18T15:40:09.383Z] 🌐 [employeeController] GET /employees - User Org: d167eaf0-38d5-4f3b-affa-5473985b9a25, Query: {}
+[2025-12-18T15:40:09.405Z] 🌐 Found 0 vehicles for org d167eaf0-38d5-4f3b-affa-5473985b9a25
+[2025-12-18T15:40:09.419Z] 🌐 [employeeController] Found 0 employees
+[2025-12-18T15:40:09.438Z] 🌐 GET /vehicles - User Org: d167eaf0-38d5-4f3b-affa-5473985b9a25, Dept: null
+[2025-12-18T15:40:09.454Z] 🌐 [employeeController] GET /employees - User Org: d167eaf0-38d5-4f3b-affa-5473985b9a25, Query: {}
+[2025-12-18T15:40:09.462Z] 🌐 Found 0 vehicles for org d167eaf0-38d5-4f3b-affa-5473985b9a25
+[2025-12-18T15:40:09.472Z] 🌐 [employeeController] Found 0 employees
+[2025-12-18T15:40:48.519Z] 🌐 GET /vehicles - User Org: d167eaf0-38d5-4f3b-affa-5473985b9a25, Dept: null
+[2025-12-18T15:40:48.523Z] 🌐 [employeeController] GET /employees - User Org: d167eaf0-38d5-4f3b-affa-5473985b9a25, Query: {}
+[2025-12-18T15:40:48.526Z] 🌐 Found 0 vehicles for org d167eaf0-38d5-4f3b-affa-5473985b9a25
+[2025-12-18T15:40:48.527Z] 🌐 [employeeController] Found 0 employees
+[2025-12-18T15:48:07.410Z] 🌐 GET /vehicles - User Org: e315c1c2-7f61-41f9-8f3b-60315f7b4deb, Dept: null
+[2025-12-18T15:48:07.448Z] 🌐 Found 1 vehicles for org e315c1c2-7f61-41f9-8f3b-60315f7b4deb
+[2025-12-18T15:48:07.458Z] 🌐 GET /vehicles - User Org: e315c1c2-7f61-41f9-8f3b-60315f7b4deb, Dept: null
+[2025-12-18T15:48:07.463Z] 🌐 Found 1 vehicles for org e315c1c2-7f61-41f9-8f3b-60315f7b4deb
+[2025-12-18T15:48:12.031Z] 🌐 GET /vehicles - User Org: e315c1c2-7f61-41f9-8f3b-60315f7b4deb, Dept: null
+[2025-12-18T15:48:12.034Z] 🌐 Found 1 vehicles for org e315c1c2-7f61-41f9-8f3b-60315f7b4deb
+[2025-12-18T15:48:12.039Z] 🌐 GET /vehicles - User Org: e315c1c2-7f61-41f9-8f3b-60315f7b4deb, Dept: null
+[2025-12-18T15:48:12.043Z] 🌐 Found 1 vehicles for org e315c1c2-7f61-41f9-8f3b-60315f7b4deb
+[2025-12-18T15:48:42.487Z] 🌐 GET /vehicles - User Org: e315c1c2-7f61-41f9-8f3b-60315f7b4deb, Dept: null
+[2025-12-18T15:48:42.493Z] 🌐 [employeeController] GET /employees - User Org: e315c1c2-7f61-41f9-8f3b-60315f7b4deb, Query: {}
+[2025-12-18T15:48:42.499Z] 🌐 Found 0 vehicles for org e315c1c2-7f61-41f9-8f3b-60315f7b4deb
+[2025-12-18T15:48:42.505Z] 🌐 GET /vehicles - User Org: e315c1c2-7f61-41f9-8f3b-60315f7b4deb, Dept: null
+[2025-12-18T15:48:42.512Z] 🌐 Found 0 vehicles for org e315c1c2-7f61-41f9-8f3b-60315f7b4deb
+[2025-12-18T15:48:42.558Z] 🌐 [employeeController] Found 0 employees
+[2025-12-18T15:48:42.562Z] 🌐 [employeeController] GET /employees - User Org: e315c1c2-7f61-41f9-8f3b-60315f7b4deb, Query: {}
+[2025-12-18T15:48:42.565Z] 🌐 [employeeController] Found 0 employees
+[2025-12-18T15:54:52.591Z] 🌐 GET /vehicles - User Org: e315c1c2-7f61-41f9-8f3b-60315f7b4deb, Dept: null
+[2025-12-18T15:54:52.623Z] 🌐 Found 0 vehicles for org e315c1c2-7f61-41f9-8f3b-60315f7b4deb
+[2025-12-18T15:54:52.628Z] 🌐 GET /vehicles - User Org: e315c1c2-7f61-41f9-8f3b-60315f7b4deb, Dept: null
+[2025-12-18T15:54:52.631Z] 🌐 Found 0 vehicles for org e315c1c2-7f61-41f9-8f3b-60315f7b4deb
+[2025-12-18T15:57:23.467Z] 🌐 GET /vehicles - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Dept: null
+[2025-12-18T15:57:23.601Z] 🌐 Found 0 vehicles for org 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c
+[2025-12-18T15:57:23.607Z] 🌐 GET /vehicles - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Dept: null
+[2025-12-18T15:57:23.610Z] 🌐 Found 0 vehicles for org 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c
+[2025-12-18T15:57:23.616Z] 🌐 GET /vehicles - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Dept: null
+[2025-12-18T15:57:23.619Z] 🌐 Found 0 vehicles for org 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c
+[2025-12-18T15:57:23.629Z] 🌐 GET /vehicles - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Dept: null
+[2025-12-18T15:57:23.637Z] 🌐 Found 0 vehicles for org 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c
+[2025-12-18T16:00:45.310Z] 🌐 GET /vehicles - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Dept: null
+[2025-12-18T16:00:45.313Z] 🌐 Found 0 vehicles for org 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c
+[2025-12-18T16:00:45.319Z] 🌐 GET /vehicles - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Dept: null
+[2025-12-18T16:00:45.321Z] 🌐 Found 0 vehicles for org 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c
+[2025-12-18T16:01:58.574Z] 🌐 GET /vehicles - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Dept: null
+[2025-12-18T16:01:58.581Z] 🌐 [employeeController] GET /employees - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Query: {}
+[2025-12-18T16:01:58.584Z] 🌐 Found 0 vehicles for org 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c
+[2025-12-18T16:01:58.599Z] 🌐 GET /vehicles - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Dept: null
+[2025-12-18T16:01:58.604Z] 🌐 Found 0 vehicles for org 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c
+[2025-12-18T16:01:58.649Z] 🌐 [employeeController] Found 0 employees
+[2025-12-18T16:01:58.658Z] 🌐 [employeeController] GET /employees - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Query: {}
+[2025-12-18T16:01:58.661Z] 🌐 [employeeController] Found 0 employees
+[2025-12-18T16:02:00.569Z] 🌐 [employeeController] GET /employees - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Query: {"isActive":"true"}
+[2025-12-18T16:02:00.578Z] 🌐 [employeeController] Found 0 employees
+[2025-12-18T16:02:00.584Z] 🌐 [employeeController] GET /employees - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Query: {"isActive":"true"}
+[2025-12-18T16:02:00.586Z] 🌐 [employeeController] Found 0 employees
+[2025-12-18T16:02:29.317Z] 🌐 [employeeController] GET /employees - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Query: {"isActive":"true"}
+[2025-12-18T16:02:29.327Z] 🌐 [employeeController] Found 1 employees
+[2025-12-18T16:02:36.286Z] 🌐 [employeeController] GET /employees - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Query: {"isActive":"true"}
+[2025-12-18T16:02:36.310Z] 🌐 [employeeController] Found 1 employees
+[2025-12-18T16:03:02.433Z] 🌐 [employeeController] GET /employees - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Query: {"isActive":"true"}
+[2025-12-18T16:03:02.439Z] 🌐 [employeeController] Found 1 employees
+[2025-12-18T16:03:02.444Z] 🌐 [employeeController] GET /employees - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Query: {"isActive":"true"}
+[2025-12-18T16:03:02.447Z] 🌐 [employeeController] Found 1 employees
+[2025-12-18T16:03:27.884Z] 🌐 [employeeController] GET /employees - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Query: {"isActive":"true"}
+[2025-12-18T16:03:27.893Z] 🌐 [employeeController] Found 1 employees
+[2025-12-18T16:03:30.345Z] 🌐 GET /vehicles - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Dept: null
+[2025-12-18T16:03:30.353Z] 🌐 [employeeController] GET /employees - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Query: {}
+[2025-12-18T16:03:30.355Z] 🌐 Found 0 vehicles for org 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c
+[2025-12-18T16:03:30.357Z] 🌐 [employeeController] Found 1 employees
+[2025-12-18T16:03:30.361Z] 🌐 GET /vehicles - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Dept: null
+[2025-12-18T16:03:30.367Z] 🌐 [employeeController] GET /employees - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Query: {}
+[2025-12-18T16:03:30.368Z] 🌐 Found 0 vehicles for org 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c
+[2025-12-18T16:03:30.370Z] 🌐 [employeeController] Found 1 employees
+[2025-12-18T16:03:57.752Z] 🌐 GET /vehicles - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Dept: null
+[2025-12-18T16:03:57.762Z] 🌐 [employeeController] GET /employees - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Query: {}
+[2025-12-18T16:03:57.766Z] 🌐 Found 1 vehicles for org 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c
+[2025-12-18T16:03:57.768Z] 🌐 [employeeController] Found 1 employees
+[2025-12-18T16:04:00.114Z] 🌐 [employeeController] GET /employees - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Query: {"isActive":"true"}
+[2025-12-18T16:04:00.121Z] 🌐 [employeeController] Found 1 employees
+[2025-12-18T16:04:00.126Z] 🌐 [employeeController] GET /employees - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Query: {"isActive":"true"}
+[2025-12-18T16:04:00.129Z] 🌐 [employeeController] Found 1 employees
+[2025-12-18T16:04:01.289Z] 🌐 [employeeController] GET /employees - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Query: {}
+[2025-12-18T16:04:01.294Z] 🌐 [employeeController] Found 1 employees
+[2025-12-18T16:04:01.301Z] 🌐 [employeeController] GET /employees - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Query: {}
+[2025-12-18T16:04:01.304Z] 🌐 [employeeController] Found 1 employees
+[2025-12-18T16:04:04.526Z] 🌐 [employeeController] GET /employees - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Query: {}
+[2025-12-18T16:04:04.538Z] 🌐 [employeeController] Found 1 employees
+[2025-12-18T16:04:04.557Z] 🌐 [employeeController] GET /employees - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Query: {}
+[2025-12-18T16:04:04.560Z] 🌐 [employeeController] Found 1 employees
+[2025-12-18T16:04:14.805Z] 🌐 [employeeController] GET /employees - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Query: {}
+[2025-12-18T16:04:14.810Z] 🌐 [employeeController] Found 1 employees
+[2025-12-18T16:04:18.895Z] 🌐 [employeeController] GET /employees - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Query: {}
+[2025-12-18T16:04:18.902Z] 🌐 [employeeController] Found 1 employees
+[2025-12-18T16:04:20.030Z] 🌐 [employeeController] GET /employees - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Query: {}
+[2025-12-18T16:04:20.034Z] 🌐 [employeeController] Found 1 employees
+[2025-12-18T16:04:20.039Z] 🌐 [employeeController] GET /employees - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Query: {}
+[2025-12-18T16:04:20.042Z] 🌐 [employeeController] Found 1 employees
+[2025-12-18T16:04:23.091Z] 🌐 GET /vehicles - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Dept: null
+[2025-12-18T16:04:23.096Z] 🌐 Found 1 vehicles for org 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c
+[2025-12-18T16:04:23.101Z] 🌐 GET /vehicles - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Dept: null
+[2025-12-18T16:04:23.104Z] 🌐 Found 1 vehicles for org 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c
+[2025-12-18T16:04:24.440Z] 🌐 GET /vehicles - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Dept: null
+[2025-12-18T16:04:24.452Z] 🌐 [employeeController] GET /employees - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Query: {}
+[2025-12-18T16:04:24.457Z] 🌐 Found 1 vehicles for org 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c
+[2025-12-18T16:04:24.459Z] 🌐 [employeeController] Found 1 employees
+[2025-12-18T16:04:24.470Z] 🌐 GET /vehicles - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Dept: null
+[2025-12-18T16:04:24.476Z] 🌐 [employeeController] GET /employees - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Query: {}
+[2025-12-18T16:04:24.482Z] 🌐 Found 1 vehicles for org 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c
+[2025-12-18T16:04:24.485Z] 🌐 [employeeController] Found 1 employees
+[2025-12-18T16:06:14.019Z] 🌐 [employeeController] GET /employees - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Query: {}
+[2025-12-18T16:06:14.030Z] 🌐 [employeeController] Found 1 employees
+[2025-12-18T16:06:14.041Z] 🌐 [employeeController] GET /employees - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Query: {}
+[2025-12-18T16:06:14.043Z] 🌐 [employeeController] Found 1 employees
+[2025-12-18T16:06:31.825Z] 🌐 [employeeController] GET /employees - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Query: {"isActive":"true"}
+[2025-12-18T16:06:31.829Z] 🌐 [employeeController] Found 1 employees
+[2025-12-18T16:06:31.833Z] 🌐 [employeeController] GET /employees - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Query: {"isActive":"true"}
+[2025-12-18T16:06:31.840Z] 🌐 [employeeController] Found 1 employees
+[2025-12-18T16:06:59.821Z] 🌐 GET /vehicles - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Dept: null
+[2025-12-18T16:06:59.825Z] 🌐 Found 1 vehicles for org 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c
+[2025-12-18T16:06:59.833Z] 🌐 GET /vehicles - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Dept: null
+[2025-12-18T16:06:59.836Z] 🌐 Found 1 vehicles for org 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c
+[2025-12-18T16:07:01.493Z] 🌐 GET /vehicles - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Dept: null
+[2025-12-18T16:07:01.499Z] 🌐 Found 1 vehicles for org 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c
+[2025-12-18T16:07:01.509Z] 🌐 GET /vehicles - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Dept: null
+[2025-12-18T16:07:01.519Z] 🌐 [employeeController] GET /employees - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Query: {}
+[2025-12-18T16:07:01.538Z] 🌐 Found 1 vehicles for org 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c
+[2025-12-18T16:07:01.664Z] 🌐 [employeeController] Found 1 employees
+[2025-12-18T16:07:01.670Z] 🌐 [employeeController] GET /employees - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Query: {}
+[2025-12-18T16:07:01.675Z] 🌐 [employeeController] Found 1 employees
+[2025-12-18T16:07:48.108Z] 🌐 [employeeController] GET /employees - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Query: {"isActive":"true"}
+[2025-12-18T16:07:48.112Z] 🌐 [employeeController] Found 1 employees
+[2025-12-18T16:07:48.117Z] 🌐 [employeeController] GET /employees - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Query: {"isActive":"true"}
+[2025-12-18T16:07:48.120Z] 🌐 [employeeController] Found 1 employees
+[2025-12-18T16:13:13.219Z] 🌐 GET /vehicles - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Dept: null
+[2025-12-18T16:13:13.254Z] 🌐 Found 1 vehicles for org 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c
+[2025-12-18T16:13:13.259Z] 🌐 GET /vehicles - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Dept: null
+[2025-12-18T16:13:13.264Z] 🌐 Found 1 vehicles for org 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c
+[2025-12-18T16:13:14.732Z] 🌐 GET /vehicles - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Dept: null
+[2025-12-18T16:13:14.737Z] 🌐 Found 1 vehicles for org 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c
+[2025-12-18T16:13:14.743Z] 🌐 GET /vehicles - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Dept: null
+[2025-12-18T16:13:14.746Z] 🌐 Found 1 vehicles for org 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c
+[2025-12-18T16:13:16.267Z] 🌐 GET /vehicles - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Dept: null
+[2025-12-18T16:13:16.277Z] 🌐 Found 1 vehicles for org 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c
+[2025-12-18T16:13:16.286Z] 🌐 [employeeController] GET /employees - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Query: {}
+[2025-12-18T16:13:16.312Z] 🌐 GET /vehicles - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Dept: null
+[2025-12-18T16:13:16.323Z] 🌐 Found 1 vehicles for org 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c
+[2025-12-18T16:13:16.468Z] 🌐 [employeeController] Found 1 employees
+[2025-12-18T16:13:16.472Z] 🌐 [employeeController] GET /employees - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Query: {}
+[2025-12-18T16:13:16.476Z] 🌐 [employeeController] Found 1 employees
+[2025-12-18T16:14:35.463Z] 🌐 GET /vehicles - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Dept: null
+[2025-12-18T16:14:35.466Z] 🌐 Found 1 vehicles for org 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c
+[2025-12-18T16:14:35.470Z] 🌐 GET /vehicles - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Dept: null
+[2025-12-18T16:14:35.476Z] 🌐 Found 1 vehicles for org 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c
+[2025-12-18T16:14:40.870Z] 🌐 [employeeController] GET /employees - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Query: {"isActive":"true"}
+[2025-12-18T16:14:40.874Z] 🌐 [employeeController] Found 1 employees
+[2025-12-18T16:14:40.878Z] 🌐 [employeeController] GET /employees - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Query: {"isActive":"true"}
+[2025-12-18T16:14:40.881Z] 🌐 [employeeController] Found 1 employees
+[2025-12-18T16:14:56.791Z] 🌐 GET /vehicles - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Dept: null
+[2025-12-18T16:14:56.794Z] 🌐 Found 1 vehicles for org 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c
+[2025-12-18T16:14:56.800Z] 🌐 GET /vehicles - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Dept: null
+[2025-12-18T16:14:56.803Z] 🌐 Found 1 vehicles for org 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c
+[2025-12-18T16:15:22.415Z] 🌐 GET /vehicles - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Dept: null
+[2025-12-18T16:15:22.418Z] 🌐 [employeeController] GET /employees - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Query: {}
+[2025-12-18T16:15:22.429Z] 🌐 Found 1 vehicles for org 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c
+[2025-12-18T16:15:22.431Z] 🌐 [employeeController] Found 1 employees
+[2025-12-18T16:15:22.442Z] 🌐 GET /vehicles - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Dept: null
+[2025-12-18T16:15:22.447Z] 🌐 [employeeController] GET /employees - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Query: {}
+[2025-12-18T16:15:22.452Z] 🌐 Found 1 vehicles for org 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c
+[2025-12-18T16:15:22.453Z] 🌐 [employeeController] Found 1 employees
+[2025-12-18T16:15:59.591Z] 🌐 [employeeController] GET /employees - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Query: {"isActive":"true"}
+[2025-12-18T16:15:59.594Z] 🌐 [employeeController] Found 1 employees
+[2025-12-18T16:15:59.599Z] 🌐 [employeeController] GET /employees - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Query: {"isActive":"true"}
+[2025-12-18T16:15:59.602Z] 🌐 [employeeController] Found 1 employees
+[2025-12-18T16:16:10.913Z] 🌐 [employeeController] GET /employees - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Query: {"isActive":"true"}
+[2025-12-18T16:16:10.920Z] 🌐 [employeeController] Found 1 employees
+[2025-12-18T16:16:12.802Z] 🌐 GET /vehicles - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Dept: null
+[2025-12-18T16:16:12.807Z] 🌐 [employeeController] GET /employees - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Query: {}
+[2025-12-18T16:16:12.811Z] 🌐 Found 1 vehicles for org 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c
+[2025-12-18T16:16:12.813Z] 🌐 [employeeController] Found 1 employees
+[2025-12-18T16:16:12.816Z] 🌐 GET /vehicles - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Dept: null
+[2025-12-18T16:16:12.822Z] 🌐 [employeeController] GET /employees - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Query: {}
+[2025-12-18T16:16:12.824Z] 🌐 Found 1 vehicles for org 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c
+[2025-12-18T16:16:12.825Z] 🌐 [employeeController] Found 1 employees
+[2025-12-18T16:16:30.868Z] 🌐 GET /vehicles - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Dept: null
+[2025-12-18T16:16:30.877Z] 🌐 [employeeController] GET /employees - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Query: {}
+[2025-12-18T16:16:30.882Z] 🌐 Found 1 vehicles for org 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c
+[2025-12-18T16:16:30.883Z] 🌐 [employeeController] Found 1 employees
+[2025-12-18T16:16:36.837Z] 🌐 [employeeController] GET /employees - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Query: {}
+[2025-12-18T16:16:36.845Z] 🌐 [employeeController] Found 1 employees
+[2025-12-18T16:16:36.851Z] 🌐 [employeeController] GET /employees - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Query: {}
+[2025-12-18T16:16:36.854Z] 🌐 [employeeController] Found 1 employees
+[2025-12-18T16:16:38.374Z] 🌐 [employeeController] GET /employees - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Query: {"isActive":"true"}
+[2025-12-18T16:16:38.378Z] 🌐 [employeeController] Found 1 employees
+[2025-12-18T16:16:38.382Z] 🌐 [employeeController] GET /employees - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Query: {"isActive":"true"}
+[2025-12-18T16:16:38.386Z] 🌐 [employeeController] Found 1 employees
+[2025-12-18T16:16:39.454Z] 🌐 GET /vehicles - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Dept: null
+[2025-12-18T16:16:39.457Z] 🌐 Found 1 vehicles for org 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c
+[2025-12-18T16:16:39.462Z] 🌐 GET /vehicles - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Dept: null
+[2025-12-18T16:16:39.466Z] 🌐 Found 1 vehicles for org 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c
+[2025-12-18T16:16:40.672Z] 🌐 GET /vehicles - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Dept: null
+[2025-12-18T16:16:40.676Z] 🌐 [employeeController] GET /employees - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Query: {}
+[2025-12-18T16:16:40.681Z] 🌐 Found 1 vehicles for org 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c
+[2025-12-18T16:16:40.687Z] 🌐 [employeeController] Found 1 employees
+[2025-12-18T16:16:40.700Z] 🌐 GET /vehicles - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Dept: null
+[2025-12-18T16:16:40.702Z] 🌐 [employeeController] GET /employees - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Query: {}
+[2025-12-18T16:16:40.708Z] 🌐 Found 1 vehicles for org 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c
+[2025-12-18T16:16:40.709Z] 🌐 [employeeController] Found 1 employees
+[2025-12-18T16:20:37.423Z] 🌐 GET /vehicles - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Dept: null
+[2025-12-18T16:20:37.570Z] 🌐 Found 1 vehicles for org 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c
+[2025-12-18T16:20:37.574Z] 🌐 GET /vehicles - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Dept: null
+[2025-12-18T16:20:37.577Z] 🌐 Found 1 vehicles for org 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c
+[2025-12-18T16:20:48.160Z] 🌐 GET /vehicles - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Dept: null
+[2025-12-18T16:20:48.163Z] 🌐 Found 1 vehicles for org 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c
+[2025-12-18T16:20:48.172Z] 🌐 GET /vehicles - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Dept: null
+[2025-12-18T16:20:48.176Z] 🌐 Found 1 vehicles for org 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c
+[2025-12-18T16:20:53.119Z] 🌐 GET /vehicles - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Dept: null
+[2025-12-18T16:20:53.125Z] 🌐 Found 1 vehicles for org 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c
+[2025-12-18T16:20:53.130Z] 🌐 [employeeController] GET /employees - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Query: {}
+[2025-12-18T16:20:53.138Z] 🌐 GET /vehicles - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Dept: null
+[2025-12-18T16:20:53.142Z] 🌐 Found 1 vehicles for org 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c
+[2025-12-18T16:20:53.194Z] 🌐 [employeeController] Found 1 employees
+[2025-12-18T16:20:53.198Z] 🌐 [employeeController] GET /employees - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Query: {}
+[2025-12-18T16:20:53.202Z] 🌐 [employeeController] Found 1 employees
+[2025-12-18T16:20:54.166Z] 🌐 [employeeController] GET /employees - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Query: {"isActive":"true"}
+[2025-12-18T16:20:54.170Z] 🌐 [employeeController] Found 1 employees
+[2025-12-18T16:20:54.174Z] 🌐 [employeeController] GET /employees - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Query: {"isActive":"true"}
+[2025-12-18T16:20:54.177Z] 🌐 [employeeController] Found 1 employees
+[2025-12-18T16:20:59.066Z] 🌐 GET /vehicles - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Dept: null
+[2025-12-18T16:20:59.069Z] 🌐 Found 1 vehicles for org 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c
+[2025-12-18T16:20:59.074Z] 🌐 GET /vehicles - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Dept: null
+[2025-12-18T16:20:59.077Z] 🌐 Found 1 vehicles for org 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c
+[2025-12-18T16:21:00.144Z] 🌐 GET /vehicles - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Dept: null
+[2025-12-18T16:21:00.150Z] 🌐 Found 1 vehicles for org 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c
+[2025-12-18T16:21:00.156Z] 🌐 GET /vehicles - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Dept: null
+[2025-12-18T16:21:00.166Z] 🌐 Found 1 vehicles for org 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c
+[2025-12-18T16:21:00.169Z] 🌐 [employeeController] GET /employees - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Query: {}
+[2025-12-18T16:21:00.182Z] 🌐 [employeeController] Found 1 employees
+[2025-12-18T16:21:00.194Z] 🌐 [employeeController] GET /employees - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Query: {}
+[2025-12-18T16:21:00.201Z] 🌐 [employeeController] Found 1 employees
+[2025-12-18T16:24:20.630Z] 🌐 GET /vehicles - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Dept: null
+[2025-12-18T16:24:20.640Z] 🌐 Found 1 vehicles for org 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c
+[2025-12-18T16:24:20.647Z] 🌐 GET /vehicles - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Dept: null
+[2025-12-18T16:24:20.651Z] 🌐 Found 1 vehicles for org 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c
+[2025-12-18T16:24:25.298Z] 🌐 GET /vehicles - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Dept: null
+[2025-12-18T16:24:25.301Z] 🌐 Found 1 vehicles for org 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c
+[2025-12-18T16:24:25.306Z] 🌐 GET /vehicles - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Dept: null
+[2025-12-18T16:24:25.311Z] 🌐 Found 1 vehicles for org 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c
+[2025-12-18T16:24:26.378Z] 🌐 GET /vehicles - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Dept: null
+[2025-12-18T16:24:26.382Z] 🌐 [employeeController] GET /employees - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Query: {}
+[2025-12-18T16:24:26.398Z] 🌐 Found 1 vehicles for org 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c
+[2025-12-18T16:24:26.420Z] 🌐 GET /vehicles - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Dept: null
+[2025-12-18T16:24:26.424Z] 🌐 Found 1 vehicles for org 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c
+[2025-12-18T16:24:26.477Z] 🌐 [employeeController] Found 1 employees
+[2025-12-18T16:24:26.481Z] 🌐 [employeeController] GET /employees - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Query: {}
+[2025-12-18T16:24:26.488Z] 🌐 [employeeController] Found 1 employees
+[2025-12-18T16:47:32.478Z] 🌐 GET /vehicles - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Dept: null
+[2025-12-18T16:47:32.529Z] 🌐 Found 1 vehicles for org 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c
+[2025-12-18T16:47:32.535Z] 🌐 GET /vehicles - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Dept: null
+[2025-12-18T16:47:32.539Z] 🌐 Found 1 vehicles for org 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c
+[2025-12-18T17:29:45.950Z] 🌐 GET /vehicles - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Dept: null
+[2025-12-18T17:29:45.986Z] 🌐 Found 1 vehicles for org 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c
+[2025-12-18T17:29:45.991Z] 🌐 GET /vehicles - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Dept: null
+[2025-12-18T17:29:45.994Z] 🌐 Found 1 vehicles for org 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c
+[2025-12-18T17:39:10.249Z] 🌐 GET /vehicles - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Dept: null
+[2025-12-18T17:39:10.382Z] 🌐 Found 1 vehicles for org 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c
+[2025-12-18T17:39:10.387Z] 🌐 GET /vehicles - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Dept: null
+[2025-12-18T17:39:10.390Z] 🌐 Found 1 vehicles for org 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c
+[2025-12-18T17:39:16.209Z] 🌐 GET /vehicles - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Dept: null
+[2025-12-18T17:39:16.214Z] 🌐 [employeeController] GET /employees - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Query: {}
+[2025-12-18T17:39:16.220Z] 🌐 Found 1 vehicles for org 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c
+[2025-12-18T17:39:16.225Z] 🌐 GET /vehicles - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Dept: null
+[2025-12-18T17:39:16.229Z] 🌐 Found 1 vehicles for org 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c
+[2025-12-18T17:39:16.274Z] 🌐 [employeeController] Found 1 employees
+[2025-12-18T17:39:16.279Z] 🌐 [employeeController] GET /employees - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Query: {}
+[2025-12-18T17:39:16.283Z] 🌐 [employeeController] Found 1 employees
+[2025-12-18T17:39:21.509Z] 🌐 [employeeController] GET /employees - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Query: {"isActive":"true"}
+[2025-12-18T17:39:21.512Z] 🌐 [employeeController] Found 1 employees
+[2025-12-18T17:39:21.517Z] 🌐 [employeeController] GET /employees - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Query: {"isActive":"true"}
+[2025-12-18T17:39:21.522Z] 🌐 [employeeController] Found 1 employees
+[2025-12-18T17:42:52.786Z] 🌐 GET /vehicles - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Dept: null
+[2025-12-18T17:42:52.797Z] 🌐 Found 1 vehicles for org 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c
+[2025-12-18T17:42:52.814Z] 🌐 GET /vehicles - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Dept: null
+[2025-12-18T17:42:52.823Z] 🌐 Found 1 vehicles for org 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c
+[2025-12-18T17:42:53.967Z] 🌐 GET /vehicles - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Dept: null
+[2025-12-18T17:42:53.977Z] 🌐 Found 1 vehicles for org 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c
+[2025-12-18T17:42:54.029Z] 🌐 GET /vehicles - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Dept: null
+[2025-12-18T17:42:54.081Z] 🌐 Found 1 vehicles for org 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c
+[2025-12-18T17:45:23.603Z] 🌐 GET /vehicles - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Dept: null
+[2025-12-18T17:45:23.740Z] 🌐 Found 1 vehicles for org 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c
+[2025-12-18T17:45:23.745Z] 🌐 GET /vehicles - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Dept: null
+[2025-12-18T17:45:23.748Z] 🌐 Found 1 vehicles for org 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c
+[2025-12-18T17:45:36.501Z] 🌐 GET /vehicles - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Dept: null
+[2025-12-18T17:45:36.505Z] 🌐 Found 1 vehicles for org 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c
+[2025-12-18T17:45:36.509Z] 🌐 GET /vehicles - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Dept: null
+[2025-12-18T17:45:36.512Z] 🌐 Found 1 vehicles for org 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c
+[2025-12-18T17:50:56.867Z] 🌐 GET /vehicles - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Dept: null
+[2025-12-18T17:50:56.899Z] 🌐 Found 1 vehicles for org 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c
+[2025-12-18T17:50:56.904Z] 🌐 GET /vehicles - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Dept: null
+[2025-12-18T17:50:56.908Z] 🌐 Found 1 vehicles for org 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c
+[2025-12-18T17:51:27.746Z] 🌐 GET /vehicles - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Dept: null
+[2025-12-18T17:51:27.753Z] 🌐 Found 1 vehicles for org 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c
+[2025-12-18T17:51:27.758Z] 🌐 GET /vehicles - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Dept: null
+[2025-12-18T17:51:27.762Z] 🌐 Found 1 vehicles for org 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c
+[2025-12-18T17:51:32.932Z] 🌐 [employeeController] GET /employees - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Query: {"isActive":"true"}
+[2025-12-18T17:51:33.110Z] 🌐 [employeeController] Found 1 employees
+[2025-12-18T17:51:33.116Z] 🌐 [employeeController] GET /employees - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Query: {"isActive":"true"}
+[2025-12-18T17:51:33.122Z] 🌐 [employeeController] Found 1 employees
+[2025-12-18T17:51:38.095Z] 🌐 GET /vehicles - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Dept: null
+[2025-12-18T17:51:38.098Z] 🌐 Found 1 vehicles for org 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c
+[2025-12-18T17:51:38.107Z] 🌐 GET /vehicles - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Dept: null
+[2025-12-18T17:51:38.113Z] 🌐 Found 1 vehicles for org 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c
+[2025-12-18T17:51:39.454Z] 🌐 GET /vehicles - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Dept: null
+[2025-12-18T17:51:39.459Z] 🌐 Found 1 vehicles for org 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c
+[2025-12-18T17:51:39.474Z] 🌐 GET /vehicles - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Dept: null
+[2025-12-18T17:51:39.481Z] 🌐 [employeeController] GET /employees - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Query: {}
+[2025-12-18T17:51:39.508Z] 🌐 Found 1 vehicles for org 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c
+[2025-12-18T17:51:39.511Z] 🌐 [employeeController] Found 1 employees
+[2025-12-18T17:51:39.543Z] 🌐 [employeeController] GET /employees - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Query: {}
+[2025-12-18T17:51:39.548Z] 🌐 [employeeController] Found 1 employees
+[2025-12-18T17:51:47.434Z] 🌐 GET /vehicles - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Dept: null
+[2025-12-18T17:51:47.441Z] 🌐 [employeeController] GET /employees - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Query: {}
+[2025-12-18T17:51:47.450Z] 🌐 Found 1 vehicles for org 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c
+[2025-12-18T17:51:47.453Z] 🌐 [employeeController] Found 1 employees
+[2025-12-18T17:51:47.458Z] 🌐 GET /vehicles - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Dept: null
+[2025-12-18T17:51:47.465Z] 🌐 [employeeController] GET /employees - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Query: {}
+[2025-12-18T17:51:47.474Z] 🌐 Found 1 vehicles for org 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c
+[2025-12-18T17:51:47.475Z] 🌐 [employeeController] Found 1 employees
+[2025-12-18T17:52:00.024Z] 🌐 GET /vehicles - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Dept: null
+[2025-12-18T17:52:00.033Z] 🌐 [employeeController] GET /employees - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Query: {}
+[2025-12-18T17:52:00.039Z] 🌐 Found 1 vehicles for org 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c
+[2025-12-18T17:52:00.041Z] 🌐 [employeeController] Found 1 employees
+[2025-12-18T17:52:02.892Z] 🌐 GET /vehicles - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Dept: null
+[2025-12-18T17:52:02.896Z] 🌐 Found 1 vehicles for org 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c
+[2025-12-18T17:52:02.901Z] 🌐 GET /vehicles - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Dept: null
+[2025-12-18T17:52:02.908Z] 🌐 Found 1 vehicles for org 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c
+[2025-12-18T17:52:03.871Z] 🌐 GET /vehicles - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Dept: null
+[2025-12-18T17:52:03.878Z] 🌐 [employeeController] GET /employees - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Query: {}
+[2025-12-18T17:52:03.893Z] 🌐 Found 1 vehicles for org 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c
+[2025-12-18T17:52:03.895Z] 🌐 [employeeController] Found 1 employees
+[2025-12-18T17:52:03.907Z] 🌐 GET /vehicles - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Dept: null
+[2025-12-18T17:52:03.910Z] 🌐 [employeeController] GET /employees - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Query: {}
+[2025-12-18T17:52:03.922Z] 🌐 Found 1 vehicles for org 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c
+[2025-12-18T17:52:03.925Z] 🌐 [employeeController] Found 1 employees
+[2025-12-18T17:53:48.874Z] 🌐 [employeeController] GET /employees - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Query: {"isActive":"true"}
+[2025-12-18T17:53:48.882Z] 🌐 [employeeController] Found 1 employees
+[2025-12-18T17:53:48.886Z] 🌐 [employeeController] GET /employees - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Query: {"isActive":"true"}
+[2025-12-18T17:53:48.891Z] 🌐 [employeeController] Found 1 employees
+[2025-12-18T17:54:04.794Z] 🌐 [employeeController] GET /employees - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Query: {"isActive":"true"}
+[2025-12-18T17:54:04.804Z] 🌐 [employeeController] Found 1 employees
+[2025-12-18T17:54:36.208Z] 🌐 GET /vehicles - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Dept: null
+[2025-12-18T17:54:36.211Z] 🌐 Found 1 vehicles for org 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c
+[2025-12-18T17:54:36.215Z] 🌐 GET /vehicles - User Org: 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c, Dept: null
+[2025-12-18T17:54:36.219Z] 🌐 Found 1 vehicles for org 6cd6aeb9-10f2-4b5b-ad63-4bbd3b5ec02c

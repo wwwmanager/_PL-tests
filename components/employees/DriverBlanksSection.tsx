@@ -18,6 +18,7 @@ const DriverBlanksSection: React.FC<Props> = ({ driverId }) => {
         setLoading(true);
         setError(null);
 
+        console.log('📜 [DriverBlanksSection] Fetching blank summary for employeeId:', driverId);
         getDriverBlankSummary(driverId)
             .then((res) => {
                 if (!cancelled) {

@@ -6,6 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { WaybillBlank, WaybillBlankBatch, BlankStatus, Organization, Employee } from '../../types';
 import { getOrganizations } from '../../services/organizationApi';
 import { getEmployees } from '../../services/api/employeeApi';
+import { listDrivers, DriverListItem } from '../../services/driverApi';
 import {
     getBlankBatches, createBlankBatch, materializeBatch,
     issueBlanksToDriver,
@@ -20,6 +21,7 @@ import { PlusIcon, TrashIcon } from '../Icons';
 import { useAuth } from '../../services/auth';
 import { BlankFiltersSchema } from '../../services/schemas';
 import { BLANK_STATUS_TRANSLATIONS, BLANK_STATUS_COLORS, SPOIL_REASON_TRANSLATIONS } from '../../constants';
+import { EmptyState, getEmptyStateFromError } from '../common/EmptyState';
 
 const FormField: React.FC<{ label: string; children: React.ReactNode; error?: string }> = ({ label, children, error }) => (
     <div><label className="block text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">{label}</label>{children}{error && <p className="text-xs text-red-500 mt-1">{error}</p>}</div>
@@ -46,61 +48,58 @@ const BatchList: React.FC<{ refreshBlanks: () => void }> = ({ refreshBlanks }) =
     const [batches, setBatches] = useState<WaybillBlankBatch[]>([]);
     const [allBlanks, setAllBlanks] = useState<WaybillBlank[]>([]);
     const [organizations, setOrganizations] = useState<Organization[]>([]);
-    const [employees, setEmployees] = useState<Employee[]>([]);
+    const [employees, setEmployees] = useState<DriverListItem[]>([]);
     const [currentBatch, setCurrentBatch] = useState<Partial<WaybillBlankBatch> | null>(null);
     const [issueModalBatch, setIssueModalBatch] = useState<WaybillBlankBatch | null>(null);
     const [driverToIssue, setDriverToIssue] = useState<string>('');
     const [issueRange, setIssueRange] = useState({ start: 0, end: 0 });
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<any>(null);
     const { showToast } = useToast();
     const { register, handleSubmit, reset, formState: { errors, isDirty } } = useForm<BatchFormData>({ resolver: zodResolver(batchSchema) });
     const { currentUser } = useAuth();
 
     const fetchData = useCallback(async () => {
-        // Use allSettled so partial failures don't block other data
-        const results = await Promise.allSettled([
-            getBlankBatches(),
-            getOrganizations(),
-            getEmployees(),
-            getBlanks()
-        ]);
+        setLoading(true);
+        setError(null);
+        try {
+            // Use allSettled so partial failures don't block other data
+            const results = await Promise.allSettled([
+                getBlankBatches(),
+                getOrganizations(),
+                listDrivers(),
+                getBlanks()
+            ]);
 
-        const batchData = results[0].status === 'fulfilled' ? results[0].value : [];
-        const orgData = results[1].status === 'fulfilled' ? results[1].value : [];
-        const empData = results[2].status === 'fulfilled' ? results[2].value : [];
-        const blankData = results[3].status === 'fulfilled' ? results[3].value : [];
+            const batchData = results[0].status === 'fulfilled' ? results[0].value : [];
+            const orgData = results[1].status === 'fulfilled' ? results[1].value : [];
+            const driversData = results[2].status === 'fulfilled' ? results[2].value : [];
+            const blankData = results[3].status === 'fulfilled' ? results[3].value : [];
 
-        // Log each result for debugging
-        console.log('📋 [BlankManagement] fetchData results:', {
-            batches: batchData?.length,
-            orgs: orgData?.length,
-            employees: empData?.length,
-            blanks: blankData?.length,
-            batchError: results[0].status === 'rejected' ? (results[0] as PromiseRejectedResult).reason?.message : null,
-            orgError: results[1].status === 'rejected' ? (results[1] as PromiseRejectedResult).reason?.message : null,
-            empError: results[2].status === 'rejected' ? (results[2] as PromiseRejectedResult).reason?.message : null,
-            blankError: results[3].status === 'rejected' ? (results[3] as PromiseRejectedResult).reason?.message : null,
-        });
+            // Log each result for debugging
+            console.log('📋 [BlankManagement] fetchData results:', {
+                batches: batchData?.length,
+                orgs: orgData?.length,
+                drivers: driversData?.length,
+                blanks: blankData?.length,
+            });
 
-        // Log full employee data to debug filtering
-        if (empData.length > 0) {
-            console.log('📋 [BlankManagement] Raw employees:', empData.map(e => ({ id: e.id, name: e.shortName, type: e.employeeType })));
+            // Check if primary data failed
+            if (results[0].status === 'rejected') {
+                throw results[0].reason;
+            }
+
+            setBatches(batchData.sort((a, b) => b.series.localeCompare(a.series) || b.startNumber - a.startNumber));
+            setOrganizations(orgData);
+            setEmployees(driversData);
+            setAllBlanks(blankData);
+        } catch (err: any) {
+            console.error('Failed to fetch batches:', err);
+            setError(err);
+        } finally {
+            setLoading(false);
         }
-
-        setBatches(batchData.sort((a, b) => b.series.localeCompare(a.series) || b.startNumber - a.startNumber));
-        setOrganizations(orgData);
-        // Filter for drivers - be case-insensitive and accept null/undefined as default driver
-        // Also log all employee types for debugging
-        const allTypes = new Set(empData.map(e => e.employeeType));
-        console.log('📋 [BlankManagement] All employee types:', [...allTypes]);
-        const drivers = empData.filter(e =>
-            !e.employeeType || // null/undefined - treat as driver (default)
-            e.employeeType.toLowerCase() === 'driver' ||
-            e.employeeType.toLowerCase() === 'водитель'
-        );
-        console.log('📋 [BlankManagement] Filtered drivers:', drivers.length, drivers.map(d => d.shortName));
-        setEmployees(drivers);
-        setAllBlanks(blankData);
-    }, []);
+    }, [refreshBlanks]);
 
     useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -189,19 +188,30 @@ const BatchList: React.FC<{ refreshBlanks: () => void }> = ({ refreshBlanks }) =
                         <tr className="text-left">{['Организация', 'Серия', 'Диапазон номеров', 'Выдано/Всего', 'Статус', 'Действия'].map(h => <th key={h} className="p-2">{h}</th>)}</tr>
                     </thead>
                     <tbody>
-                        {enrichedBatches.map(b => (
-                            <tr key={b.id} className="border-t dark:border-gray-700">
-                                <td>{organizations.find(o => o.id === b.organizationId)?.shortName}</td>
-                                <td>{b.series}</td>
-                                <td>{String(b.startNumber).padStart(6, '0')} - {String(b.endNumber).padStart(6, '0')}</td>
-                                <td>{b.issuedCount} / {b.totalCount}</td>
-                                <td>{b.status}</td>
-                                <td className="space-x-2 whitespace-nowrap">
-                                    <button onClick={() => handleMaterialize(b.id)} disabled={b.isMaterialized} className="text-blue-600 disabled:text-gray-400 disabled:cursor-not-allowed">Материализовать</button>
-                                    <button onClick={() => openIssueModal(b)} disabled={!b.isMaterialized} className="text-green-600 disabled:text-gray-400 disabled:cursor-not-allowed">Выдать</button>
+                        {loading || error || enrichedBatches.length === 0 ? (
+                            <tr>
+                                <td colSpan={6} className="p-0">
+                                    <EmptyState
+                                        reason={error ? getEmptyStateFromError(error) : (loading ? { type: 'loading' } : { type: 'empty', entityName: 'пачки бланков' })}
+                                        onRetry={fetchData}
+                                    />
                                 </td>
                             </tr>
-                        ))}
+                        ) : (
+                            enrichedBatches.map(b => (
+                                <tr key={b.id} className="border-t dark:border-gray-700">
+                                    <td>{organizations.find(o => o.id === b.organizationId)?.shortName}</td>
+                                    <td>{b.series}</td>
+                                    <td>{String(b.startNumber).padStart(6, '0')} - {String(b.endNumber).padStart(6, '0')}</td>
+                                    <td>{b.issuedCount} / {b.totalCount}</td>
+                                    <td>{b.status}</td>
+                                    <td className="space-x-2 whitespace-nowrap">
+                                        <button onClick={() => handleMaterialize(b.id)} disabled={b.isMaterialized} className="text-blue-600 disabled:text-gray-400 disabled:cursor-not-allowed">Материализовать</button>
+                                        <button onClick={() => openIssueModal(b)} disabled={!b.isMaterialized} className="text-green-600 disabled:text-gray-400 disabled:cursor-not-allowed">Выдать</button>
+                                    </td>
+                                </tr>
+                            ))
+                        )}
                     </tbody>
                 </table>
             </div>
@@ -252,28 +262,39 @@ type SelectionState = {
 
 const BlankList: React.FC<{ key: number }> = () => {
     const [blanks, setBlanks] = useState<WaybillBlank[]>([]);
-    const [employees, setEmployees] = useState<Employee[]>([]);
+    const [employees, setEmployees] = useState<DriverListItem[]>([]);
     const [spoilModalData, setSpoilModalData] = useState<{ blank: { id: string, organizationId: string, series: string, number: number }, reason: string } | null>(null);
     const { showToast } = useToast();
     const { currentUser, can, rolePolicies } = useAuth();
     const [pagination, setPagination] = useState({ page: 1, pageSize: 50, total: 0 });
     const [isSpoilModalOpen, setIsSpoilModalOpen] = useState(false);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<any>(null);
 
     const [selection, setSelection] = useState<SelectionState>({ mode: 'none', selectedIds: new Set(), excludedIds: new Set() });
 
     const fetchData = useCallback(async (filters: Record<string, string>, page: number, pageSize: number) => {
-        const query = {
-            series: filters.series || undefined,
-            number: filters.number ? parseInt(filters.number, 10) : undefined,
-            status: filters.status ? [filters.status as BlankStatus] : undefined,
-            ownerEmployeeId: filters.ownerName ? employees.find(e => e.shortName.toLowerCase().includes(filters.ownerName!.toLowerCase()))?.id : undefined,
-        };
-        const { items, total } = await searchBlanks({ ...query, page, pageSize });
-        setBlanks(items);
-        setPagination(p => ({ ...p, total }));
+        setLoading(true);
+        setError(null);
+        try {
+            const query = {
+                series: filters.series || undefined,
+                number: filters.number ? parseInt(filters.number, 10) : undefined,
+                status: filters.status ? [filters.status as BlankStatus] : undefined,
+                ownerEmployeeId: filters.ownerName ? employees.find(e => e.shortName.toLowerCase().includes(filters.ownerName!.toLowerCase()))?.id : undefined,
+            };
+            const { items, total } = await searchBlanks({ ...query, page, pageSize });
+            setBlanks(items);
+            setPagination(p => ({ ...p, total }));
+        } catch (err: any) {
+            console.error('Failed to fetch blanks:', err);
+            setError(err);
+        } finally {
+            setLoading(false);
+        }
     }, [employees]);
 
-    useEffect(() => { getEmployees().then(setEmployees); }, []);
+    useEffect(() => { listDrivers().then(setEmployees); }, []);
 
     const employeeMap = useMemo(() => new Map(employees.map(e => [e.id, e.shortName])), [employees]);
 
@@ -310,12 +331,13 @@ const BlankList: React.FC<{ key: number }> = () => {
             };
             const userPolicies = currentUser.role ? rolePolicies[currentUser.role] : [];
             const allAbilities = new Set([...userPolicies, ...(currentUser.extraCaps || [])]);
-            const actorEmployee = employees.find(e => e.email === currentUser.email);
+            // Drivers list doesn't have email, but currentUser has the user ID and linked employee info if needed
+            // For now, we can pass null or find a way to get the employeeId if needed for the context
 
             const ctx = {
                 abilities: allAbilities,
                 actorId: currentUser.id,
-                actorEmployeeId: actorEmployee?.id ?? null,
+                actorEmployeeId: null, // We don't have a direct email match in DriverListItem
                 deviceId: 'webapp-spoil'
             };
             await spoilBlank(params, ctx);
@@ -423,23 +445,34 @@ const BlankList: React.FC<{ key: number }> = () => {
                         </tr>
                     </thead>
                     <tbody>
-                        {enrichedBlanks.map(b => (
-                            <tr key={b.id} className="border-t dark:border-gray-700">
-                                <td className="p-2"><input type="checkbox" checked={selection.mode === 'filter' ? !selection.excludedIds.has(b.id) : selection.selectedIds.has(b.id)} onChange={e => onToggleRow(b.id, e.target.checked)} /></td>
-                                <td>{b.series}</td>
-                                <td>{b.number}</td>
-                                <td><span className={`px-2 py-1 text-xs font-semibold rounded-full ${BLANK_STATUS_COLORS[b.status]}`}>{BLANK_STATUS_TRANSLATIONS[b.status]}</span></td>
-                                <td>{b.ownerName}</td>
-                                <td>{b.usedInWaybillId || '-'}</td>
-                                <td>
-                                    {isSpoilAllowed && canBeSpoiled(b.status) && (
-                                        <button onClick={() => setSpoilModalData({ blank: { id: b.id, series: b.series, number: parseInt(b.number, 10), organizationId: b.organizationId }, reason: '' })} className="p-1" title="Испортить/списать бланк">
-                                            <TrashIcon className="h-5 w-5 text-yellow-600" />
-                                        </button>
-                                    )}
+                        {loading || error || enrichedBlanks.length === 0 ? (
+                            <tr>
+                                <td colSpan={columns.length + 2} className="p-0">
+                                    <EmptyState
+                                        reason={error ? getEmptyStateFromError(error) : (loading ? { type: 'loading' } : { type: 'empty', entityName: 'бланки' })}
+                                        onRetry={() => fetchData(filters, pagination.page, pagination.pageSize)}
+                                    />
                                 </td>
                             </tr>
-                        ))}
+                        ) : (
+                            enrichedBlanks.map(b => (
+                                <tr key={b.id} className="border-t dark:border-gray-700">
+                                    <td className="p-2"><input type="checkbox" checked={selection.mode === 'filter' ? !selection.excludedIds.has(b.id) : selection.selectedIds.has(b.id)} onChange={e => onToggleRow(b.id, e.target.checked)} /></td>
+                                    <td>{b.series}</td>
+                                    <td>{b.number}</td>
+                                    <td><span className={`px-2 py-1 text-xs font-semibold rounded-full ${BLANK_STATUS_COLORS[b.status]}`}>{BLANK_STATUS_TRANSLATIONS[b.status]}</span></td>
+                                    <td>{b.ownerName}</td>
+                                    <td>{b.usedInWaybillId || '-'}</td>
+                                    <td>
+                                        {isSpoilAllowed && canBeSpoiled(b.status) && (
+                                            <button onClick={() => setSpoilModalData({ blank: { id: b.id, series: b.series, number: parseInt(b.number, 10), organizationId: b.organizationId }, reason: '' })} className="p-1" title="Испортить/списать бланк">
+                                                <TrashIcon className="h-5 w-5 text-yellow-600" />
+                                            </button>
+                                        )}
+                                    </td>
+                                </tr>
+                            ))
+                        )}
                     </tbody>
                 </table>
             </div>

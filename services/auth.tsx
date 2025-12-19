@@ -11,6 +11,8 @@ import { loadJSON, saveJSON, removeKey } from './storage';
 import { getAppSettings } from './settingsApi';
 import { roleApi } from './roleApi';
 import { subscribe } from './bus';
+import { setSessionExpiredHandler, getSessionExpiredMessage } from './session';
+import { ToastContext } from '../contexts/ToastContext';
 import type { Role, Capability, User, AppSettings } from '../types';
 import { DEFAULT_ROLE_POLICIES, ALL_CAPS } from '../constants';
 
@@ -26,6 +28,7 @@ type AuthContextValue = {
   // Старый dev-метод, остаётся для DevRoleSwitcher / тестов
   loginAs: (user: User) => Promise<void>;
   logout: () => Promise<void>;
+  logoutAll: () => Promise<void>;
 
   allCaps: Capability[];
   rolePolicies: Record<Role, Capability[]>;
@@ -125,10 +128,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     return window.localStorage.getItem(TOKEN_KEY);
   });
 
+  // AUTH-002: Get toast context for session expiry notifications
+  const toastContext = useContext(ToastContext);
+
   const fetchPolicies = useCallback(async () => {
     const policies = await roleApi.getRolePolicies();
     setRolePolicies(policies);
   }, []);
+
+  // AUTH-002: Register session expired handler on mount
+  useEffect(() => {
+    setSessionExpiredHandler((reason) => {
+      // Clear local state
+      setCurrentUser(null);
+      setToken(null);
+
+      // Show toast message
+      const message = getSessionExpiredMessage(reason);
+      if (toastContext?.showToast) {
+        toastContext.showToast(message, 'error');
+      }
+
+      // Redirect to login
+      if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
+        window.location.href = '/login';
+      }
+    });
+  }, [toastContext]);
+
 
   useEffect(() => {
     let alive = true;
@@ -231,6 +258,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   }, [token]);
 
+  const logoutAll = useCallback(async () => {
+    try {
+      if (token) {
+        await fetch(`${API_BASE}/auth/logout-all`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+        });
+      }
+    } catch (e) {
+      console.error('Logout all failed', e);
+    }
+    // Regardless of success (if 401 we still want to clear locally)
+    setCurrentUser(null);
+    setToken(null);
+    await removeKey(CURRENT_USER_KEY);
+    if (typeof window !== 'undefined') {
+      window.localStorage.removeItem(TOKEN_KEY);
+      const { onSessionExpired } = await import('./session');
+      onSessionExpired('logout_all');
+    }
+  }, [token]);
+
   const value: AuthContextValue = {
     currentUser,
     appSettings,
@@ -239,6 +288,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     login,
     loginAs,
     logout,
+    logoutAll,
     allCaps: ALL_CAPS,
     rolePolicies,
     refreshPolicies: fetchPolicies,

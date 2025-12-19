@@ -3,6 +3,7 @@ import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcrypt';
 import { BadRequestError } from '../utils/errors';
 import { signAccessToken } from '../utils/jwt';
+import { hashToken, generateRefreshToken, addDays, REFRESH_TTL_DAYS } from '../utils/refreshToken';
 
 const prisma = new PrismaClient();
 
@@ -69,28 +70,43 @@ export async function login(email: string, password: string) {
     // Get role (use first role or fallback to 'user')
     const primaryRole = user.roles[0]?.role.code || 'user';
 
-    // Generate JWT token
-    const token = signAccessToken({
+    // Generate JWT access token
+    const accessToken = signAccessToken({
         id: user.id,
         organizationId: user.organizationId,
-        departmentId: user.departmentId,  // NEW: include department
+        departmentId: user.departmentId,
         role: primaryRole,
-        employeeId: user.employeeId // WB-905
+        employeeId: user.employeeId,
+        tokenVersion: user.tokenVersion  // AUTH-003: для мгновенной инвалидации
+    });
+
+    // Generate refresh token and store hash in DB
+    const refreshToken = generateRefreshToken();
+    const refreshTokenHash = hashToken(refreshToken);
+    const refreshExpiresAt = addDays(new Date(), REFRESH_TTL_DAYS);
+
+    await prisma.refreshToken.create({
+        data: {
+            userId: user.id,
+            tokenHash: refreshTokenHash,
+            expiresAt: refreshExpiresAt
+        }
     });
 
     // Return formatted response for frontend
     return {
         success: true,
         data: {
-            token,
+            token: accessToken,
+            refreshToken: refreshToken, // Frontend should store securely or we set HttpOnly cookie
             user: {
                 id: user.id,
                 email: user.email,
                 role: primaryRole,
                 displayName: user.fullName,
                 organizationId: user.organizationId,
-                departmentId: user.departmentId,  // NEW: return department info
-                employeeId: user.employeeId // WB-905
+                departmentId: user.departmentId,
+                employeeId: user.employeeId
             }
         }
     };

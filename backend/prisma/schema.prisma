@@ -142,6 +142,7 @@ model User {
   fullName       String   @db.Text
   isActive       Boolean  @default(true)
   isSystem       Boolean  @default(false)  // System users cannot be deleted
+  tokenVersion   Int      @default(0)      // AUTH-003: для немедленной инвалидации access token
   createdAt      DateTime @default(now()) @db.Timestamp(6)
   updatedAt      DateTime @default(now()) @updatedAt @db.Timestamp(6)
   employeeId     String?  @unique @db.Uuid

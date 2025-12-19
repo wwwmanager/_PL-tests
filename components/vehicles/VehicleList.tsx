@@ -14,6 +14,7 @@ import Modal from '../shared/Modal';
 import ConfirmationModal from '../shared/ConfirmationModal';
 import { useToast } from '../../hooks/useToast';
 import CollapsibleSection from '../shared/CollapsibleSection';
+import { EmptyState, getEmptyStateFromError, type EmptyStateReason } from '../common/EmptyState';
 // FIX: Import VEHICLE_STATUS_COLORS and VEHICLE_STATUS_TRANSLATIONS to resolve compilation errors.
 import { VEHICLE_STATUS_COLORS, VEHICLE_STATUS_TRANSLATIONS } from '../../constants';
 import { FormField, FormInput, FormSelect, FormTextarea, FormCheckbox } from '../shared/FormComponents';
@@ -89,6 +90,7 @@ export const VehicleList: React.FC = () => {
     const [organizations, setOrganizations] = useState<Organization[]>([]);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
+    const [loadError, setLoadError] = useState<EmptyStateReason | null>(null);
     const [actionModal, setActionModal] = useState<{ isOpen: boolean; type?: 'delete' | 'archive' | 'unarchive'; item?: Vehicle }>({ isOpen: false });
     const [showArchived, setShowArchived] = useState(false);
     const { showToast } = useToast();
@@ -120,6 +122,7 @@ export const VehicleList: React.FC = () => {
         console.log('🔍 [VehicleList] fetchData called');
         try {
             setIsLoading(true);
+            setLoadError(null);
             console.log('🔍 [VehicleList] Calling getVehicles()...');
             const [vehiclesData, fuelTypesData, employeesData, organizationsData] = await Promise.all([
                 getVehicles(),
@@ -132,9 +135,9 @@ export const VehicleList: React.FC = () => {
             setFuelTypes(fuelTypesData);
             setEmployees(employeesData.filter(e => e.employeeType === 'driver'));
             setOrganizations(organizationsData);
-        } catch (e) {
+        } catch (e: any) {
             console.error('❌ [VehicleList] Error in fetchData:', e);
-            showToast('Не удалось загрузить данные', 'error');
+            setLoadError(getEmptyStateFromError(e));
         } finally {
             setIsLoading(false);
         }
@@ -192,6 +195,7 @@ export const VehicleList: React.FC = () => {
         };
 
         try {
+            console.log('💾 [VehicleList] Saving vehicle:', JSON.stringify(dataToSave, null, 2));
             if (dataToSave.id) {
                 await updateVehicle(dataToSave as Vehicle);
             } else {
@@ -360,20 +364,25 @@ export const VehicleList: React.FC = () => {
                             </tr>
                         </thead>
                         <tbody>
-                            {isLoading ? (<tr><td colSpan={columns.length + 1} className="text-center p-4">Загрузка...</td></tr>)
-                                : rows.map(v => (
-                                    <tr key={v.id} className="bg-white dark:bg-gray-800 border-b dark:border-gray-700">
-                                        <td className="px-6 py-4 font-medium text-gray-900 dark:text-white">{v.registrationNumber}</td>
-                                        <td className="px-6 py-4">{v.brand}</td>
-                                        <td className="px-6 py-4">{v.driverName}</td>
-                                        <td className="px-6 py-4"><span className={`px-2 py-1 text-xs font-semibold rounded-full ${VEHICLE_STATUS_COLORS[v.status]}`}>{VEHICLE_STATUS_TRANSLATIONS[v.status]}</span></td>
-                                        <td className="px-6 py-4 text-center">
-                                            <button onClick={() => handleEdit(v)} className="p-2 text-blue-500" title="Редактировать"><PencilIcon className="h-5 w-5" /></button>
-                                            {v.status === VehicleStatus.ACTIVE ? <button onClick={() => openActionModal('archive', v)} className="p-2 text-purple-500" title="Архивировать"><ArchiveBoxIcon className="h-5 w-5" /></button> : <button onClick={() => openActionModal('unarchive', v)} className="p-2 text-green-500" title="Восстановить"><ArrowUpTrayIcon className="h-5 w-5" /></button>}
-                                            <button onClick={() => openActionModal('delete', v)} className="p-2 text-red-500" title="Удалить"><TrashIcon className="h-5 w-5" /></button>
-                                        </td>
-                                    </tr>
-                                ))}
+                            {isLoading ? (
+                                <tr><td colSpan={columns.length + 1}><EmptyState reason={{ type: 'loading' }} /></td></tr>
+                            ) : loadError ? (
+                                <tr><td colSpan={columns.length + 1}><EmptyState reason={loadError} entityName="транспорт" onRetry={fetchData} /></td></tr>
+                            ) : rows.length === 0 ? (
+                                <tr><td colSpan={columns.length + 1}><EmptyState reason={{ type: 'empty', entityName: 'транспорт' }} onRetry={fetchData} /></td></tr>
+                            ) : rows.map(v => (
+                                <tr key={v.id} className="bg-white dark:bg-gray-800 border-b dark:border-gray-700">
+                                    <td className="px-6 py-4 font-medium text-gray-900 dark:text-white">{v.registrationNumber}</td>
+                                    <td className="px-6 py-4">{v.brand}</td>
+                                    <td className="px-6 py-4">{v.driverName}</td>
+                                    <td className="px-6 py-4"><span className={`px-2 py-1 text-xs font-semibold rounded-full ${VEHICLE_STATUS_COLORS[v.status]}`}>{VEHICLE_STATUS_TRANSLATIONS[v.status]}</span></td>
+                                    <td className="px-6 py-4 text-center">
+                                        <button onClick={() => handleEdit(v)} className="p-2 text-blue-500" title="Редактировать"><PencilIcon className="h-5 w-5" /></button>
+                                        {v.status === VehicleStatus.ACTIVE ? <button onClick={() => openActionModal('archive', v)} className="p-2 text-purple-500" title="Архивировать"><ArchiveBoxIcon className="h-5 w-5" /></button> : <button onClick={() => openActionModal('unarchive', v)} className="p-2 text-green-500" title="Восстановить"><ArrowUpTrayIcon className="h-5 w-5" /></button>}
+                                        <button onClick={() => openActionModal('delete', v)} className="p-2 text-red-500" title="Удалить"><TrashIcon className="h-5 w-5" /></button>
+                                    </td>
+                                </tr>
+                            ))}
                         </tbody>
                     </table>
                 </div>

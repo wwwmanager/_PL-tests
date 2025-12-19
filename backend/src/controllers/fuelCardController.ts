@@ -66,3 +66,16 @@ export async function assignFuelCard(req: Request, res: Response, next: NextFunc
         next(err);
     }
 }
+
+/**
+ * REL-601: Get fuel cards for a specific driver
+ */
+export async function getFuelCardsForDriver(req: Request, res: Response, next: NextFunction) {
+    try {
+        const { driverId } = req.params;
+        const fuelCards = await fuelCardService.getFuelCardsForDriver(req.user!.organizationId, driverId);
+        res.json({ data: fuelCards });
+    } catch (err) {
+        next(err);
+    }
+}

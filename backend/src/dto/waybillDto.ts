@@ -50,8 +50,8 @@ const legacyFuelFieldsSchema = z.object({
  * Create waybill input schema
  */
 export const createWaybillSchema = z.object({
-    // Required fields
-    number: z.string().min(1, 'Номер путевого листа обязателен'),
+    // WB-901: number is optional - backend assigns it from blank
+    number: z.string().optional().default(''),
     date: z.string().regex(/^\d{4}-\d{2}-\d{2}/, 'Дата должна быть в формате YYYY-MM-DD'),
     vehicleId: z.string().uuid('vehicleId должен быть UUID'),
     driverId: z.string().uuid('driverId должен быть UUID'),

@@ -8,6 +8,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { deleteWaybill, getWaybills, updateWaybill, getLatestWaybill } from '../../services/api/waybillApi';
 import { getVehicles } from '../../services/api/vehicleApi';
 import { Waybill, WaybillStatus, Vehicle } from '../../types';
+import { listDrivers, DriverListItem } from '../../services/driverApi';
 import { WAYBILL_STATUS_COLORS, WAYBILL_STATUS_TRANSLATIONS } from '../../constants';
 import { PlusIcon, PencilIcon, TrashIcon, ArrowUpIcon, ArrowDownIcon, StatusCompletedIcon, CalendarDaysIcon } from '../Icons';
 // FIX: Changed import to a named import to resolve module resolution error.
@@ -17,6 +18,8 @@ import ConfirmationModal from '../shared/ConfirmationModal';
 import { useToast } from '../../hooks/useToast';
 import SeasonSettingsModal from './SeasonSettingsModal';
 import { subscribe } from '../../services/bus';
+import { EmptyState, getEmptyStateFromError } from '../common/EmptyState';
+import { HttpError } from '../../services/httpClient';
 
 
 type EnrichedWaybill = Waybill & { mileage?: number; rowNumber?: number; };
@@ -39,7 +42,9 @@ const VEHICLE_FILTER_KEY = 'waybillList_selectedVehicle';
 const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpened }) => {
   const [waybills, setWaybills] = useState<EnrichedWaybill[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [drivers, setDrivers] = useState<DriverListItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<HttpError | Error | null>(null);
   const [selectedVehicleId, setSelectedVehicleIdState] = useState<string>(() => {
     try {
       return localStorage.getItem(VEHICLE_FILTER_KEY) || '';
@@ -76,24 +81,33 @@ const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpene
 
   const fetchData = async () => {
     setLoading(true);
-    const [waybillsResponse, vehiclesData] = await Promise.all([
-      getWaybills({
-        page: currentPage,
-        limit: pageSize,
-        status: topLevelFilter.status || undefined,
-        startDate: topLevelFilter.dateFrom || undefined,
-        endDate: topLevelFilter.dateTo || undefined,
-      }),
-      getVehicles()
-    ]);
+    setError(null);
+    try {
+      const [waybillsResponse, vehiclesData, driversData] = await Promise.all([
+        getWaybills({
+          page: currentPage,
+          limit: pageSize,
+          status: topLevelFilter.status || undefined,
+          startDate: topLevelFilter.dateFrom || undefined,
+          endDate: topLevelFilter.dateTo || undefined,
+        }),
+        getVehicles(),
+        listDrivers()
+      ]);
 
-    setWaybills(waybillsResponse.waybills);
-    if (waybillsResponse.pagination) {
-      setTotalPages(waybillsResponse.pagination.pages);
-      setTotalRecords(waybillsResponse.pagination.total);
+      setWaybills(waybillsResponse.waybills);
+      if (waybillsResponse.pagination) {
+        setTotalPages(waybillsResponse.pagination.pages);
+        setTotalRecords(waybillsResponse.pagination.total);
+      }
+      setVehicles(vehiclesData);
+      setDrivers(driversData);
+    } catch (err: any) {
+      console.error('Failed to fetch waybills:', err);
+      setError(err);
+    } finally {
+      setLoading(false);
     }
-    setVehicles(vehiclesData);
-    setLoading(false);
   };
 
   useEffect(() => {
@@ -157,12 +171,19 @@ const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpene
   }, [isExtendedView]);
 
   const enrichedData = useMemo(() => {
-    return preFilteredWaybills.map((w, index) => ({
-      ...w,
-      rowNumber: index + 1,
-      mileage: (w.odometerEnd ?? w.odometerStart) - w.odometerStart,
-    }));
-  }, [preFilteredWaybills]);
+    return preFilteredWaybills.map((w, index) => {
+      const driver = drivers.find(d => d.id === w.driverId);
+      const vehicle = vehicles.find(v => v.id === w.vehicleId);
+
+      return {
+        ...w,
+        rowNumber: index + 1,
+        mileage: (w.odometerEnd ?? w.odometerStart) - w.odometerStart,
+        driver: driver?.fullName || w.driverId,
+        vehicle: vehicle ? `${vehicle.brand} ${vehicle.registrationNumber}` : w.vehicleId,
+      };
+    });
+  }, [preFilteredWaybills, drivers, vehicles]);
 
 
   const {
@@ -278,13 +299,20 @@ const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpene
           <input type="date" value={topLevelFilter.dateTo} onChange={e => setTopLevelFilter({ ...topLevelFilter, dateTo: e.target.value })} className="bg-white dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded-md p-2 focus:ring-blue-500 focus:border-blue-500 text-gray-700 dark:text-gray-200" placeholder="Дата по" />
           <select value={topLevelFilter.status} onChange={e => setTopLevelFilter({ ...topLevelFilter, status: e.target.value })} className="bg-white dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded-md p-2 focus:ring-blue-500 focus:border-blue-500 text-gray-700 dark:text-gray-200">
             <option value="">Все статусы</option>
-            {Object.entries(WAYBILL_STATUS_TRANSLATIONS).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
           </select>
           <select value={selectedVehicleId} onChange={e => setSelectedVehicleId(e.target.value)} className="bg-white dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded-md p-2 focus:ring-blue-500 focus:border-blue-500 text-gray-700 dark:text-gray-200">
             <option value="">Все ТС</option>
             {vehicles.map(vehicle => (
               <option key={vehicle.id} value={vehicle.id}>
-                {vehicle.brand} {vehicle.plateNumber}
+                {vehicle.brand} {vehicle.registrationNumber}
+              </option>
+            ))}
+          </select>
+          <select value={filters.driverId || ''} onChange={e => handleFilterChange('driverId', e.target.value)} className="bg-white dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded-md p-2 focus:ring-blue-500 focus:border-blue-500 text-gray-700 dark:text-gray-200">
+            <option value="">Все водители</option>
+            {drivers.map(driver => (
+              <option key={driver.id} value={driver.id}>
+                {driver.fullName}
               </option>
             ))}
           </select>
@@ -326,8 +354,15 @@ const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpene
               )}
             </thead>
             <tbody>
-              {loading ? (
-                <tr><td colSpan={columns.length + 2} className="text-center p-6">Загрузка...</td></tr>
+              {loading || error || rows.length === 0 ? (
+                <tr>
+                  <td colSpan={columns.length + 2} className="p-0">
+                    <EmptyState
+                      reason={error ? getEmptyStateFromError(error) : (loading ? { type: 'loading' } : { type: 'empty', entityName: 'путевые листы' })}
+                      onRetry={fetchData}
+                    />
+                  </td>
+                </tr>
               ) : (
                 rows.map(w => {
                   const colors = WAYBILL_STATUS_COLORS[w.status];
@@ -356,8 +391,8 @@ const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpene
                         <>
                           <td className="px-6 py-4 font-medium text-gray-900 dark:text-white">{w.number}</td>
                           <td className="px-6 py-4">{new Date(w.date).toLocaleDateString('ru-RU')}</td>
-                          <td className="px-6 py-4">{w.vehicleId}</td>
-                          <td className="px-6 py-4">{w.driverId}</td>
+                          <td className="px-6 py-4">{w.vehicle}</td>
+                          <td className="px-6 py-4">{w.driver}</td>
                           <td className="px-6 py-4">{w.organizationId}</td>
                           <td className="px-6 py-4">
                             <span className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium ${colors?.bg} ${colors?.text}`}>
@@ -400,7 +435,7 @@ const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpene
             </div>
           </div>
         )}
-      </div>
+      </div >
     </>
   );
 };

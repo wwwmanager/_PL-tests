@@ -83,42 +83,62 @@ export async function createEmployee(data: any) {
         throw new BadRequestError('fullName is required');
     }
 
-    return prisma.employee.create({
-        data: {
-            organizationId: data.organizationId,
-            departmentId: data.departmentId || null,
-            fullName: data.fullName,
-            shortName: data.shortName || null,
-            employeeType: data.employeeType || 'driver',
-            position: data.position || null,
-            status: data.status || 'Active',
-            phone: data.phone || null,
-            address: data.address || null,
-            email: data.email || null,
-            dateOfBirth: data.dateOfBirth || null,
-            personnelNumber: data.personnelNumber || null,
-            snils: data.snils || null,
-            licenseCategory: data.licenseCategory || null,
-            documentNumber: data.documentNumber || null,
-            documentExpiry: data.documentExpiry || null,
-            medicalCertificateSeries: data.medicalCertificateSeries || null,
-            medicalCertificateNumber: data.medicalCertificateNumber || null,
-            medicalCertificateIssueDate: data.medicalCertificateIssueDate || null,
-            medicalCertificateExpiryDate: data.medicalCertificateExpiryDate || null,
-            medicalInstitutionId: data.medicalInstitutionId || null,
-            driverCardType: data.driverCardType || null,
-            driverCardNumber: data.driverCardNumber || null,
-            driverCardStartDate: data.driverCardStartDate || null,
-            driverCardExpiryDate: data.driverCardExpiryDate || null,
-            fuelCardNumber: data.fuelCardNumber || null,
-            fuelCardBalance: data.fuelCardBalance !== undefined ? parseFloat(data.fuelCardBalance) : 0,
-            dispatcherId: data.dispatcherId || null,
-            controllerId: data.controllerId || null,
-            notes: data.notes || null,
-            isActive: data.status === 'Active',
-        },
+    // REL-011: Use transaction to create employee and auto-create Driver if needed
+    return prisma.$transaction(async (tx) => {
+        const employee = await tx.employee.create({
+            data: {
+                organizationId: data.organizationId,
+                departmentId: data.departmentId || null,
+                fullName: data.fullName,
+                shortName: data.shortName || null,
+                employeeType: data.employeeType || 'driver',
+                position: data.position || null,
+                status: data.status || 'Active',
+                phone: data.phone || null,
+                address: data.address || null,
+                email: data.email || null,
+                dateOfBirth: data.dateOfBirth || null,
+                personnelNumber: data.personnelNumber || null,
+                snils: data.snils || null,
+                licenseCategory: data.licenseCategory || null,
+                documentNumber: data.documentNumber || null,
+                documentExpiry: data.documentExpiry || null,
+                medicalCertificateSeries: data.medicalCertificateSeries || null,
+                medicalCertificateNumber: data.medicalCertificateNumber || null,
+                medicalCertificateIssueDate: data.medicalCertificateIssueDate || null,
+                medicalCertificateExpiryDate: data.medicalCertificateExpiryDate || null,
+                medicalInstitutionId: data.medicalInstitutionId || null,
+                driverCardType: data.driverCardType || null,
+                driverCardNumber: data.driverCardNumber || null,
+                driverCardStartDate: data.driverCardStartDate || null,
+                driverCardExpiryDate: data.driverCardExpiryDate || null,
+                fuelCardNumber: data.fuelCardNumber || null,
+                fuelCardBalance: data.fuelCardBalance !== undefined ? parseFloat(data.fuelCardBalance) : 0,
+                dispatcherId: data.dispatcherId || null,
+                controllerId: data.controllerId || null,
+                notes: data.notes || null,
+                isActive: data.status === 'Active',
+            },
+        });
+
+        // REL-011: Auto-create Driver record if employeeType is 'driver'
+        const employeeType = data.employeeType || 'driver';
+        if (employeeType === 'driver') {
+            await tx.driver.create({
+                data: {
+                    employeeId: employee.id,
+                    licenseNumber: data.documentNumber || `AUTO-${employee.id.slice(0, 8)}`,
+                    licenseCategory: data.licenseCategory || 'B',
+                    licenseValidTo: data.documentExpiry || null,
+                },
+            });
+            console.log(`[REL-011] Auto-created Driver for employee ${employee.id} (${employee.fullName})`);
+        }
+
+        return employee;
     });
 }
+
 
 export async function updateEmployee(id: string, data: any) {
     const employee = await prisma.employee.findUnique({
@@ -166,11 +186,42 @@ export async function updateEmployee(id: string, data: any) {
     if (data.notes !== undefined) updateData.notes = data.notes;
     if (data.organizationId !== undefined) updateData.organizationId = data.organizationId;
 
-    return prisma.employee.update({
-        where: { id },
-        data: updateData,
+    // REL-011: Check if we need to auto-create Driver when type changes to 'driver'
+    const newEmployeeType = data.employeeType || employee.employeeType;
+    const wasNotDriver = employee.employeeType !== 'driver';
+    const isNowDriver = newEmployeeType === 'driver';
+    const shouldCreateDriver = wasNotDriver && isNowDriver;
+
+    return prisma.$transaction(async (tx) => {
+        const updatedEmployee = await tx.employee.update({
+            where: { id },
+            data: updateData,
+        });
+
+        // REL-011: Auto-create Driver if employee type changed to 'driver'
+        if (shouldCreateDriver) {
+            const existingDriver = await tx.driver.findUnique({
+                where: { employeeId: id }
+            });
+
+            if (!existingDriver) {
+                await tx.driver.create({
+                    data: {
+                        employeeId: id,
+                        licenseNumber: data.documentNumber || employee.documentNumber || `AUTO-${id.slice(0, 8)}`,
+                        licenseCategory: data.licenseCategory || employee.licenseCategory || 'B',
+                        licenseValidTo: data.documentExpiry || employee.documentExpiry || null,
+                    },
+                });
+
+                console.log(`[REL-011] Auto-created Driver for employee ${id} (type changed to driver)`);
+            }
+        }
+
+        return updatedEmployee;
     });
 }
+
 
 export async function deleteEmployee(id: string): Promise<void> {
     const employee = await prisma.employee.findUnique({

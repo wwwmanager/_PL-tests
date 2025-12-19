@@ -15,6 +15,7 @@ import { generateId } from '../../services/api/core';
 import { getAvailableFuelExpenses, updateStockTransaction, getStockTransactions, getGarageStockItems, getNextWaybillNumber, getFuelCardBalance } from '../../services/stockApi';
 import { getVehicles } from '../../services/vehicleApiFacade';
 import { getEmployees } from '../../services/employeeApiFacade';
+import { listDrivers, DriverListItem } from '../../services/driverApi';
 import { generateRouteFromPrompt } from '../../services/geminiService';
 import { TrashIcon, SparklesIcon, PrinterIcon, PaperClipIcon, ChatBubbleLeftRightIcon, UploadIcon, BanknotesIcon, PaperAirplaneIcon, CheckCircleIcon, ArrowUturnLeftIcon, XIcon, PencilIcon } from '../Icons';
 import { WAYBILL_STATUS_TRANSLATIONS, WAYBILL_STATUS_COLORS } from '../../constants';
@@ -84,6 +85,7 @@ export const WaybillDetail: React.FC<WaybillDetailProps> = ({ waybill, isPrefill
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [organizations, setOrganizations] = useState<Organization[]>([]);
+  const [drivers, setDrivers] = useState<DriverListItem[]>([]); // REL-010: Real Driver list from API
   const [savedRoutes, setSavedRoutes] = useState<SavedRoute[]>([]);
   const [fuelTypes, setFuelTypes] = useState<FuelType[]>([]);
   const [seasonSettings, setSeasonSettings] = useState<SeasonSettings | null>(null);
@@ -156,15 +158,17 @@ export const WaybillDetail: React.FC<WaybillDetailProps> = ({ waybill, isPrefill
     }));
   };
 
-  const drivers = useMemo(() => employees.filter(e => e.employeeType === 'driver'), [employees]);
+  // REL-010: Removed - now using real Driver list from API
+  // const drivers = useMemo(() => employees.filter(e => e.employeeType === 'driver'), [employees]);
 
   useEffect(() => {
     const loadData = async () => {
-      // Removed checkAIAvailability from Promise.all to disable the check
-      const [vehiclesData, employeesData, organizationsData, savedRoutesData, fuelTypesData, settings, appSettingsData, stockItemsData, allTransactions] = await Promise.all([
+      // REL-010: Added listDrivers() to load real Driver data with Driver.id
+      const [vehiclesData, employeesData, organizationsData, driversData, savedRoutesData, fuelTypesData, settings, appSettingsData, stockItemsData, allTransactions] = await Promise.all([
         getVehicles(),
         getEmployees(),
         getOrganizations(),
+        listDrivers(),
         getSavedRoutes(),
         getFuelTypes(),
         getSeasonSettings(),
@@ -175,12 +179,14 @@ export const WaybillDetail: React.FC<WaybillDetailProps> = ({ waybill, isPrefill
       setVehicles(vehiclesData);
       setEmployees(employeesData);
       setOrganizations(organizationsData);
+      setDrivers(driversData); // REL-010: Set real drivers
       setSavedRoutes(savedRoutesData);
       setFuelTypes(fuelTypesData);
       // setIsAIAvailable is already true by default
       setSeasonSettings(settings);
       setAppSettings(appSettingsData);
       setStockItems(stockItemsData);
+
 
       let formDataToSet: Omit<Waybill, 'id'> | Waybill;
       if (isPrefill && waybill) {
@@ -262,7 +268,9 @@ export const WaybillDetail: React.FC<WaybillDetailProps> = ({ waybill, isPrefill
   }, [formData]);
 
   const selectedVehicle = useMemo(() => vehicles.find(v => v.id === formData.vehicleId), [formData.vehicleId, vehicles]);
-  const selectedDriver = useMemo(() => employees.find(e => e.id === formData.driverId), [formData.driverId, employees]);
+  // REL-010: Use real Driver.id from drivers list, fallback to employee data for display
+  const selectedDriver = useMemo(() => drivers.find(d => d.id === formData.driverId), [formData.driverId, drivers]);
+
   const selectedOrg = useMemo(() => organizations.find(o => o.id === formData.organizationId), [formData.organizationId, organizations]);
   const selectedDispatcher = useMemo(() => employees.find(e => e.id === formData.dispatcherId), [formData.dispatcherId, employees]);
   const selectedController = useMemo(() => employees.find(e => e.id === formData.controllerId), [formData.controllerId, employees]);
@@ -270,17 +278,16 @@ export const WaybillDetail: React.FC<WaybillDetailProps> = ({ waybill, isPrefill
 
 
   useEffect(() => {
-    if (selectedDriver?.organizationId) {
-      // For new or prefilled waybills, always sync organization with the selected driver.
-      // For existing waybills, don't change it automatically.
-      if (!('id' in formData) || !formData.id || isPrefill) {
-        setFormData(prev => ({
-          ...prev,
-          organizationId: selectedDriver.organizationId!,
-        }));
-      }
+    // REL-304: Ensure organization and department are synced if selecting a driver for a new waybill
+    if (selectedDriver && (!('id' in formData) || !formData.id || isPrefill)) {
+      setFormData(prev => ({
+        ...prev,
+        organizationId: prev.organizationId || selectedDriver.departmentId ? organizations.find(o => o.id === selectedDriver.departmentId)?.id || prev.organizationId : prev.organizationId,
+        // Department sync is more complex as it depends on Employee record
+      }));
     }
-  }, [selectedDriver, 'id' in formData ? formData.id : undefined, isPrefill]);
+  }, [selectedDriver, 'id' in formData ? (formData as any).id : undefined, isPrefill, organizations]);
+
 
 
   const uniqueLocations = useMemo(() => {
@@ -430,15 +437,18 @@ export const WaybillDetail: React.FC<WaybillDetailProps> = ({ waybill, isPrefill
 
   }, [totalDistance, formData.odometerStart, formData.fuelAtStart, formData.fuelFilled, selectedVehicle, formData.date, formData.routes, formData.fuelCalculationMethod, seasonSettings, dayMode]);
 
-  useEffect(() => {
-    if (selectedDriver) {
-      setFormData(prev => ({
-        ...prev,
-        dispatcherId: selectedDriver.dispatcherId || selectedDriver.id, // Default to self if not set
-        controllerId: selectedDriver.controllerId || selectedDriver.id, // Default to self if not set
-      }));
-    }
-  }, [selectedDriver]);
+  // REL-010: Removed incorrect auto-fill of dispatcherId/controllerId
+  // These are separate employees, not properties of the driver
+  // useEffect(() => {
+  //   if (selectedDriver) {
+  //     setFormData(prev => ({
+  //       ...prev,
+  //       dispatcherId: ...,
+  //       controllerId: ...,
+  //     }));
+  //   }
+  // }, [selectedDriver]);
+
 
   // WB-901: Removed updateWaybillNumberForDriver as number is now assigned by backend
 
@@ -447,17 +457,14 @@ export const WaybillDetail: React.FC<WaybillDetailProps> = ({ waybill, isPrefill
     const { name, value } = e.target;
 
     if (name === 'driverId') {
-      const driver = employees.find(d => d.id === value);
+      const driver = drivers.find(d => d.id === value);
 
       setFormData(prev => {
         const newFormData = { ...prev, driverId: value };
-        if (driver?.organizationId && (!('id' in prev) || !prev.id || isPrefill)) {
-          newFormData.organizationId = driver.organizationId;
-        }
+        // If it's a new waybill, try to sync org from driver's department (if available)
+        // Since backend GET /drivers doesn't return orgId directly, we might need to rely on vehicle
         return newFormData;
       });
-
-      // WB-901: Removed updateWaybillNumberForDriver call
 
       if (value) {
         getFuelCardBalance(value)
@@ -466,7 +473,6 @@ export const WaybillDetail: React.FC<WaybillDetailProps> = ({ waybill, isPrefill
       } else {
         setFuelCardBalance(null);
       }
-
     } else {
       setFormData(prev => {
         let newFormData = { ...prev, [name]: value };
@@ -1017,13 +1023,14 @@ export const WaybillDetail: React.FC<WaybillDetailProps> = ({ waybill, isPrefill
         <PrintableWaybill
           waybill={formData as Waybill}
           vehicle={selectedVehicle}
-          driver={selectedDriver}
+          driver={selectedDriver ? { fullName: selectedDriver.fullName, shortName: selectedDriver.shortName } as any : undefined} // REL-304: Pass driver data for print
           organization={selectedOrg}
           dispatcher={selectedDispatcher}
           controller={selectedController}
           fuelType={selectedFuelType}
           allOrganizations={organizations}
           onClose={() => setIsPrintModalOpen(false)}
+
         />
       )}
       {isImportModalOpen && <RouteImportModal onClose={() => setIsImportModalOpen(false)} onConfirm={handleImportConfirm} />}
@@ -1142,11 +1149,22 @@ export const WaybillDetail: React.FC<WaybillDetailProps> = ({ waybill, isPrefill
               </FormSelect>
               {autoFillMessage && <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">{autoFillMessage}</p>}
             </FormField>
+            {/* REL-304: Usage of drivers list (Driver.id) instead of employees */}
             <FormField label="Водитель">
-              <FormSelect name="driverId" value={formData.driverId} onChange={handleChange} disabled={!canEdit || isDriver}>
-                <option value="">Выберите водителя</option>
-                {drivers.map(d => <option key={d.id} value={d.id}>{d.fullName}</option>)}
+              <FormSelect
+                name="driverId"
+                value={formData.driverId}
+                onChange={handleChange}
+                disabled={!canEdit || isDriver}
+              >
+                <option value="">Выберите водителя...</option>
+                {drivers.map(d => (
+                  <option key={d.id} value={d.id}>
+                    {d.fullName} {d.isActive ? '' : '(неактивен)'}
+                  </option>
+                ))}
               </FormSelect>
+
               {fuelCardBalance != null && (
                 <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                   Доступно на карте: {fuelCardBalance.toFixed(2)} л

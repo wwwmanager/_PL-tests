@@ -33,12 +33,16 @@ export async function createUser(req: Request, res: Response, next: NextFunction
             organizationId: orgId
         };
 
+        console.log('🔧 [userController] Creating user with data:', JSON.stringify(data, null, 2));
         const user = await userService.createUser(data);
+        console.log('✅ [userController] User created:', user.id);
         res.status(201).json(user);
-    } catch (err) {
+    } catch (err: any) {
+        console.error('❌ [userController] Error creating user:', err.message, err.stack);
         next(err);
     }
 }
+
 
 export async function updateUser(req: Request, res: Response, next: NextFunction) {
     try {

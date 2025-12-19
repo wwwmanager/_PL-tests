@@ -33,6 +33,7 @@ export async function createVehicle(data: Partial<Vehicle>): Promise<Vehicle> {
 
 export async function updateVehicle(data: Partial<Vehicle> & { id: string }): Promise<Vehicle> {
     const { id, ...updateData } = data;
+    console.log('📝 [vehicleApi] PUT /vehicles/' + id, 'updateData:', JSON.stringify(updateData, null, 2));
     // Backend now returns the updated vehicle object (updated in WB-201)
     const vehicle = await httpClient.put<Vehicle>(`/vehicles/${id}`, updateData);
     return vehicle;

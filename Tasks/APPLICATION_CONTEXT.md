@@ -41,7 +41,7 @@
 - **Слоистая архитектура:** routes → controllers → services → TypeORM
 - **Основные сущности:**
   - Organization, Department
-  - User, Role, Permission, UserRole, RolePermission
+  - User (tokenVersion), Role, Permission, UserRole, RolePermission
   - Employee (driver, dispatcher, etc.)
   - Vehicle, FuelCard
   - Waybill, WaybillRoute, WaybillFuel
@@ -127,6 +127,13 @@ AI обязан:
 1. Подтвердить загрузку контекста
 2. Соотнести команду с планом
 3. При необходимости предложить обновление документации
+
+---
+
+## History
+
+- **2025-12-19:** AUTH-003 — Немедленная инвалидация access token через tokenVersion. Добавлена проверка в authMiddleware и инкремент в transferUser.
+- **2025-12-19:** REL-204 — Реализация "Умных пустых состояний" (Smart Empty States) во всех основных списках приложения.
 
 ---
 

@@ -1,9 +1,29 @@
 /**
  * HTTP Client для взаимодействия с Backend API
- * Поддерживает авторизацию через Bearer токен
+ * Поддерживает авторизацию через Bearer токен и HttpOnly refresh cookie
  */
 
+import { onSessionExpired } from './session';
+
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3001/api';
+
+/**
+ * Custom HTTP Error class that includes status code and requestId
+ * REL-204: Allows consumers to detect specific HTTP errors and show requestId
+ */
+export class HttpError extends Error {
+    statusCode: number;
+    requestId: string | null;
+    code: string | null;
+
+    constructor(message: string, statusCode: number, requestId?: string | null, code?: string | null) {
+        super(message);
+        this.name = 'HttpError';
+        this.statusCode = statusCode;
+        this.requestId = requestId ?? null;
+        this.code = code ?? null;
+    }
+}
 
 let accessToken: string | null = null;
 
@@ -32,10 +52,60 @@ export function getAccessToken(): string | null {
     return accessToken;
 }
 
+// REL-402: Защита от параллельных refresh запросов
+let refreshInFlight: Promise<boolean> | null = null;
+
+/**
+ * Попытка обновить access token через refresh endpoint
+ * Использует HttpOnly cookie
+ */
+async function tryRefreshToken(): Promise<boolean> {
+    // Если уже идёт refresh — ждём его результат
+    if (refreshInFlight) return refreshInFlight;
+
+    refreshInFlight = (async () => {
+        try {
+            console.log('🔄 [httpClient] Attempting token refresh...');
+
+            const res = await fetch(`${API_URL}/auth/refresh`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include', // КЛЮЧЕВО: отправляет HttpOnly cookie
+            });
+
+            if (!res.ok) {
+                console.warn('🔄 [httpClient] Refresh failed:', res.status);
+                return false;
+            }
+
+            const payload = await res.json();
+
+            // Извлекаем новый токен из ответа
+            const token = payload?.data?.token ?? payload?.token ?? null;
+            if (!token) {
+                console.warn('🔄 [httpClient] Refresh response missing token');
+                return false;
+            }
+
+            setAccessToken(token);
+            console.log('✅ [httpClient] Token refreshed successfully');
+            return true;
+        } catch (error) {
+            console.error('❌ [httpClient] Refresh error:', error);
+            return false;
+        } finally {
+            refreshInFlight = null;
+        }
+    })();
+
+    return refreshInFlight;
+}
+
 /**
  * Базовая функция для выполнения HTTP запросов
+ * @param retryOn401 - если true, пробует refresh при 401 и повторяет запрос
  */
-async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+async function request<T>(path: string, options: RequestInit = {}, retryOn401 = true): Promise<T> {
     const headers: Record<string, string> = {
         'Content-Type': 'application/json',
     };
@@ -57,12 +127,32 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
             console.group(`🌐 ${options.method} ${API_URL}${path}`);
             console.log('📤 Request Headers:', headers);
             if (options.body) {
-                console.log('📦 Request Payload:', JSON.parse(options.body as string));
+                try {
+                    console.log('📦 Request Payload:', JSON.parse(options.body as string));
+                } catch {
+                    console.log('📦 Request Payload: [non-JSON]');
+                }
             }
             console.groupEnd();
         }
 
-        const res = await fetch(`${API_URL}${path}`, { ...options, headers });
+        const res = await fetch(`${API_URL}${path}`, {
+            ...options,
+            headers,
+            credentials: 'include'  // REL-402: Для HttpOnly refresh cookie
+        });
+
+        // REL-402: При 401 пробуем refresh один раз
+        if (res.status === 401 && retryOn401) {
+            const refreshed = await tryRefreshToken();
+            if (refreshed) {
+                // Повторяем запрос с новым токеном (без повторного retry)
+                return request<T>(path, options, false);
+            }
+            // AUTH-002: Refresh не удался — уведомляем о разлогине
+            setAccessToken(null);
+            onSessionExpired('token_revoked');
+        }
 
         if (!res.ok) {
             // Обработка ошибок
@@ -84,15 +174,14 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
             }
             console.groupEnd();
 
-            // Если 401 - сбросить токен
-            if (res.status === 401) {
-                setAccessToken(null);
-            }
-
-            throw new Error(errorMessage);
+            throw new HttpError(errorMessage, res.status, errorData?.requestId, errorData?.code);
         }
 
-        // Обработка пустого ответа
+        // Обработка пустого ответа (204 No Content)
+        if (res.status === 204) {
+            return undefined as T;
+        }
+
         const contentType = res.headers.get('content-type');
         if (contentType && contentType.includes('application/json')) {
             const jsonResponse = await res.json();
@@ -109,6 +198,9 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
         return res.text() as unknown as T;
     } catch (error) {
+        if (error instanceof HttpError) {
+            throw error;
+        }
         if (error instanceof Error) {
             throw error;
         }
@@ -143,4 +235,8 @@ export const http = {
     delete: <T>(path: string) =>
         request<T>(path, { method: 'DELETE' }),
 };
+
 export const httpClient = http;
+
+// Re-export для использования в authApi
+export { setAccessToken as setToken, getAccessToken as getToken };

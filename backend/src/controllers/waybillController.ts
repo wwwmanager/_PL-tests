@@ -9,12 +9,6 @@ import {
 } from '../dto/waybillDto';
 import { BadRequestError } from '../utils/errors';
 
-/**
- * Format Zod validation errors for API response
- */
-function formatZodError(error: ZodError): string {
-    return error.issues.map((e: any) => `${e.path.join('.')}: ${e.message}`).join('; ');
-}
 
 export async function listWaybills(req: Request, res: Response, next: NextFunction) {
     try {
@@ -65,16 +59,10 @@ export async function createWaybill(req: Request, res: Response, next: NextFunct
     try {
         const orgId = req.user!.organizationId;
 
-        // Validate input with Zod
-        const parseResult = createWaybillSchema.safeParse(req.body);
-        if (!parseResult.success) {
-            throw new BadRequestError(formatZodError(parseResult.error));
-        }
-
-        const data = parseResult.data;
-
         // Map legacy fuel fields to fuelLines if needed
-        mapLegacyFuelFields(data);
+        mapLegacyFuelFields(req.body);
+
+        const data = req.body;
 
         console.log('[WB-401] Validated waybill data:', {
             number: data.number,
@@ -106,16 +94,10 @@ export async function updateWaybill(req: Request, res: Response, next: NextFunct
         const orgId = req.user!.organizationId;
         const { id } = req.params;
 
-        // Validate input with Zod
-        const parseResult = updateWaybillSchema.safeParse(req.body);
-        if (!parseResult.success) {
-            throw new BadRequestError(formatZodError(parseResult.error));
-        }
-
-        const data = parseResult.data;
-
         // Map legacy fuel fields to fuelLines if needed
-        mapLegacyFuelFields(data);
+        mapLegacyFuelFields(req.body);
+
+        const data = req.body;
 
         const waybill = await waybillService.updateWaybill(req.user as any, id, data as any);
         res.json(waybill);
@@ -142,13 +124,7 @@ export async function changeWaybillStatus(req: Request, res: Response, next: Nex
         const userRole = req.user!.role;
         const { id } = req.params;
 
-        // Validate status input
-        const parseResult = changeStatusSchema.safeParse(req.body);
-        if (!parseResult.success) {
-            throw new BadRequestError(formatZodError(parseResult.error));
-        }
-
-        const { status } = parseResult.data;
+        const { status } = req.body;
 
         // WB-701: Check for override permission
         // Admin and dispatcher can override norm, others cannot

@@ -57,6 +57,35 @@ export async function getNextBlankForDriver(
 }
 
 /**
+ * REL-502: Get all available blanks for a driver (ISSUED status)
+ * Returns list of blanks that can be selected for waybill creation.
+ * 
+ * @param driverId - Driver ID (references Driver table, not Employee)
+ * @returns Array of available blanks
+ */
+export async function getAvailableBlanksForDriver(driverId: string): Promise<Array<{
+    id: string;
+    series: string;
+    number: number;
+    formattedNumber: string;
+}>> {
+    try {
+        const response = await httpClient.get<{
+            data: Array<{
+                id: string;
+                series: string;
+                number: number;
+                formattedNumber: string;
+            }>
+        }>(`/blanks/available/${driverId}`);
+        return response.data;
+    } catch (error) {
+        console.error('[blankApi] getAvailableBlanksForDriver error:', error);
+        return [];
+    }
+}
+
+/**
  * Mark a blank as used for a waybill
  * @param organizationId - Organization ID
  * @param series - Blank series

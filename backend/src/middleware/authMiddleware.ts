@@ -1,22 +1,27 @@
 import { Request, Response, NextFunction } from 'express';
 import { verifyAccessToken } from '../utils/jwt';
 import { UnauthorizedError } from '../utils/errors';
+import { prisma } from '../db/prisma';
 
 declare module 'express-serve-static-core' {
     interface Request {
         user?: {
             id: string;
             organizationId: string;
-            departmentId: string | null;  // NEW: department-level isolation
+            departmentId: string | null;
             role: string;
-            employeeId: string | null; // WB-905
+            employeeId: string | null;
+            tokenVersion?: number;
         };
     }
 }
 
-export const authMiddleware = (req: Request, res: Response, next: NextFunction) => {
+/**
+ * AUTH-003: Auth middleware with database-backed tokenVersion check.
+ * Ensures immediate invalidation of access tokens when user properties change.
+ */
+export const authMiddleware = async (req: Request, res: Response, next: NextFunction) => {
     const header = req.headers.authorization;
-    console.log('[authMiddleware] Authorization header:', header ? `Bearer ${header.substring(0, 20)}...` : 'MISSING');
 
     if (!header || !header.startsWith('Bearer ')) {
         console.log('[authMiddleware] No valid Bearer token');
@@ -24,20 +29,44 @@ export const authMiddleware = (req: Request, res: Response, next: NextFunction) 
     }
 
     const token = header.substring('Bearer '.length);
-    console.log('[authMiddleware] Token length:', token.length);
 
     try {
         const payload = verifyAccessToken(token);
-        console.log('[authMiddleware] Decoded payload:', JSON.stringify(payload, null, 2));
+
+        // ✅ AUTH-003: Check tokenVersion against database
+        const tokenVersionFromJwt = Number(payload.tokenVersion ?? 0);
+
+        const userRow = await prisma.user.findUnique({
+            where: { id: payload.sub },
+            select: {
+                id: true,
+                isActive: true,
+                tokenVersion: true,
+                organizationId: true,
+                departmentId: true,
+            },
+        });
+
+        if (!userRow || !userRow.isActive) {
+            console.log('[authMiddleware] User not found or inactive:', payload.sub);
+            return next(new UnauthorizedError('Неверный или истёкший токен'));
+        }
+
+        if (Number(userRow.tokenVersion ?? 0) !== tokenVersionFromJwt) {
+            console.warn('[authMiddleware] SESSION_INVALIDATED for user:', payload.sub,
+                'DB version:', userRow.tokenVersion, 'JWT version:', tokenVersionFromJwt);
+            return next(new UnauthorizedError('Сессия недействительна (SESSION_INVALIDATED)'));
+        }
 
         req.user = {
             id: payload.sub,
             organizationId: payload.organizationId,
-            departmentId: payload.departmentId,  // NEW: extract from JWT
+            departmentId: payload.departmentId,
             role: payload.role,
-            employeeId: payload.employeeId, // WB-905
+            employeeId: payload.employeeId,
+            tokenVersion: userRow.tokenVersion
         };
-        console.log('[authMiddleware] req.user set:', req.user);
+
         next();
     } catch (err: any) {
         console.error('[authMiddleware] Token verification error:', err.name, err.message);

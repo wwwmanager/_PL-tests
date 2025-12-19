@@ -83,7 +83,7 @@ export async function getDriverSummary(req: Request, res: Response, next: NextFu
     try {
         const { driverId } = req.params;
         console.log(`🌐 [blankController] GET /summary/driver/${driverId} request received`);
-        const summary = await blankService.getDriverSummary(driverId);
+        const summary = await blankService.getDriverSummary(req.user!.organizationId, driverId);
         res.json(summary);
     } catch (err) {
         console.error(`❌ [blankController] getDriverSummary error for driverId ${req.params.driverId}:`, err);
@@ -114,4 +114,20 @@ export async function issueBlanksRange(req: Request, res: Response, next: NextFu
     }
 }
 
+/**
+ * REL-501: Get available blanks for a driver
+ * GET /blanks/available/:driverId
+ * Returns blanks in ISSUED status that can be selected for waybill
+ */
+export async function getAvailableBlanks(req: Request, res: Response, next: NextFunction) {
+    try {
+        const { driverId } = req.params;
+        console.log(`🎫 [blankController] GET /blanks/available/${driverId} request received`);
 
+        const blanks = await blankService.getAvailableBlanksForDriver(req.user!.organizationId, driverId);
+        res.json({ data: blanks });
+    } catch (err) {
+        console.error(`❌ [blankController] getAvailableBlanks error for driverId ${req.params.driverId}:`, err);
+        next(err);
+    }
+}

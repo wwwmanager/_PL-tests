@@ -883,9 +883,9 @@ export const importData = async (req: Request, res: Response) => {
  */
 export const transferUser = async (req: Request, res: Response) => {
     const adminUserId = (req as any).user?.id;
-    const { userId, targetOrganizationId, createOrganization, transferAllData } = req.body;
+    const { userId, targetOrganizationId, targetDepartmentId, createOrganization, transferAllData } = req.body;
 
-    logger.info({ adminUserId, userId, targetOrganizationId, createOrganization, transferAllData }, 'Transfer user requested');
+    logger.info({ adminUserId, userId, targetOrganizationId, targetDepartmentId, createOrganization, transferAllData }, 'Transfer user requested');
 
     try {
         // Validate user exists
@@ -940,12 +940,50 @@ export const transferUser = async (req: Request, res: Response) => {
         // Transfer counts for response
         const transferCounts: Record<string, number> = {};
 
-        // Transfer user
-        await prisma.user.update({
-            where: { id: userId },
-            data: { organizationId: targetOrgId }
+        // REL-402: Transfer user AND revoke tokens in single transaction
+        const txResult = await prisma.$transaction(async (tx) => {
+            // 1) Update user organization and increment tokenVersion (AUTH-003)
+            const updatedUser = await tx.user.update({
+                where: { id: userId },
+                data: {
+                    organizationId: targetOrgId,
+                    departmentId: targetDepartmentId ?? null,
+                    tokenVersion: { increment: 1 }
+                },
+                select: { id: true, organizationId: true, departmentId: true, tokenVersion: true }
+            });
+
+            // 2) Revoke all active refresh tokens for this user
+            const revokedTokens = await tx.refreshToken.updateMany({
+                where: {
+                    userId: userId,
+                    revokedAt: null  // Only revoke active tokens
+                },
+                data: {
+                    revokedAt: new Date()
+                }
+            });
+
+            // 3) Create audit log
+            await tx.auditLog.create({
+                data: {
+                    organizationId: targetOrgId,
+                    userId: adminUserId,
+                    actionType: 'UPDATE',
+                    entityType: 'USER',
+                    entityId: userId,
+                    description: `Перенос пользователя из "${sourceOrgName}" в "${targetOrg.shortName || targetOrg.name}". Revoked tokens: ${revokedTokens.count}`,
+                    oldValue: { organizationId: sourceOrgId, departmentId: user.departmentId, tokenVersion: user.tokenVersion },
+                    newValue: { organizationId: updatedUser.organizationId, departmentId: updatedUser.departmentId, tokenVersion: updatedUser.tokenVersion }
+                }
+            });
+
+            return { updatedUser, revokedCount: revokedTokens.count };
         });
+
         transferCounts.users = 1;
+        const revokedTokensCount = txResult.revokedCount;
+        logger.info({ userId, revokedCount: revokedTokensCount }, '[REL-402] Revoked refresh tokens after organization change');
 
         // If transferAllData is true, move all data from source org to target org
         if (transferAllData) {

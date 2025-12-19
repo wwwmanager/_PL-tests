@@ -183,12 +183,36 @@ export async function issueBlank(organizationId: string, data: IssueBlankDto) {
         throw new Error(`Бланк не доступен (статус: ${blank.status})`);
     }
 
+    // REL-702: Validate driverId references Driver table, not Employee
+    let actualDriverId = data.driverId;
+    if (data.driverId) {
+        // First try direct Driver lookup
+        let driver = await prisma.driver.findUnique({
+            where: { id: data.driverId }
+        });
+
+        if (!driver) {
+            // Fallback: maybe frontend sent Employee.id instead of Driver.id
+            driver = await prisma.driver.findUnique({
+                where: { employeeId: data.driverId }
+            });
+            if (driver) {
+                console.warn(`[REL-702] WARNING: issueBlank received employeeId '${data.driverId}' instead of driverId '${driver.id}'. Frontend should send Driver.id.`);
+                actualDriverId = driver.id;
+            }
+        }
+
+        if (!driver && !actualDriverId) {
+            throw new Error('Водитель не найден');
+        }
+    }
+
     // Update blank
     return prisma.blank.update({
         where: { id: blank.id },
         data: {
             status: BlankStatus.ISSUED,
-            issuedToDriverId: data.driverId,
+            issuedToDriverId: actualDriverId || null,
             issuedToVehicleId: data.vehicleId,
             issuedAt: new Date()
         }
@@ -315,12 +339,15 @@ function buildBlankRanges(blanks: { series: string | null; number: number }[]): 
     return ranges;
 }
 
-export async function getDriverSummary(employeeId: string): Promise<DriverBlankSummary> {
-    console.log(`📊 [blankService] Fetching summary for employeeId: ${employeeId}`);
+export async function getDriverSummary(organizationId: string, employeeId: string): Promise<DriverBlankSummary> {
+    console.log(`📊 [blankService] Fetching summary for employeeId: ${employeeId} in org: ${organizationId}`);
 
-    // First find the Driver record by employeeId
-    const driver = await prisma.driver.findUnique({
-        where: { employeeId }
+    // First find the Driver record by employeeId and check organization
+    const driver = await prisma.driver.findFirst({
+        where: {
+            employeeId,
+            employee: { organizationId }
+        }
     });
 
     if (!driver) {
@@ -337,7 +364,7 @@ export async function getDriverSummary(employeeId: string): Promise<DriverBlankS
         select: { series: true, number: true, status: true }
     });
 
-    console.log(`📋 [blankService] Found ${blanks.length} total blanks for driver: ${driver.id}`);
+    console.log(`📋[blankService] Found ${blanks.length} total blanks for driver: ${driver.id} `);
 
     // Categorize by status
     // Include both ISSUED and RESERVED in active blanks
@@ -345,13 +372,55 @@ export async function getDriverSummary(employeeId: string): Promise<DriverBlankS
     const usedBlanks = blanks.filter(b => b.status === BlankStatus.USED);
     const spoiledBlanks = blanks.filter(b => b.status === BlankStatus.SPOILED);
 
-    console.log(`📈 [blankService] Categorized: active=${activeBlanks.length}, used=${usedBlanks.length}, spoiled=${spoiledBlanks.length}`);
+    console.log(`📈[blankService] Categorized: active = ${activeBlanks.length}, used = ${usedBlanks.length}, spoiled = ${spoiledBlanks.length} `);
 
     return {
         active: buildBlankRanges(activeBlanks),
         used: buildBlankRanges(usedBlanks),
         spoiled: buildBlankRanges(spoiledBlanks)
     };
+}
+
+/**
+ * REL-501: Get available blanks for driver (ISSUED status only)
+ * Returns list of blanks that can be selected for waybill creation.
+ * 
+ * @param driverId - Driver ID (references Driver table, not Employee)
+ * @returns Array of available blanks with id, series, number
+ */
+export async function getAvailableBlanksForDriver(organizationId: string, driverId: string): Promise<Array<{
+    id: string;
+    series: string;
+    number: number;
+    formattedNumber: string;
+}>> {
+    console.log(`🎫[blankService] getAvailableBlanksForDriver called for driverId: ${driverId} in org: ${organizationId} `);
+
+    const blanks = await prisma.blank.findMany({
+        where: {
+            organizationId,
+            issuedToDriverId: driverId,
+            status: BlankStatus.ISSUED  // Only ISSUED, not RESERVED or USED
+        },
+        select: {
+            id: true,
+            series: true,
+            number: true
+        },
+        orderBy: [
+            { series: 'asc' },
+            { number: 'asc' }
+        ]
+    });
+
+    console.log(`📋[blankService] Found ${blanks.length} available blanks for driverId: ${driverId} `);
+
+    return blanks.map(b => ({
+        id: b.id,
+        series: b.series || '',
+        number: b.number,
+        formattedNumber: `${b.series || ''} ${String(b.number).padStart(6, '0')} `.trim()
+    }));
 }
 
 // ============================================================================
@@ -384,16 +453,26 @@ export async function reserveNextBlankForDriver(
     return prisma.$transaction(async (tx) => {
         // Find the next available blank with row lock (FOR UPDATE)
         // This raw query locks the row so parallel transactions wait
+        // BLS-FIX: Use Prisma.sql for conditional department filtering
+        // Column names must be quoted camelCase to match Prisma schema
+        const { Prisma } = require('@prisma/client');
+
+        const departmentFilter = departmentId
+            ? Prisma.sql`AND "departmentId" = ${departmentId} `
+            : Prisma.empty;
+
         const blanks = await tx.$queryRaw<Array<{ id: string; series: string; number: number }>>`
             SELECT id, series, number 
             FROM blanks 
-            WHERE organization_id = ${organizationId}
+            WHERE "organizationId" = ${organizationId}
               AND status = 'AVAILABLE'
-              ${departmentId ? tx.$queryRaw`AND department_id = ${departmentId}` : tx.$queryRaw``}
+              ${departmentFilter}
             ORDER BY series ASC, number ASC
             LIMIT 1
             FOR UPDATE SKIP LOCKED
         `;
+
+
 
         if (blanks.length === 0) {
             throw new Error('Нет доступных бланков для резервирования');
@@ -501,7 +580,7 @@ export async function releaseBlank(
             }
         });
 
-        return { success: true, message: `Бланк ${blank.series}-${blank.number} освобождён` };
+        return { success: true, message: `Бланк ${blank.series} -${blank.number} освобождён` };
     });
 }
 
@@ -534,7 +613,7 @@ export async function useBlank(
             }
         });
 
-        return { success: true, message: `Бланк ${blank.series}-${blank.number} использован` };
+        return { success: true, message: `Бланк ${blank.series} -${blank.number} использован` };
     });
 }
 
@@ -573,7 +652,7 @@ export async function spoilBlank(
             where: { id: blank.id },
             data: {
                 status: BlankStatus.SPOILED,
-                damagedReason: `${options.reason}: ${options.note || ''}`
+                damagedReason: `${options.reason}: ${options.note || ''} `
             }
         });
 
@@ -585,12 +664,12 @@ export async function spoilBlank(
                 actionType: 'STATUS_CHANGE',
                 entityType: 'BLANK',
                 entityId: blank.id,
-                description: `Бланк ${blank.series}-${blank.number} списан: ${options.reason}`,
+                description: `Бланк ${blank.series} -${blank.number} списан: ${options.reason} `,
                 oldValue: { status: blank.status },
                 newValue: { status: BlankStatus.SPOILED, reason: options.reason }
             }
         });
 
-        return { success: true, message: `Бланк ${blank.series}-${blank.number} списан` };
+        return { success: true, message: `Бланк ${blank.series} -${blank.number} списан` };
     });
 }

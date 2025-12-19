@@ -63,3 +63,13 @@ export function checkPermission(requiredPermission: string) {
         }
     };
 }
+
+/**
+ * REL-702: Invalidate the permission cache
+ * Call this when roles or role-permissions are updated
+ */
+export function invalidatePermissionCache() {
+    console.log('🧹 Invalidating permission cache...');
+    permissionCache = null;
+    cacheTimestamp = 0;
+}

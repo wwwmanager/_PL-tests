@@ -13,6 +13,7 @@ import { z } from 'zod';
 import { createRequiredProps } from '../../utils/schemaHelpers';
 
 import DriverBlanksSection from './DriverBlanksSection';
+import { EmptyState, getEmptyStateFromError } from '../common/EmptyState';
 
 const ALL_LICENSE_CATEGORIES = ['A', 'A1', 'B', 'B1', 'BE', 'C', 'C1', 'CE', 'C1E', 'D', 'D1', 'DE', 'D1E', 'M', 'Tm', 'Tb'];
 
@@ -115,6 +116,7 @@ const EmployeeList: React.FC = () => {
     const [currentItem, setCurrentItem] = useState<Partial<Employee> | null>(null);
     const [initialItem, setInitialItem] = useState<Partial<Employee> | null>(null);
     const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState<any>(null);
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [employeeToDelete, setEmployeeToDelete] = useState<Employee | null>(null);
@@ -154,8 +156,9 @@ const EmployeeList: React.FC = () => {
     };
 
     const fetchData = async () => {
+        setIsLoading(true);
+        setError(null);
         try {
-            setIsLoading(true);
             const [employeesData, orgsData] = await Promise.all([
                 getEmployees({ isActive: true }), // Only fetch active employees
                 getOrganizations()
@@ -164,6 +167,8 @@ const EmployeeList: React.FC = () => {
             setOrganizations(orgsData);
             setErrors({});
         } catch (e) {
+            console.error('Failed to fetch employees:', e);
+            setError(e);
             setErrors({ 'fetch': 'Не удалось загрузить данные.' });
         } finally {
             setIsLoading(false);
@@ -552,10 +557,14 @@ const EmployeeList: React.FC = () => {
                             </tr>
                         </thead>
                         <tbody>
-                            {isLoading ? (
-                                <tr><td colSpan={columns.length + 1} className="text-center p-4">Загрузка...</td></tr>
-                            ) : errors.fetch ? (
-                                <tr><td colSpan={columns.length + 1} className="text-center p-4 text-red-500">{errors.fetch}</td></tr>
+                            {isLoading || error || rows.length === 0 ? (
+                                <tr>
+                                    <td colSpan={columns.length + 1} className="p-0">
+                                        <EmptyState
+                                            reason={error ? getEmptyStateFromError(error) : (isLoading ? { type: 'loading' } : { type: 'empty', entityName: 'сотрудники' })}
+                                        />
+                                    </td>
+                                </tr>
                             ) : rows.map(e => (
                                 <tr key={e.id} className="bg-white dark:bg-gray-800 border-b dark:border-gray-700">
                                     <td className="px-6 py-4 font-medium text-gray-900 dark:text-white" title={e.fullName}>{e.shortName}</td>

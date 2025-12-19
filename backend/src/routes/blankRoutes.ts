@@ -31,4 +31,5 @@ router.post('/issue-range', checkPermission('blank.update'), blankController.iss
 // Get driver blank summary (read permission)
 router.get('/summary/driver/:driverId', checkPermission('blank.read'), blankController.getDriverSummary);
 
-
+// REL-501: Get available blanks for driver (blanks in ISSUED status for waybill selection)
+router.get('/available/:driverId', checkPermission('blank.read'), blankController.getAvailableBlanks);

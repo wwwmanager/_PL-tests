@@ -6,12 +6,12 @@ import { authMiddleware } from '../middleware/authMiddleware';
 const router = Router();
 
 /**
- * Middleware to require a specific role
+ * Middleware to require a specific role (case-insensitive)
  */
 const requireRole = (role: string) => {
     return (req: Request, res: Response, next: NextFunction) => {
         const userRole = (req as any).user?.role;
-        if (userRole !== role) {
+        if (!userRole || String(userRole).toLowerCase() !== role.toLowerCase()) {
             return res.status(403).json({
                 success: false,
                 message: `Access denied. Required role: ${role}`

@@ -32,8 +32,15 @@ export async function login(email: string, password: string): Promise<AuthUser> 
  */
 export async function logout(): Promise<void> {
     setAccessToken(null);
-    // Можно добавить вызов на backend для инвалидации токена
-    // await http.post('/auth/logout');
+    await http.post('/auth/logout');
+}
+
+/**
+ * Выйти со всех устройств (AUTH-004.1)
+ */
+export async function logoutAll(): Promise<void> {
+    await http.post('/auth/logout-all');
+    setAccessToken(null);
 }
 
 /**

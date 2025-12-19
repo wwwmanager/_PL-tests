@@ -19,10 +19,15 @@ import { router as settingsRoutes } from './settingsRoutes';
 import { router as dashboardRoutes } from './dashboardRoutes';
 import adminRoutes from './adminRoutes';
 import { calendarRouter } from './calendarRoutes';
+import { router as meRoutes } from './meRoutes';
 
 export const router = Router();
 
+// REL-001: /me endpoint for user context
+router.use('/me', meRoutes);
+
 router.use('/auth', authRoutes);
+
 router.use('/vehicles', vehicleRoutes);
 router.use('/waybills', waybillRoutes);
 router.use('/audit', auditRoutes);

@@ -223,10 +223,17 @@ export async function createWaybill(userInfo: UserInfo, input: CreateWaybillInpu
     });
     if (!vehicle) throw new BadRequestError('Транспортное средство не найдено');
 
+    // REL-701: Strict Driver.id enforcement. No more fallback to employeeId.
     const driver = await prisma.driver.findFirst({
         where: { id: targetDriverId, employee: { organizationId } }
     });
-    if (!driver) throw new BadRequestError('Водитель не найден');
+
+    if (!driver) throw new BadRequestError('Водитель не найден (неверный ID водителя)');
+
+    // Use the actual driver ID for waybill creation
+    const actualDriverId = driver.id;
+
+
 
     // BLS-202: Reserve blank for this waybill
     let validatedBlankId: string | null = null;
@@ -237,7 +244,7 @@ export async function createWaybill(userInfo: UserInfo, input: CreateWaybillInpu
             const result = await reserveSpecificBlank(
                 organizationId,
                 input.blankId,
-                targetDriverId,
+                actualDriverId,
                 vehicle.departmentId ?? undefined
             );
             validatedBlankId = result.blank.id;
@@ -245,7 +252,7 @@ export async function createWaybill(userInfo: UserInfo, input: CreateWaybillInpu
         } else {
             const result = await reserveNextBlankForDriver(
                 organizationId,
-                targetDriverId,
+                actualDriverId,
                 vehicle.departmentId ?? undefined
             );
             validatedBlankId = result.blank.id;
@@ -314,7 +321,7 @@ export async function createWaybill(userInfo: UserInfo, input: CreateWaybillInpu
             number: waybillNumber,
             date: date,
             vehicleId: input.vehicleId,
-            driverId: targetDriverId,
+            driverId: actualDriverId,
             blankId: validatedBlankId,
             odometerStart: input.odometerStart,
             odometerEnd: input.odometerEnd,
