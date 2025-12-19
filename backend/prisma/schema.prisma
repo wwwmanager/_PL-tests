@@ -61,6 +61,19 @@ enum AuditActionType {
   LOGOUT
 }
 
+// FUEL-001: Fuel Card Transaction and TopUp enums
+enum FuelCardTransactionType {
+  TOPUP
+  ADJUSTMENT
+  DEBIT
+}
+
+enum TopUpScheduleType {
+  DAILY
+  WEEKLY
+  MONTHLY
+}
+
 // ============================================================================
 // ОРГАНИЗАЦИИ И ПОДРАЗДЕЛЕНИЯ
 // ============================================================================
@@ -159,6 +172,7 @@ model User {
   createdBlankBatches   BlankBatch[]
   auditLogs             AuditLog[]
   refreshTokens         RefreshToken[]
+  fuelCardTransactions  FuelCardTransaction[] @relation("FuelCardTransactionCreatedBy") // FUEL-001
 
   @@map("users")
 }
@@ -362,6 +376,7 @@ model FuelCard {
   isActive            Boolean  @default(true)
   assignedToDriverId  String?  @db.Uuid
   assignedToVehicleId String?  @db.Uuid
+  balanceLiters       Decimal  @default(0) @db.Decimal(14, 3) // FUEL-001: литровый баланс
   createdAt           DateTime @default(now()) @db.Timestamp(6)
   updatedAt           DateTime @default(now()) @updatedAt @db.Timestamp(6)
 
@@ -369,6 +384,8 @@ model FuelCard {
   assignedToDriver  Driver?      @relation("FuelCardDriver", fields: [assignedToDriverId], references: [id], onDelete: SetNull)
   assignedToVehicle Vehicle?     @relation("FuelCardVehicle", fields: [assignedToVehicleId], references: [id], onDelete: SetNull)
   waybills          Waybill[]
+  transactions      FuelCardTransaction[] // FUEL-001
+  topUpRules        FuelCardTopUpRule[]   // FUEL-001
 
   @@map("fuel_cards")
 }
@@ -653,3 +670,48 @@ model CalendarEvent {
   @@map("calendar_events")
 }
 
+// ============================================================================
+// FUEL CARD TRANSACTIONS & AUTO TOP-UP (FUEL-001)
+// ============================================================================
+
+/// Ledger для истории пополнений/корректировок топливной карты
+model FuelCardTransaction {
+  id              String                  @id @default(uuid()) @db.Uuid
+  organizationId  String                  @db.Uuid
+  fuelCardId      String                  @db.Uuid
+  type            FuelCardTransactionType
+  amountLiters    Decimal                 @db.Decimal(14, 3)
+  reason          String?                 @db.Text
+  periodKey       String?                 @db.Text // для авто-пополнения (например 2025-12, 2025-W51, 2025-12-19)
+  createdByUserId String?                 @db.Uuid
+  createdAt       DateTime                @default(now()) @db.Timestamp(6)
+
+  fuelCard        FuelCard @relation(fields: [fuelCardId], references: [id], onDelete: Cascade)
+  createdByUser   User?    @relation("FuelCardTransactionCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+
+  // Идемпотентность авто-пополнений: один TOPUP на период
+  @@unique([organizationId, fuelCardId, type, periodKey])
+  @@index([organizationId, fuelCardId, createdAt])
+  @@map("fuel_card_transactions")
+}
+
+/// Правила автопополнения топливной карты
+model FuelCardTopUpRule {
+  id               String            @id @default(uuid()) @db.Uuid
+  organizationId   String            @db.Uuid
+  fuelCardId       String            @db.Uuid
+  isActive         Boolean           @default(true)
+  scheduleType     TopUpScheduleType
+  amountLiters     Decimal           @db.Decimal(14, 3)
+  minBalanceLiters Decimal?          @db.Decimal(14, 3) // если задано — пополняем только при балансе < порога
+  timezone         String            @default("Europe/Moscow") @db.Text
+  nextRunAt        DateTime
+  lastRunAt        DateTime?
+  createdAt        DateTime          @default(now()) @db.Timestamp(6)
+  updatedAt        DateTime          @default(now()) @updatedAt @db.Timestamp(6)
+
+  fuelCard         FuelCard @relation(fields: [fuelCardId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, isActive, nextRunAt])
+  @@map("fuel_card_topup_rules")
+}

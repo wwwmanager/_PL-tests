@@ -264,3 +264,148 @@ async function ensureSameOrg(user: AuthUser, id: string) {
         throw new NotFoundError('Топливная карта не найдена или доступ запрещён');
     }
 }
+
+// ============================================================================
+// FUEL-001: Top-Up Rules and Transactions
+// ============================================================================
+
+/**
+ * Get top-up rule for a fuel card
+ */
+export async function getTopUpRule(organizationId: string, fuelCardId: string) {
+    return prisma.fuelCardTopUpRule.findFirst({
+        where: { organizationId, fuelCardId }
+    });
+}
+
+/**
+ * Create or update top-up rule
+ */
+export async function upsertTopUpRule(
+    organizationId: string,
+    fuelCardId: string,
+    data: {
+        scheduleType: 'DAILY' | 'WEEKLY' | 'MONTHLY';
+        amountLiters: number;
+        minBalanceLiters?: number;
+        timezone?: string;
+        isActive?: boolean;
+    }
+) {
+    const existing = await prisma.fuelCardTopUpRule.findFirst({
+        where: { organizationId, fuelCardId }
+    });
+
+    const nextRunAt = new Date();
+    if (data.scheduleType === 'DAILY') nextRunAt.setUTCDate(nextRunAt.getUTCDate() + 1);
+    if (data.scheduleType === 'WEEKLY') nextRunAt.setUTCDate(nextRunAt.getUTCDate() + 7);
+    if (data.scheduleType === 'MONTHLY') nextRunAt.setUTCMonth(nextRunAt.getUTCMonth() + 1);
+
+    if (existing) {
+        return prisma.fuelCardTopUpRule.update({
+            where: { id: existing.id },
+            data: {
+                scheduleType: data.scheduleType,
+                amountLiters: data.amountLiters,
+                minBalanceLiters: data.minBalanceLiters ?? null,
+                timezone: data.timezone ?? 'Europe/Moscow',
+                isActive: data.isActive ?? true,
+                nextRunAt
+            }
+        });
+    }
+
+    return prisma.fuelCardTopUpRule.create({
+        data: {
+            organizationId,
+            fuelCardId,
+            scheduleType: data.scheduleType,
+            amountLiters: data.amountLiters,
+            minBalanceLiters: data.minBalanceLiters ?? null,
+            timezone: data.timezone ?? 'Europe/Moscow',
+            isActive: data.isActive ?? true,
+            nextRunAt
+        }
+    });
+}
+
+/**
+ * Delete (deactivate) top-up rule
+ */
+export async function deleteTopUpRule(organizationId: string, fuelCardId: string) {
+    const rule = await prisma.fuelCardTopUpRule.findFirst({
+        where: { organizationId, fuelCardId }
+    });
+    if (rule) {
+        await prisma.fuelCardTopUpRule.update({
+            where: { id: rule.id },
+            data: { isActive: false }
+        });
+    }
+}
+
+/**
+ * Get transactions for a fuel card
+ */
+export async function getTransactions(
+    organizationId: string,
+    fuelCardId: string,
+    from?: string,
+    to?: string
+) {
+    const where: any = { organizationId, fuelCardId };
+
+    if (from || to) {
+        where.createdAt = {};
+        if (from) where.createdAt.gte = new Date(from);
+        if (to) where.createdAt.lte = new Date(to);
+    }
+
+    return prisma.fuelCardTransaction.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        take: 100
+    });
+}
+
+/**
+ * Create manual transaction (adjustment)
+ */
+export async function createTransaction(
+    user: AuthUser,
+    fuelCardId: string,
+    data: {
+        type: 'TOPUP' | 'ADJUSTMENT' | 'DEBIT';
+        amountLiters: number;
+        reason?: string;
+    }
+) {
+    const card = await prisma.fuelCard.findFirst({
+        where: { id: fuelCardId, organizationId: user.organizationId }
+    });
+    if (!card) {
+        throw new NotFoundError('Топливная карта не найдена');
+    }
+
+    return prisma.$transaction(async (tx) => {
+        const transaction = await tx.fuelCardTransaction.create({
+            data: {
+                organizationId: user.organizationId,
+                fuelCardId,
+                type: data.type,
+                amountLiters: data.amountLiters,
+                reason: data.reason ?? 'MANUAL',
+                createdByUserId: user.id
+            }
+        });
+
+        // Update balance
+        const delta = data.type === 'DEBIT' ? -data.amountLiters : data.amountLiters;
+        await tx.fuelCard.update({
+            where: { id: fuelCardId },
+            data: { balanceLiters: { increment: delta } }
+        });
+
+        return transaction;
+    });
+}

@@ -2,6 +2,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { resetDatabase, getDataPreview, selectiveDelete, importData, transferUser, transferOrganizationData } from '../controllers/adminController';
 import { runRecalculation } from '../controllers/recalculationController';
 import { authMiddleware } from '../middleware/authMiddleware';
+import { runFuelCardTopUps } from '../jobs/fuelCardTopUpJob';
 
 const router = Router();
 
@@ -45,5 +46,15 @@ router.post('/transfer-organization', authMiddleware, requireRole('admin'), tran
 
 // POST /api/admin/recalculate - Helper for recalculating balances
 router.post('/recalculate', authMiddleware, requireRole('admin'), runRecalculation);
+
+// FUEL-001: POST /api/admin/jobs/run-fuelcard-topups - Manual top-up job execution
+router.post('/jobs/run-fuelcard-topups', authMiddleware, requireRole('admin'), async (req: Request, res: Response) => {
+    try {
+        const result = await runFuelCardTopUps();
+        res.json({ success: true, ...result });
+    } catch (err: any) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
 
 export default router;

@@ -16,3 +16,12 @@ router.get('/:id', fuelCardController.getFuelCardById);
 router.put('/:id', fuelCardController.updateFuelCard);
 router.delete('/:id', fuelCardController.deleteFuelCard);
 router.patch('/:id/assign', fuelCardController.assignFuelCard);
+
+// FUEL-001: Top-up rules
+router.get('/:id/topup-rule', fuelCardController.getTopUpRule);
+router.put('/:id/topup-rule', fuelCardController.upsertTopUpRule);
+router.delete('/:id/topup-rule', fuelCardController.deleteTopUpRule);
+
+// FUEL-001: Transactions
+router.get('/:id/transactions', fuelCardController.getTransactions);
+router.post('/:id/transactions', fuelCardController.createTransaction);

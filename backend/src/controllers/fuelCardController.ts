@@ -79,3 +79,73 @@ export async function getFuelCardsForDriver(req: Request, res: Response, next: N
         next(err);
     }
 }
+
+// ============================================================================
+// FUEL-001: Top-Up Rules and Transactions
+// ============================================================================
+
+/**
+ * GET /fuel-cards/:id/topup-rule
+ */
+export async function getTopUpRule(req: Request, res: Response, next: NextFunction) {
+    try {
+        const { id } = req.params;
+        const rule = await fuelCardService.getTopUpRule(req.user!.organizationId, id);
+        res.json(rule);
+    } catch (err) {
+        next(err);
+    }
+}
+
+/**
+ * PUT /fuel-cards/:id/topup-rule
+ */
+export async function upsertTopUpRule(req: Request, res: Response, next: NextFunction) {
+    try {
+        const { id } = req.params;
+        const rule = await fuelCardService.upsertTopUpRule(req.user!.organizationId, id, req.body);
+        res.json(rule);
+    } catch (err) {
+        next(err);
+    }
+}
+
+/**
+ * DELETE /fuel-cards/:id/topup-rule
+ */
+export async function deleteTopUpRule(req: Request, res: Response, next: NextFunction) {
+    try {
+        const { id } = req.params;
+        await fuelCardService.deleteTopUpRule(req.user!.organizationId, id);
+        res.status(204).send();
+    } catch (err) {
+        next(err);
+    }
+}
+
+/**
+ * GET /fuel-cards/:id/transactions
+ */
+export async function getTransactions(req: Request, res: Response, next: NextFunction) {
+    try {
+        const { id } = req.params;
+        const { from, to } = req.query as { from?: string; to?: string };
+        const transactions = await fuelCardService.getTransactions(req.user!.organizationId, id, from, to);
+        res.json(transactions);
+    } catch (err) {
+        next(err);
+    }
+}
+
+/**
+ * POST /fuel-cards/:id/transactions (manual adjustment)
+ */
+export async function createTransaction(req: Request, res: Response, next: NextFunction) {
+    try {
+        const { id } = req.params;
+        const transaction = await fuelCardService.createTransaction(req.user!, id, req.body);
+        res.status(201).json(transaction);
+    } catch (err) {
+        next(err);
+    }
+}
