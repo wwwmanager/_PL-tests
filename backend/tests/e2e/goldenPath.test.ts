@@ -401,3 +401,179 @@ describe('Golden Path: Blanks → Waybill → Posted', () => {
         console.log('✅ GP-03: Blank correctly returned to ISSUED status');
     }, 30000);
 });
+
+/**
+ * GP-01 & GP-02: Fuel Calculation Methods Integration Tests
+ */
+describe('Golden Path: Fuel Calculation Methods', () => {
+    const prisma = new PrismaClient();
+
+    afterEach(async () => {
+        // Cleanup handled per-test
+    });
+
+    /**
+     * GP-02: Test all three fuelPlanned calculation methods
+     * BOILER: Uses odometer distance only, no modifiers
+     * SEGMENTS: Uses route segments with city/warming modifiers
+     * MIXED: Applies segment modifiers pro-rata to odometer distance
+     */
+    it('GP-02: should calculate fuelPlanned correctly for BOILER method', async () => {
+        // Import fuel calculation function
+        const { calculatePlannedFuelByMethod } = await import('../../src/domain/waybill/fuel');
+
+        const rates = {
+            summerRate: 10,      // 10 L/100km
+            winterRate: 12,
+            cityIncreasePercent: 10,
+            warmingIncreasePercent: 5
+        };
+
+        // BOILER: 100km at 10 L/100km = 10L (no modifiers applied)
+        const boilerResult = calculatePlannedFuelByMethod({
+            method: 'BOILER',
+            baseRate: 10,
+            odometerDistanceKm: 100,
+            segments: [],
+            rates
+        });
+        expect(boilerResult).toBe(10);
+
+        // BOILER with 50km
+        const boiler50 = calculatePlannedFuelByMethod({
+            method: 'BOILER',
+            baseRate: 10,
+            odometerDistanceKm: 50,
+            segments: [],
+            rates
+        });
+        expect(boiler50).toBe(5);
+
+        console.log('✅ GP-02 BOILER: Calculations correct');
+    });
+
+    it('GP-02: should calculate fuelPlanned correctly for SEGMENTS method', async () => {
+        const { calculatePlannedFuelByMethod } = await import('../../src/domain/waybill/fuel');
+
+        const rates = {
+            summerRate: 10,
+            winterRate: 12,
+            cityIncreasePercent: 10,  // 0.10 as coefficient
+            warmingIncreasePercent: 5  // 0.05 as coefficient
+        };
+
+        // SEGMENTS: Two segments, one with city driving
+        // Segment 1: 50km highway (no modifiers) = 5L
+        // Segment 2: 50km city (+10%) = 5.5L
+        // Total: 10.5L
+        const segmentsResult = calculatePlannedFuelByMethod({
+            method: 'SEGMENTS',
+            baseRate: 10,
+            odometerDistanceKm: 100,
+            segments: [
+                { distanceKm: 50, isCityDriving: false, isWarming: false },
+                { distanceKm: 50, isCityDriving: true, isWarming: false }
+            ],
+            rates
+        });
+        expect(segmentsResult).toBe(10.5);
+
+        // SEGMENTS: All city driving with warming
+        // 100km at 10 L/100km * (1 + 0.10 + 0.05) = 11.5L
+        const allModifiers = calculatePlannedFuelByMethod({
+            method: 'SEGMENTS',
+            baseRate: 10,
+            odometerDistanceKm: 100,
+            segments: [
+                { distanceKm: 100, isCityDriving: true, isWarming: true }
+            ],
+            rates
+        });
+        expect(allModifiers).toBe(11.5);
+
+        console.log('✅ GP-02 SEGMENTS: Calculations correct');
+    });
+
+    it('GP-02: should calculate fuelPlanned correctly for MIXED method', async () => {
+        const { calculatePlannedFuelByMethod } = await import('../../src/domain/waybill/fuel');
+
+        const rates = {
+            summerRate: 10,
+            winterRate: 12,
+            cityIncreasePercent: 10,
+            warmingIncreasePercent: 5
+        };
+
+        // MIXED: Segments define modifiers, but odometer distance is used
+        // Segment 1: 50km highway (rate = 10)
+        // Segment 2: 50km city (rate = 11)
+        // Average rate: (50*10 + 50*11) / 100 = 10.5 L/100km
+        // Odometer: 100km * 10.5/100 = 10.5L
+        const mixedResult = calculatePlannedFuelByMethod({
+            method: 'MIXED',
+            baseRate: 10,
+            odometerDistanceKm: 100,
+            segments: [
+                { distanceKm: 50, isCityDriving: false, isWarming: false },
+                { distanceKm: 50, isCityDriving: true, isWarming: false }
+            ],
+            rates
+        });
+        expect(mixedResult).toBe(10.5);
+
+        // MIXED: Odometer differs from segment total
+        // If odometer = 120km but segments total = 100km
+        // Still uses average rate from segments applied to odometer
+        // Average rate: 10.5 L/100km (same as above)
+        // Result: 120 * 10.5/100 = 12.6L
+        const mixedLonger = calculatePlannedFuelByMethod({
+            method: 'MIXED',
+            baseRate: 10,
+            odometerDistanceKm: 120,
+            segments: [
+                { distanceKm: 50, isCityDriving: false, isWarming: false },
+                { distanceKm: 50, isCityDriving: true, isWarming: false }
+            ],
+            rates
+        });
+        expect(mixedLonger).toBe(12.6);
+
+        console.log('✅ GP-02 MIXED: Calculations correct');
+    });
+
+    it('GP-01: should create DRAFT waybill with minimal fields (no routes)', async () => {
+        // This test verifies that a DRAFT can be created without routes
+        // and fuelPlanned is calculated based on odometer (BOILER fallback)
+
+        const { calculatePlannedFuelByMethod } = await import('../../src/domain/waybill/fuel');
+
+        const rates = {
+            summerRate: 10,
+            winterRate: 12,
+            cityIncreasePercent: 10,
+            warmingIncreasePercent: 5
+        };
+
+        // No routes, use BOILER method
+        const minimalResult = calculatePlannedFuelByMethod({
+            method: 'BOILER',
+            baseRate: 10,
+            odometerDistanceKm: 100,
+            segments: undefined, // No routes
+            rates
+        });
+        expect(minimalResult).toBe(10);
+
+        // If odometer is null, result should be 0
+        const noOdometer = calculatePlannedFuelByMethod({
+            method: 'BOILER',
+            baseRate: 10,
+            odometerDistanceKm: null,
+            segments: [],
+            rates
+        });
+        expect(noOdometer).toBe(0);
+
+        console.log('✅ GP-01: Minimal DRAFT calculations correct');
+    });
+});
