@@ -1,11 +1,15 @@
 /**
  * FUEL-001: Fuel Card Auto Top-Up Worker
+ * REL-104: Integrated with StockMovement TRANSFER
  * 
  * Runs periodically to process due top-up rules.
  * Uses FOR UPDATE SKIP LOCKED to prevent duplicate processing.
  * PeriodKey unique constraint ensures idempotency.
+ * Creates TRANSFER (source location → fuel card location) for stock tracking.
  */
-import { PrismaClient, Prisma, FuelCardTransactionType, TopUpScheduleType } from "@prisma/client";
+import { PrismaClient, Prisma, FuelCardTransactionType, TopUpScheduleType, StockMovementType } from "@prisma/client";
+import { getOrCreateFuelCardLocation, getOrCreateDefaultWarehouseLocation } from "../services/stockLocationService";
+import { createTransfer } from "../services/stockService";
 
 const prisma = new PrismaClient();
 
@@ -73,6 +77,7 @@ export async function runFuelCardTopUps(batchSize = 50): Promise<TopUpResult> {
     try {
         await prisma.$transaction(async (tx) => {
             // Claim due rules with SKIP LOCKED (Postgres)
+            // REL-104: Added stockItemId and sourceLocationId
             const rules = await tx.$queryRaw<
                 Array<{
                     id: string;
@@ -82,10 +87,13 @@ export async function runFuelCardTopUps(batchSize = 50): Promise<TopUpResult> {
                     amountLiters: string;
                     minBalanceLiters: string | null;
                     timezone: string;
+                    stockItemId: string | null;
+                    sourceLocationId: string | null;
                 }>
             >(Prisma.sql`
         SELECT "id", "organizationId", "fuelCardId", "scheduleType",
-               "amountLiters"::text, "minBalanceLiters"::text, "timezone"
+               "amountLiters"::text, "minBalanceLiters"::text, "timezone",
+               "stockItemId", "sourceLocationId"
         FROM "fuel_card_topup_rules"
         WHERE "isActive" = true
           AND "nextRunAt" <= NOW()
@@ -140,11 +148,51 @@ export async function runFuelCardTopUps(batchSize = 50): Promise<TopUpResult> {
                             },
                         });
 
-                        // Increment balance
+                        // Increment balance on FuelCard
                         await tx.fuelCard.update({
                             where: { id: r.fuelCardId },
                             data: { balanceLiters: { increment: new Prisma.Decimal(r.amountLiters) } },
                         });
+
+                        // REL-104: Create TRANSFER (source → fuel card) if stockItemId configured
+                        if (r.stockItemId) {
+                            try {
+                                // Get fuel card location
+                                const cardLocation = await getOrCreateFuelCardLocation(r.fuelCardId);
+
+                                // Get source location (configured or default warehouse)
+                                let sourceLocationId: string;
+                                if (r.sourceLocationId) {
+                                    sourceLocationId = r.sourceLocationId;
+                                } else {
+                                    const warehouseLocation = await getOrCreateDefaultWarehouseLocation(r.organizationId);
+                                    sourceLocationId = warehouseLocation.id;
+                                }
+
+                                // externalRef for idempotency: TOPUP:<ruleId>:<periodKey>
+                                const externalRef = `TOPUP:${r.id}:${periodKey}`;
+
+                                await createTransfer({
+                                    organizationId: r.organizationId,
+                                    stockItemId: r.stockItemId,
+                                    quantity: Number(r.amountLiters),
+                                    fromLocationId: sourceLocationId,
+                                    toLocationId: cardLocation.id,
+                                    occurredAt: now,
+                                    occurredSeq: 20,  // After manual operations
+                                    documentType: "FUEL_CARD_TOPUP",
+                                    documentId: r.id,  // Reference to rule
+                                    externalRef,
+                                    comment: `Автопополнение карты (правило ${r.id})`,
+                                });
+
+                                console.log(`[REL-104] TRANSFER created: ${r.amountLiters}L to card ${r.fuelCardId}, externalRef: ${externalRef}`);
+                            } catch (transferErr: any) {
+                                // Log but don't fail the top-up if TRANSFER fails
+                                console.error(`[REL-104] Failed to create TRANSFER for rule ${r.id}: ${transferErr.message}`);
+                                result.errors.push(`TRANSFER failed for rule ${r.id}: ${transferErr.message}`);
+                            }
+                        }
 
                         result.toppedUp++;
                     } catch (e: any) {
@@ -177,3 +225,4 @@ export async function scheduledTopUpJob() {
     console.log('[FuelCardTopUp] Complete:', result);
     return result;
 }
+

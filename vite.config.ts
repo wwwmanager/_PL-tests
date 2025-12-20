@@ -6,7 +6,8 @@ import { readFileSync } from 'fs';
 // https://vitejs.dev/config/
 export default defineConfig({
   // Базовый URL для развертывания на GitHub Pages.
-  base: '/_PL-tests/',
+  // Закомментировано для локальной разработки. Раскомментируйте для продакшн деплоя на GitHub Pages.
+  // base: '/_PL-tests/',
 
   // --- Плагины ---
   plugins: [

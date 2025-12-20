@@ -1,5 +1,5 @@
 
-import React, { createContext, useState, useCallback, ReactNode } from 'react';
+import React, { createContext, useState, useCallback, ReactNode, useRef } from 'react';
 import { XIcon } from '../components/Icons';
 
 interface ToastMessage {
@@ -16,19 +16,34 @@ export const ToastContext = createContext<ToastContextType | undefined>(undefine
 
 export const ToastProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
+  // Track last message to prevent duplicate toasts
+  const lastMessageRef = useRef<string>('');
+  const lastMessageTimeRef = useRef<number>(0);
+
+  // Use useCallback for removeToast to ensure stable reference
+  const removeToast = useCallback((id: number) => {
+    setToasts(prevToasts => prevToasts.filter(toast => toast.id !== id));
+  }, []);
 
   const showToast = useCallback((message: string, type: 'success' | 'error' | 'info' = 'success') => {
-    const id = Date.now();
+    // Prevent duplicate toasts (same message within 2 seconds)
+    const now = Date.now();
+    if (message === lastMessageRef.current && now - lastMessageTimeRef.current < 2000) {
+      console.warn('[Toast] Ignoring duplicate toast:', message);
+      return;
+    }
+    lastMessageRef.current = message;
+    lastMessageTimeRef.current = now;
+
+    const id = now;
     setToasts(prevToasts => [...prevToasts, { id, message, type }]);
+
+    // Auto-dismiss after 5 seconds
     setTimeout(() => {
-      removeToast(id);
+      setToasts(prev => prev.filter(t => t.id !== id));
     }, 5000);
   }, []);
 
-  const removeToast = (id: number) => {
-    setToasts(prevToasts => prevToasts.filter(toast => toast.id !== id));
-  };
-  
   const getToastClasses = (type: 'success' | 'error' | 'info') => {
     switch (type) {
       case 'success':
@@ -51,13 +66,17 @@ export const ToastProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             className={`flex items-center justify-between max-w-sm w-full p-4 text-white rounded-lg shadow-lg border-l-4 ${getToastClasses(toast.type)} animate-fade-in-right`}
           >
             <span>{toast.message}</span>
-            <button onClick={() => removeToast(toast.id)} className="ml-4 p-1 rounded-full hover:bg-white/20">
+            <button
+              onClick={() => removeToast(toast.id)}
+              className="ml-4 p-1 rounded-full hover:bg-white/20 cursor-pointer"
+              type="button"
+            >
               <XIcon className="w-4 h-4" />
             </button>
           </div>
         ))}
       </div>
-       <style>{`
+      <style>{`
         @keyframes fade-in-right {
             from {
                 opacity: 0;
@@ -75,3 +94,4 @@ export const ToastProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     </ToastContext.Provider>
   );
 };
+

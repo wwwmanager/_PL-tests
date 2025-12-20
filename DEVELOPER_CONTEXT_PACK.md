@@ -1,0 +1,667 @@
+# 🚛 Waybill Management System — Developer Context Pack
+
+> **Версия:** 2.0 | **Дата:** 2025-12-20 | **Target:** Onboarding разработчиков
+
+---
+
+## 📋 Содержание
+
+1. [Обзор приложения](#1-обзор-приложения)
+2. [Технологический стек](#2-технологический-стек)
+3. [Архитектура проекта](#3-архитектура-проекта)
+4. [Доменные модели (Prisma)](#4-доменные-модели-prisma)
+5. [API Endpoints](#5-api-endpoints)
+6. [Frontend структура](#6-frontend-структура)
+7. [Аутентификация и RBAC](#7-аутентификация-и-rbac)
+8. [Бизнес-логика ключевых доменов](#8-бизнес-логика-ключевых-доменов)
+9. [Типичные паттерны и соглашения](#9-типичные-паттерны-и-соглашения)
+10. [Известные проблемы и решения](#10-известные-проблемы-и-решения)
+11. [Запуск и разработка](#11-запуск-и-разработка)
+12. [Тестирование](#12-тестирование)
+
+---
+
+## 1. Обзор приложения
+
+**Waybill Management System** — B2B SaaS-система для автоматизации учета путевых листов и транспортной логистики (РФ).
+
+### Ключевые домены:
+
+| Домен | Описание |
+|-------|----------|
+| **Путевые листы (ПЛ)** | Создание, редактирование, проведение. Учёт одометра, расхода топлива, маршрутов |
+| **БСО (Бланки)** | Учёт бланков строгой отчётности. Пачки → выдача → резервирование → использование → списание |
+| **Склад** | Движение ТМЦ (INCOME/EXPENSE/ADJUSTMENT), балансы, топливные карты |
+| **Справочники** | Организации, подразделения, сотрудники, водители, транспорт, типы топлива |
+| **RBAC** | Роли, права доступа (permissions), проверка checkPermission |
+
+### Мульти-тенантность:
+- Изоляция по `organizationId` (обязательно)
+- Опциональная изоляция по `departmentId`
+- `authMiddleware` добавляет в `req.user`: `{ id, organizationId, departmentId, role }`
+
+---
+
+## 2. Технологический стек
+
+### Frontend
+
+| Технология | Версия | Назначение |
+|------------|--------|------------|
+| React | 19.2.0 | UI-фреймворк |
+| Vite | 6.0.7 | Сборка и dev-сервер |
+| TypeScript | 5.8.3 | Типизация |
+| Tailwind CSS | 3.4.17 | Стилизация |
+| Zod | 3.22.4 | Валидация форм |
+| React Hook Form | 7.51.0 | Управление формами |
+| Recharts | 3.5.1 | Графики (Dashboard) |
+| Playwright | 1.43.0 | E2E тестирование |
+
+### Backend
+
+| Технология | Версия | Назначение |
+|------------|--------|------------|
+| Node.js | LTS | Рантайм |
+| Express | 4.21.2 | HTTP-сервер |
+| TypeScript | 5.4.0 | Типизация |
+| Prisma | 5.22.0 | ORM |
+| PostgreSQL | 14+ | База данных |
+| Zod | 4.2.1 | DTO-валидация |
+| JWT | 9.0.2 | Аутентификация |
+| bcrypt | 5.1.0 | Хеширование паролей |
+| Pino | 10.1.0 | Логирование |
+
+---
+
+## 3. Архитектура проекта
+
+```
+📦 waybill-app/
+├── 📁 backend/                    # Express API сервер
+│   ├── 📁 prisma/
+│   │   ├── schema.prisma          # 🔑 Схема БД (721 строка, 30+ моделей)
+│   │   ├── migrations/            # Миграции
+│   │   └── seed.ts                # Сидирование данных
+│   ├── 📁 src/
+│   │   ├── 📁 controllers/        # 22 контроллера
+│   │   ├── 📁 services/           # 17 сервисов (бизнес-логика)
+│   │   ├── 📁 routes/             # 22 роут-файла
+│   │   ├── 📁 middleware/         # auth, RBAC, requestId
+│   │   ├── 📁 dto/                # Zod-схемы валидации
+│   │   ├── 📁 utils/              # Утилиты (jwt, errors, dateUtils)
+│   │   ├── 📁 domain/             # Доменные функции
+│   │   ├── app.ts                 # Express app
+│   │   └── server.ts              # Точка входа
+│   └── 📁 tests/                  # Unit/Integration тесты
+│
+├── 📁 components/                 # React компоненты
+│   ├── 📁 admin/                  # Админ-панель (19 файлов)
+│   ├── 📁 waybills/               # Путевые листы (8 файлов)
+│   ├── 📁 vehicles/               # Транспорт
+│   ├── 📁 employees/              # Сотрудники
+│   ├── 📁 dictionaries/           # Справочники
+│   ├── 📁 dashboard/              # Дашборд
+│   ├── 📁 reports/                # Отчёты
+│   └── 📁 shared/                 # Общие компоненты (Modal, Form, etc.)
+│
+├── 📁 services/                   # API-клиенты и доменная логика
+│   ├── 📁 api/                    # Фасады API (16 файлов)
+│   ├── httpClient.ts              # HTTP-клиент с интерцепторами
+│   ├── auth.tsx                   # AuthProvider
+│   └── schemas.ts                 # Zod-схемы frontend
+│
+├── 📁 hooks/                      # Кастомные React хуки
+├── 📁 contexts/                   # React контексты
+├── 📁 utils/                      # Утилиты frontend
+├── 📁 tests/                      # E2E тесты Playwright
+│
+├── types.ts                       # 🔑 Главные типы (516 строк)
+├── constants.ts                   # Переводы, цвета, константы
+├── App.tsx                        # Root компонент
+└── index.tsx                      # Entry point
+```
+
+---
+
+## 4. Доменные модели (Prisma)
+
+### Основные сущности
+
+```mermaid
+erDiagram
+    Organization ||--o{ Department : has
+    Organization ||--o{ User : has
+    Organization ||--o{ Employee : has
+    Organization ||--o{ Vehicle : has
+    Organization ||--o{ Waybill : has
+    Organization ||--o{ BlankBatch : has
+    
+    Department ||--o{ User : has
+    Department ||--o{ Waybill : has
+    
+    Employee ||--o| Driver : "may be"
+    Employee ||--o| User : "may be linked"
+    Driver ||--o{ Waybill : drives
+    
+    Vehicle ||--o{ Waybill : used_in
+    Blank ||--o| Waybill : reserved_for
+    
+    Waybill ||--o{ WaybillRoute : has
+    Waybill ||--o{ WaybillFuel : has
+```
+
+### Ключевые Enums
+
+```typescript
+// Статусы путевого листа
+enum WaybillStatus {
+  DRAFT      // Черновик
+  SUBMITTED  // Отправлен на проверку
+  POSTED     // Проведён (финальный)
+  CANCELLED  // Отменён
+}
+
+// Статусы бланка БСО
+enum BlankStatus {
+  AVAILABLE  // На складе
+  ISSUED     // Выдан водителю
+  RESERVED   // Зарезервирован под ПЛ
+  USED       // Использован
+  RETURNED   // Возвращён
+  SPOILED    // Испорчен
+}
+
+// Статус транспорта
+enum VehicleStatus {
+  ACTIVE = 'Active'    // ⚠️ PascalCase!
+  ARCHIVED = 'Archived'
+}
+```
+
+### Критичные модели
+
+| Модель | Назначение | Ключевые поля |
+|--------|------------|---------------|
+| `Organization` | Организация (главная изоляция) | `id`, `name`, `status` |
+| `User` | Пользователь системы | `organizationId`, `email`, `passwordHash`, `tokenVersion` |
+| `Employee` | Сотрудник | `employeeType` (driver/dispatcher/etc), `isActive` |
+| `Driver` | Водитель (связь 1:1 с Employee) | `employeeId`, `licenseNumber` |
+| `Vehicle` | Транспортное средство | `registrationNumber`, `fuelConsumptionRates`, `isActive` |
+| `Waybill` | Путевой лист | `status`, `blankId` (unique!), `driverId`, `vehicleId` |
+| `Blank` | Бланк БСО | `series`, `number`, `status`, `issuedToDriverId` |
+| `StockMovement` | Движение склада | `movementType`, `quantity`, `stockItemId` |
+
+---
+
+## 5. API Endpoints
+
+### Базовый URL: `/api`
+
+| Метод | Endpoint | Контроллер | Описание |
+|-------|----------|------------|----------|
+| **Auth** ||||
+| POST | `/auth/login` | authController | Логин, получение токенов |
+| POST | `/auth/refresh` | authController | Обновление access token |
+| POST | `/auth/logout` | authController | Logout (отзыв refresh token) |
+| GET | `/me` | meController | Контекст текущего пользователя |
+| **Waybills** ||||
+| GET | `/waybills` | waybillController | Список ПЛ (фильтры) |
+| POST | `/waybills` | waybillController | Создание ПЛ |
+| GET | `/waybills/:id` | waybillController | Получить ПЛ по ID |
+| PUT | `/waybills/:id` | waybillController | Обновить ПЛ |
+| DELETE | `/waybills/:id` | waybillController | Удалить ПЛ |
+| PATCH | `/waybills/:id/status` | waybillController | Смена статуса (RBAC!) |
+| **Vehicles** ||||
+| GET | `/vehicles` | vehicleController | Список транспорта |
+| POST | `/vehicles` | vehicleController | Создать ТС |
+| PUT | `/vehicles/:id` | vehicleController | Обновить ТС |
+| DELETE | `/vehicles/:id` | vehicleController | Удалить ТС |
+| **Employees** ||||
+| GET | `/employees` | employeeController | Список сотрудников |
+| POST | `/employees` | employeeController | Создать сотрудника |
+| PUT | `/employees/:id` | employeeController | Обновить сотрудника |
+| **Blanks** ||||
+| GET | `/blanks` | blankController | Список бланков |
+| POST | `/blanks/batches` | blankController | Создать пачку бланков |
+| POST | `/blanks/issue` | blankController | Выдать бланки водителю |
+| POST | `/blanks/:id/spoil` | blankController | Списать бланк |
+| **Stock** ||||
+| GET | `/stock/items` | stockController | Номенклатура |
+| GET | `/stock/movements` | stockController | Движения |
+| POST | `/stock/movements` | stockController | Создать движение |
+| **Admin** ||||
+| POST | `/admin/import` | adminController | Импорт данных |
+| POST | `/admin/export` | adminController | Экспорт данных |
+| POST | `/admin/selective-delete` | adminController | Выборочное удаление |
+
+---
+
+## 6. Frontend структура
+
+### Основные Views (App.tsx)
+
+```typescript
+type View =
+  | 'DASHBOARD'      // Дашборд с KPI
+  | 'WAYBILLS'       // Журнал путевых листов
+  | 'DICTIONARIES'   // Справочники (вкладки)
+  | 'WAREHOUSE'      // Складской учёт
+  | 'REPORTS'        // Отчёты
+  | 'ADMIN'          // Админ-панель
+  | 'BLANKS'         // Учёт бланков БСО
+```
+
+### Структура компонентов
+
+```
+components/
+├── admin/
+│   ├── Admin.tsx                 # Главный компонент админки
+│   ├── DataDeletionModal.tsx     # Выборочное удаление
+│   ├── ImportPreviewModal.tsx    # Предпросмотр импорта
+│   ├── UserManagement.tsx        # Управление пользователями
+│   └── RoleManagement.tsx        # Управление ролями
+│
+├── waybills/
+│   ├── WaybillList.tsx           # Журнал ПЛ
+│   ├── WaybillDetail.tsx         # Карточка ПЛ (создание/редактирование)
+│   ├── WaybillRouteEditor.tsx    # Редактор маршрутов
+│   └── WaybillFuelPanel.tsx      # Панель топлива
+│
+├── vehicles/
+│   └── VehicleList.tsx           # Справочник транспорта
+│
+├── employees/
+│   └── EmployeeList.tsx          # Справочник сотрудников
+│
+├── shared/
+│   ├── Modal.tsx                 # Универсальный модал
+│   ├── CollapsibleSection.tsx    # Сворачиваемая секция
+│   ├── ConfirmationModal.tsx     # Модал подтверждения
+│   └── FormComponents.tsx        # FormField, FormInput, FormSelect
+```
+
+### Паттерн API-фасадов
+
+```typescript
+// services/api/vehicleApi.ts
+export async function getVehicles(): Promise<Vehicle[]> {
+  return httpClient.get<Vehicle[]>('/vehicles');
+}
+
+export async function updateVehicle(data: Vehicle): Promise<Vehicle> {
+  const { id, ...updateData } = data;
+  const payload = sanitizeVehiclePayload(updateData);
+  return httpClient.put<Vehicle>(`/vehicles/${id}`, payload);
+}
+```
+
+---
+
+## 7. Аутентификация и RBAC
+
+### JWT Flow
+
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant A as API
+    participant DB as Database
+    
+    C->>A: POST /auth/login (email, password)
+    A->>DB: Verify credentials
+    DB-->>A: User + Roles
+    A-->>C: { accessToken, refreshToken }
+    
+    Note over C,A: Access Token (15 min, in memory)
+    Note over C,A: Refresh Token (7 days, httpOnly cookie)
+    
+    C->>A: GET /vehicles (Authorization: Bearer <accessToken>)
+    A->>A: authMiddleware: verify JWT, extract user
+    A->>A: checkPermission('vehicle.read')
+    A-->>C: 200 OK / 403 Forbidden
+```
+
+### Роли и права
+
+```typescript
+type Role = 
+  | 'admin'      // Полный доступ
+  | 'dispatcher' // Диспетчер
+  | 'driver'     // Водитель
+  | 'accountant' // Бухгалтер
+  | 'mechanic'   // Механик
+  | 'auditor'    // Аудитор
+  | 'reviewer'   // Проверяющий
+  | 'viewer';    // Только просмотр
+
+// Примеры capabilities
+type Capability =
+  | 'waybill.create'
+  | 'waybill.submit'
+  | 'waybill.post'
+  | 'blanks.issue'
+  | 'admin.panel'
+  | 'audit.read';
+```
+
+### Token Versioning (AUTH-003)
+
+Для немедленной инвалидации токенов при смене организации/роли:
+- `User.tokenVersion` хранится в БД
+- `tokenVersion` включается в JWT payload
+- При смене прав версия инкрементируется
+- `authMiddleware` проверяет совпадение версий
+
+---
+
+## 8. Бизнес-логика ключевых доменов
+
+### 8.1 Путевые листы (Waybill)
+
+#### Жизненный цикл
+
+```mermaid
+stateDiagram-v2
+    [*] --> DRAFT: Создание
+    DRAFT --> SUBMITTED: Submit (waybill.submit)
+    DRAFT --> CANCELLED: Cancel
+    SUBMITTED --> POSTED: Post (waybill.post)
+    SUBMITTED --> CANCELLED: Cancel
+    POSTED --> [*]: Финальный статус
+    CANCELLED --> [*]: Финальный статус
+```
+
+#### Расчёт топлива (fuelPlanned)
+
+```typescript
+enum FuelCalculationMethod {
+  BOILER   // Котловой: базовая норма × пробег
+  SEGMENTS // По сегментам: сумма расходов по каждому участку
+  MIXED    // Смешанный: средняя норма × одометр
+}
+
+// Учитывается:
+// - Зимняя/летняя норма (по настройкам сезонности)
+// - Городской цикл (+cityIncreasePercent%)
+// - Прогрев (+warmingIncreasePercent%)
+```
+
+#### Проводка (POSTED)
+
+В транзакции выполняется:
+1. Списание топлива со склада (`StockMovement EXPENSE`)
+2. Перевод бланка в `USED`
+3. Обновление статуса ПЛ
+4. Запись в `AuditLog`
+
+### 8.2 Бланки БСО (Blank)
+
+#### Жизненный цикл
+
+```
+AVAILABLE → ISSUED → RESERVED → USED
+              ↓         ↓
+              └─────────┴──→ SPOILED
+              ↑         │
+              └─────────┘ (release при отмене ПЛ)
+```
+
+#### Ключевые операции
+
+| Операция | Переход статуса | Триггер |
+|----------|-----------------|---------|
+| `issue` | AVAILABLE → ISSUED | Выдача водителю |
+| `reserve` | ISSUED → RESERVED | Создание/редактирование ПЛ |
+| `release` | RESERVED → ISSUED | Удаление/отмена черновика ПЛ |
+| `use` | RESERVED → USED | Проводка ПЛ |
+| `spoil` | * → SPOILED | Списание бланка |
+
+#### Гарантии
+
+- `Waybill.blankId` — **уникальный** (1 бланк = 1 ПЛ)
+- Атомарные операции с защитой от гонок (индексы + транзакции)
+
+### 8.3 Транспорт (Vehicle)
+
+#### ⚠️ Критичный момент: Status vs isActive
+
+```typescript
+// Frontend использует enum VehicleStatus
+enum VehicleStatus {
+  ACTIVE = 'Active',    // PascalCase!
+  ARCHIVED = 'Archived'
+}
+
+// Backend хранит boolean isActive
+// При чтении: isActive → status ('Active'/'Archived')
+// При записи: status → isActive (true/false)
+```
+
+**Правило:** Бэкенд ДОЛЖЕН возвращать `status: 'Active'` (не `'ACTIVE'`!) для соответствия frontend enum.
+
+---
+
+## 9. Типичные паттерны и соглашения
+
+### 9.1 Sanitize Payload
+
+Фронтенд перед отправкой на бэкенд нормализует данные:
+
+```typescript
+// services/api/vehicleApi.ts
+function sanitizeVehiclePayload(data) {
+  // Пустые строки → null
+  // status → isActive синхронизация
+  // Валидация fuelConsumptionRates
+}
+```
+
+### 9.2 Организационная изоляция
+
+Все запросы скоупятся по `organizationId`:
+
+```typescript
+// Бэкенд автоматически фильтрует
+const vehicles = await prisma.vehicle.findMany({
+  where: { organizationId: req.user.organizationId }
+});
+```
+
+### 9.3 Form + Zod валидация
+
+```tsx
+const schema = z.object({
+  registrationNumber: z.string().min(1),
+  mileage: z.number().min(0),
+  status: z.nativeEnum(VehicleStatus),
+});
+
+const { register, handleSubmit } = useForm({
+  resolver: zodResolver(schema),
+});
+```
+
+### 9.4 Обработка ошибок
+
+```typescript
+// Backend
+throw new NotFoundError('Транспортное средство не найдено');
+throw new BadRequestError('Некорректные данные');
+throw new UnauthorizedError('Требуется авторизация');
+throw new ForbiddenError('Недостаточно прав');
+
+// Frontend (EmptyState)
+const reason = getEmptyStateFromError(error);
+// → { type: 'error', entityName: 'транспорт' }
+// → { type: 'forbidden' }
+// → { type: 'loading' }
+```
+
+---
+
+## 10. Известные проблемы и решения
+
+### ⚠️ Проблема: Статус транспорта не сохраняется
+
+**Причина:** Несовпадение регистра `'ACTIVE'` vs `'Active'`
+
+**Решение:** В `vehicleService.ts` использовать:
+```typescript
+status: v.isActive ? 'Active' : 'Archived'  // НЕ 'ACTIVE'!
+```
+
+### ⚠️ Проблема: Пустые справочники
+
+**Причины:**
+1. `organizationId` в токене указывает на другую организацию
+2. Данные перенесены между организациями
+
+**Диагностика:** GET `/me` возвращает контекст пользователя.
+
+### ⚠️ Проблема: Employee vs Driver
+
+**Правило:** Везде, где речь о водителе и бланках/ПЛ — использовать `Driver.id`, НЕ `Employee.id`!
+
+Инвариант: если `employeeType = 'driver'`, запись `Driver` должна существовать.
+
+---
+
+## 11. Запуск и разработка
+
+### Первоначальная настройка
+
+```bash
+# 1. Клонировать репозиторий
+git clone <repo>
+
+# 2. Установить зависимости
+npm install
+cd backend && npm install
+
+# 3. Настроить переменные окружения
+cp backend/.env.example backend/.env
+# Заполнить DATABASE_URL, JWT_SECRET
+
+# 4. Применить миграции и сидировать
+cd backend
+npx prisma migrate dev
+npx prisma db seed
+
+# 5. Запустить бэкенд
+npm run dev
+
+# 6. Запустить фронтенд (новый терминал)
+cd ..
+npm run dev
+```
+
+### Полезные команды
+
+```bash
+# Frontend
+npm run dev          # Dev server (Vite)
+npm run build        # Production build
+npm run test         # Vitest unit tests
+npm run test:e2e     # Playwright E2E
+
+# Backend
+cd backend
+npm run dev          # Nodemon + ts-node
+npm run build        # TypeScript compile
+npm run test         # Vitest tests
+npx prisma studio    # Prisma Studio GUI
+npx prisma migrate dev --name <name>  # Новая миграция
+```
+
+### Переменные окружения
+
+```env
+# backend/.env
+DATABASE_URL="postgresql://user:pass@localhost:5432/waybills"
+JWT_SECRET="your-secret-key"
+JWT_EXPIRES_IN="15m"
+REFRESH_TOKEN_EXPIRES_IN="7d"
+PORT=3001
+```
+
+```env
+# frontend/.env
+VITE_API_URL="http://localhost:3001/api"
+```
+
+---
+
+## 12. Тестирование
+
+### Unit тесты (Vitest)
+
+```bash
+# Frontend
+npm run test
+
+# Backend
+cd backend && npm run test
+```
+
+Покрытие:
+- Сезонность (`isWinterDate`)
+- Расчёт топлива
+- Валидация баланса топлива
+- State-машины статусов
+
+### E2E тесты (Playwright)
+
+```bash
+npm run test:e2e
+npm run test:e2e:headed  # С браузером
+npm run test:e2e:debug   # Отладка
+```
+
+Golden-path тест:
+1. Бланки → выдача
+2. Создание ПЛ
+3. POSTED
+4. Проверка склада + USED + audit
+
+---
+
+## Приложение A: Типы и константы
+
+### Полный список Roles
+
+| Role | Русское название | Основные права |
+|------|------------------|----------------|
+| `admin` | Администратор | Полный доступ |
+| `dispatcher` | Диспетчер | import.limited, export.run |
+| `driver` | Водитель | ПЛ: создание, отправка, проведение |
+| `accountant` | Бухгалтер | waybill.post, audit.business.read |
+| `mechanic` | Механик | export.run, blanks.spoil.warehouse |
+| `auditor` | Аудитор | audit.read, audit.diff |
+| `reviewer` | Проверяющий | audit.business.read, waybill.submit |
+| `viewer` | Наблюдатель | audit.read |
+
+### Полный список типов сотрудников
+
+```typescript
+type EmployeeType = 
+  | 'driver'      // Водитель
+  | 'dispatcher'  // Диспетчер
+  | 'controller'  // Контролер
+  | 'accountant'  // Бухгалтер
+  | 'mechanic'    // Механик
+  | 'reviewer';   // Проверяющий
+```
+
+---
+
+## Приложение B: Контакты и ресурсы
+
+- **Prisma Studio:** `cd backend && npx prisma studio`
+- **Swagger/OpenAPI:** (планируется)
+- **Логи:** `backend/logs/` + Pino pretty в dev
+- **Sentry:** Настроен в `sentry.config.ts`
+
+---
+
+> **Примечание:** Этот документ актуален на декабрь 2025. При значительных архитектурных изменениях — обновлять документ.

@@ -252,3 +252,228 @@ export async function getNextWaybillNumber(organizationId: string): Promise<stri
     const seq = String(Math.floor(Math.random() * 1000)).padStart(4, '0');
     return `${year}${month}${day}-${seq}`;
 }
+
+// ==================== REL-107: FUEL MANAGEMENT API ====================
+
+/**
+ * Stock location from backend
+ */
+export interface StockLocation {
+    id: string;
+    organizationId: string;
+    type: 'WAREHOUSE' | 'FUEL_CARD' | 'VEHICLE_TANK';
+    name: string;
+    warehouseId?: string;
+    fuelCardId?: string;
+    vehicleId?: string;
+}
+
+/**
+ * Balance at a specific date
+ */
+export interface LocationBalance {
+    locationId: string;
+    locationName: string;
+    locationType: string;
+    stockItemId: string;
+    stockItemName: string;
+    balance: number;
+    unit: string;
+}
+
+/**
+ * Get all stock locations
+ */
+export async function getStockLocations(): Promise<StockLocation[]> {
+    console.log('📡 [stockApi] Fetching stock locations...');
+    const response = await httpClient.get<ApiResponse<StockLocation[]>>('/stock/locations');
+    return response.data || [];
+}
+
+/**
+ * Get balances at a specific date
+ */
+export async function getBalancesAt(asOf?: Date): Promise<LocationBalance[]> {
+    console.log('📡 [stockApi] Fetching balances at:', asOf?.toISOString() || 'now');
+    const params = asOf ? `?asOf=${asOf.toISOString()}` : '';
+    const response = await httpClient.get<ApiResponse<LocationBalance[]>>(`/stock/balances${params}`);
+    return response.data || [];
+}
+
+/**
+ * Get balance for a specific location and item
+ */
+export async function getBalanceAt(
+    locationId: string,
+    stockItemId: string,
+    asOf?: Date
+): Promise<number> {
+    const params = new URLSearchParams({ locationId, stockItemId });
+    if (asOf) params.append('asOf', asOf.toISOString());
+    const response = await httpClient.get<ApiResponse<{ balance: number }>>(`/stock/balance?${params.toString()}`);
+    return response.data?.balance || 0;
+}
+
+/**
+ * Movement from backend with full details
+ */
+export interface StockMovementV2 {
+    id: string;
+    movementType: 'INCOME' | 'EXPENSE' | 'ADJUSTMENT' | 'TRANSFER';
+    quantity: number;
+    stockItemId: string;
+    stockItemName?: string;
+    stockLocationId?: string;
+    stockLocationName?: string;
+    fromStockLocationId?: string;
+    fromStockLocationName?: string;
+    toStockLocationId?: string;
+    toStockLocationName?: string;
+    occurredAt: string;
+    createdAt: string;
+    documentType?: string;
+    documentId?: string;
+    comment?: string;
+}
+
+/**
+ * Get movements with filters
+ */
+export async function getMovementsV2(filters?: {
+    locationId?: string;
+    stockItemId?: string;
+    movementType?: string;
+    from?: Date;
+    to?: Date;
+}): Promise<StockMovementV2[]> {
+    const params = new URLSearchParams();
+    if (filters?.locationId) params.append('locationId', filters.locationId);
+    if (filters?.stockItemId) params.append('stockItemId', filters.stockItemId);
+    if (filters?.movementType) params.append('movementType', filters.movementType);
+    if (filters?.from) params.append('from', filters.from.toISOString());
+    if (filters?.to) params.append('to', filters.to.toISOString());
+
+    const response = await httpClient.get<ApiResponse<StockMovementV2[]>>(`/stock/movements/v2?${params.toString()}`);
+    return response.data || [];
+}
+
+// ==================== FUEL CARDS ====================
+
+export interface FuelCard {
+    id: string;
+    cardNumber: string;
+    provider?: string;
+    isActive: boolean;
+    balanceLiters: number;
+    assignedToDriverId?: string;
+    assignedToVehicleId?: string;
+}
+
+export interface FuelCardAssignment {
+    id: string;
+    fuelCardId: string;
+    validFrom: string;
+    validTo?: string;
+    driverId?: string;
+    driverName?: string;
+    vehicleId?: string;
+    vehicleNumber?: string;
+    providerName?: string;
+}
+
+/**
+ * Get all fuel cards
+ */
+export async function getFuelCards(): Promise<FuelCard[]> {
+    const response = await httpClient.get<ApiResponse<FuelCard[]>>('/fuel-cards');
+    return response.data || [];
+}
+
+/**
+ * Get assignment history for a fuel card
+ */
+export async function getCardAssignments(fuelCardId: string): Promise<FuelCardAssignment[]> {
+    const response = await httpClient.get<ApiResponse<FuelCardAssignment[]>>(`/fuel-cards/${fuelCardId}/assignments`);
+    return response.data || [];
+}
+
+/**
+ * Check if card is valid at date
+ */
+export async function isCardValidAt(fuelCardId: string, asOf?: Date): Promise<{ valid: boolean; reason?: string }> {
+    const params = asOf ? `?asOf=${asOf.toISOString()}` : '';
+    const response = await httpClient.get<ApiResponse<{ valid: boolean; reason?: string }>>(`/fuel-cards/${fuelCardId}/valid${params}`);
+    return response.data || { valid: false };
+}
+
+// ==================== TOP-UP & RESET RULES ====================
+
+export interface TopUpRule {
+    id: string;
+    fuelCardId: string;
+    fuelCardNumber?: string;
+    isActive: boolean;
+    scheduleType: 'DAILY' | 'WEEKLY' | 'MONTHLY';
+    amountLiters: number;
+    minBalanceLiters?: number;
+    stockItemId?: string;
+    stockItemName?: string;
+    nextRunAt?: string;
+    lastRunAt?: string;
+}
+
+export interface ResetRule {
+    id: string;
+    name: string;
+    isActive: boolean;
+    frequency: 'MONTHLY' | 'QUARTERLY' | 'YEARLY' | 'MANUAL';
+    scope: 'ALL_CARDS' | 'BY_PROVIDER' | 'BY_DEPARTMENT' | 'SPECIFIC_CARDS';
+    mode: 'TRANSFER_TO_WAREHOUSE' | 'EXPIRE_EXPENSE';
+    stockItemId?: string;
+    stockItemName?: string;
+    nextRunAt?: string;
+    lastRunAt?: string;
+}
+
+/**
+ * Get all top-up rules
+ */
+export async function getTopUpRules(): Promise<TopUpRule[]> {
+    const response = await httpClient.get<ApiResponse<TopUpRule[]>>('/fuel-cards/topup-rules');
+    return response.data || [];
+}
+
+/**
+ * Get all reset rules
+ */
+export async function getResetRules(): Promise<ResetRule[]> {
+    const response = await httpClient.get<ApiResponse<ResetRule[]>>('/fuel-cards/reset-rules');
+    return response.data || [];
+}
+
+/**
+ * Run top-up job manually
+ */
+export async function runTopUpJob(): Promise<{ processed: number; toppedUp: number; skipped: number }> {
+    const response = await httpClient.post<ApiResponse<{ processed: number; toppedUp: number; skipped: number }>>('/admin/jobs/run-fuelcard-topups');
+    return response.data || { processed: 0, toppedUp: 0, skipped: 0 };
+}
+
+/**
+ * Run reset rules
+ */
+export async function runResetRules(ruleId?: string): Promise<{ processed: number; reset: number; skipped: number }> {
+    const body = ruleId ? { ruleId } : {};
+    const response = await httpClient.post<ApiResponse<{ processed: number; reset: number; skipped: number }>>('/admin/fuel/resets/run', body);
+    return response.data || { processed: 0, reset: 0, skipped: 0 };
+}
+
+/**
+ * Preview reset without making changes
+ */
+export async function previewResetRules(ruleId?: string): Promise<{ processed: number; reset: number; skipped: number }> {
+    const params = ruleId ? `?ruleId=${ruleId}` : '';
+    const response = await httpClient.get<ApiResponse<{ processed: number; reset: number; skipped: number }>>(`/admin/fuel/resets/preview${params}`);
+    return response.data || { processed: 0, reset: 0, skipped: 0 };
+}
+

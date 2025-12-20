@@ -3,6 +3,7 @@ import { resetDatabase, getDataPreview, selectiveDelete, importData, transferUse
 import { runRecalculation } from '../controllers/recalculationController';
 import { authMiddleware } from '../middleware/authMiddleware';
 import { runFuelCardTopUps } from '../jobs/fuelCardTopUpJob';
+import { prisma } from '../db/prisma';
 
 const router = Router();
 
@@ -47,14 +48,79 @@ router.post('/transfer-organization', authMiddleware, requireRole('admin'), tran
 // POST /api/admin/recalculate - Helper for recalculating balances
 router.post('/recalculate', authMiddleware, requireRole('admin'), runRecalculation);
 
-// FUEL-001: POST /api/admin/jobs/run-fuelcard-topups - Manual top-up job execution
+// FUEL-OPS-001: POST /api/admin/jobs/run-fuelcard-topups - Manual top-up job execution with audit
 router.post('/jobs/run-fuelcard-topups', authMiddleware, requireRole('admin'), async (req: Request, res: Response) => {
+    const startTime = Date.now();
+    const requestId = (req as any).requestId || 'unknown';
+    const userId = (req as any).user?.userId;
+    const organizationId = (req as any).user?.organizationId;
+
     try {
         const result = await runFuelCardTopUps();
-        res.json({ success: true, ...result });
+        const durationMs = Date.now() - startTime;
+
+        // Write audit log for job execution
+        try {
+            await prisma.auditLog.create({
+                data: {
+                    organizationId: organizationId || null,
+                    userId: userId || null,
+                    actionType: 'UPDATE',
+                    entityType: 'JOB',
+                    entityId: null,
+                    description: `Manual FuelCard top-up job executed. Processed: ${result.processed}, Topped up: ${result.toppedUp}, Skipped: ${result.skipped}`,
+                    newValue: {
+                        jobType: 'FUEL_CARD_TOPUP',
+                        requestId,
+                        ...result,
+                        durationMs,
+                    },
+                },
+            });
+        } catch (auditError) {
+            // Don't fail the request if audit logging fails
+            console.error('[AuditLog] Failed to log job execution:', auditError);
+        }
+
+        res.json({
+            success: true,
+            requestId,
+            durationMs,
+            ...result,
+        });
     } catch (err: any) {
-        res.status(500).json({ success: false, error: err.message });
+        const durationMs = Date.now() - startTime;
+
+        // Log failed execution
+        try {
+            await prisma.auditLog.create({
+                data: {
+                    organizationId: organizationId || null,
+                    userId: userId || null,
+                    actionType: 'UPDATE',
+                    entityType: 'JOB',
+                    entityId: null,
+                    description: `Manual FuelCard top-up job FAILED: ${err.message}`,
+                    newValue: {
+                        jobType: 'FUEL_CARD_TOPUP',
+                        requestId,
+                        error: err.message,
+                        durationMs,
+                    },
+                },
+            });
+        } catch (auditError) {
+            console.error('[AuditLog] Failed to log job error:', auditError);
+        }
+
+        res.status(500).json({
+            success: false,
+            requestId,
+            durationMs,
+            error: err.message,
+        });
     }
 });
 
 export default router;
+

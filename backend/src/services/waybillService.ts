@@ -4,6 +4,9 @@ import { validateOdometer, calculateDistanceKm, calculatePlannedFuelByMethod, Fu
 import { isWinterDate } from '../utils/dateUtils';
 import { getSeasonSettings } from './settingsService';
 import { reserveNextBlankForDriver, reserveSpecificBlank, releaseBlank } from './blankService';
+// REL-103: Stock location imports
+import { getOrCreateVehicleTankLocation, getOrCreateFuelCardLocation, getOrCreateDefaultWarehouseLocation } from './stockLocationService';
+import { createTransfer, createExpenseMovement } from './stockService';
 
 const prisma = new PrismaClient();
 
@@ -591,6 +594,7 @@ export async function changeWaybillStatus(
                 },
             },
             blank: true,
+            department: true, // WH-DEC-001: Need defaultWarehouseId for stock movements
         },
     });
 
@@ -663,25 +667,79 @@ export async function changeWaybillStatus(
 
         // Business logic для перехода в POSTED (завершенный ПЛ)
         if (status === WaybillStatus.POSTED) {
-            // 1. Создать движения расхода топлива
-            const { createExpenseMovement } = await import('./stockService');
+            // REL-103: Получить локацию бака ТС
+            const vehicleTank = await getOrCreateVehicleTankLocation(waybill.vehicleId);
 
-            for (const fuelLine of waybill.fuelLines) {
-                if (fuelLine.fuelConsumed && Number(fuelLine.fuelConsumed) > 0) {
-                    await createExpenseMovement(
+            // 1. REL-103: TRANSFER заправок в бак
+            for (let lineIndex = 0; lineIndex < waybill.fuelLines.length; lineIndex++) {
+                const fuelLine = waybill.fuelLines[lineIndex];
+                const fuelReceived = Number(fuelLine.fuelReceived || 0);
+
+                if (fuelReceived > 0) {
+                    // Определяем источник заправки
+                    let sourceLocationId: string;
+
+                    if (fuelLine.sourceType === 'FUEL_CARD' && waybill.fuelCardId) {
+                        // Заправка с топливной карты
+                        const cardLocation = await getOrCreateFuelCardLocation(waybill.fuelCardId);
+                        sourceLocationId = cardLocation.id;
+                    } else {
+                        // Заправка со склада (по умолчанию)
+                        const warehouseLocation = await getOrCreateDefaultWarehouseLocation(
+                            organizationId,
+                            waybill.departmentId
+                        );
+                        sourceLocationId = warehouseLocation.id;
+                    }
+
+                    // Время заправки: refueledAt или startAt или date
+                    const refueledAt = fuelLine.refueledAt
+                        || waybill.startAt
+                        || waybill.date;
+
+                    await createTransfer({
                         organizationId,
-                        fuelLine.stockItemId,
-                        Number(fuelLine.fuelConsumed),
-                        'WAYBILL',
-                        waybill.id,
+                        stockItemId: fuelLine.stockItemId,
+                        quantity: fuelReceived,
+                        fromLocationId: sourceLocationId,
+                        toLocationId: vehicleTank.id,
+                        occurredAt: refueledAt,
+                        occurredSeq: lineIndex * 100,  // 0, 100, 200...
+                        documentType: 'WAYBILL',
+                        documentId: waybill.id,
+                        comment: `Заправка по ПЛ №${waybill.number}`,
                         userId,
-                        null,
-                        `Расход по ПЛ №${waybill.number} от ${waybill.date.toISOString().slice(0, 10)}`
-                    );
+                    });
+
+                    console.log(`[REL-103] TRANSFER created: ${fuelReceived}L from ${sourceLocationId} to tank ${vehicleTank.id}`);
                 }
             }
 
-            // 2. WB-501: Обновить статус бланка (ISSUED/RESERVED → USED)
+            // 2. REL-103: EXPENSE расхода топлива из бака
+            const expenseOccurredAt = waybill.endAt || waybill.date;
+
+            for (const fuelLine of waybill.fuelLines) {
+                const fuelConsumed = Number(fuelLine.fuelConsumed || 0);
+
+                if (fuelConsumed > 0) {
+                    await createExpenseMovement(
+                        organizationId,
+                        fuelLine.stockItemId,
+                        fuelConsumed,
+                        'WAYBILL',
+                        waybill.id,
+                        userId,
+                        null,  // warehouseId deprecated
+                        `Расход по ПЛ №${waybill.number} от ${waybill.date.toISOString().slice(0, 10)}`,
+                        vehicleTank.id,  // stockLocationId = бак ТС
+                        expenseOccurredAt  // occurredAt = endAt или date
+                    );
+
+                    console.log(`[REL-103] EXPENSE created: ${fuelConsumed}L from tank ${vehicleTank.id}`);
+                }
+            }
+
+            // 3. WB-501: Обновить статус бланка (ISSUED/RESERVED → USED)
             if (waybill.blankId && waybill.blank) {
                 const blankStatus = waybill.blank.status;
                 if (blankStatus === BlankStatus.ISSUED || blankStatus === BlankStatus.RESERVED) {

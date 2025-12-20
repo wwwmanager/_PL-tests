@@ -562,6 +562,7 @@ const EmployeeList: React.FC = () => {
                                     <td colSpan={columns.length + 1} className="p-0">
                                         <EmptyState
                                             reason={error ? getEmptyStateFromError(error) : (isLoading ? { type: 'loading' } : { type: 'empty', entityName: 'сотрудники' })}
+                                            onRetry={fetchData}
                                         />
                                     </td>
                                 </tr>

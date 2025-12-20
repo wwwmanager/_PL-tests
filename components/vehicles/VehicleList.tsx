@@ -189,13 +189,14 @@ export const VehicleList: React.FC = () => {
     }, []);
 
     const onSubmit = async (data: VehicleFormData) => {
+        // Логика нормализации status/isActive перенесена в sanitizeVehiclePayload (vehicleApi.ts)
         const dataToSave = {
             ...data,
             organizationId: data.organizationId === '' ? null : data.organizationId,
         };
 
         try {
-            console.log('💾 [VehicleList] Saving vehicle:', JSON.stringify(dataToSave, null, 2));
+            console.log('🔥 [VehicleList] SAVING:', JSON.stringify(dataToSave, null, 2));
             if (dataToSave.id) {
                 await updateVehicle(dataToSave as Vehicle);
             } else {
@@ -205,6 +206,7 @@ export const VehicleList: React.FC = () => {
             setIsModalOpen(false);
             fetchData();
         } catch (error) {
+            console.error(error);
             showToast("Не удалось сохранить изменения.", 'error');
         }
     };

@@ -171,6 +171,10 @@ async function request<T>(path: string, options: RequestInit = {}, retryOn401 = 
             console.log('Error Message:', errorMessage);
             if (errorData) {
                 console.log('Error Data:', errorData);
+                // REL-FIX: Explicitly log validation errors for debugging
+                if (errorData.errors && Array.isArray(errorData.errors)) {
+                    console.error('🔴 Validation Errors:', JSON.stringify(errorData.errors, null, 2));
+                }
             }
             console.groupEnd();
 

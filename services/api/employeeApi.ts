@@ -17,6 +17,46 @@ export interface EmployeesResponse {
     totalPages: number;
 }
 
+/**
+ * Allowed fields for Employee create/update
+ * Filters out: organizationId (from JWT), blankBatches (computed), id, createdAt, updatedAt, relations
+ */
+const ALLOWED_EMPLOYEE_FIELDS = [
+    'fullName', 'shortName', 'position', 'phone', 'email', 'address', 'dateOfBirth',
+    'personnelNumber', 'snils', 'notes',
+    'employeeType', 'status', 'isActive',
+    'departmentId', 'dispatcherId', 'controllerId', 'medicalInstitutionId',
+    'documentNumber', 'documentExpiry', 'licenseCategory',
+    'driverCardType', 'driverCardNumber', 'driverCardStartDate', 'driverCardExpiryDate',
+    'medicalCertificateSeries', 'medicalCertificateNumber', 'medicalCertificateIssueDate', 'medicalCertificateExpiryDate',
+    'fuelCardNumber', 'fuelCardBalance',
+] as const;
+
+// Fields that should be converted from "" to null (dates, unique fields, etc.)
+const NULLABLE_IF_EMPTY_FIELDS = [
+    'dateOfBirth', 'documentExpiry',
+    'driverCardStartDate', 'driverCardExpiryDate',
+    'medicalCertificateIssueDate', 'medicalCertificateExpiryDate',
+    'fuelCardNumber', // unique constraint - empty string would cause duplicate errors
+    'shortName', 'email', 'phone', 'address',
+    'departmentId', 'dispatcherId', 'controllerId', 'medicalInstitutionId',
+];
+
+function sanitizeEmployeePayload(data: Record<string, unknown>): Record<string, unknown> {
+    const filtered = Object.fromEntries(
+        Object.entries(data).filter(([key]) => (ALLOWED_EMPLOYEE_FIELDS as readonly string[]).includes(key))
+    );
+
+    // Convert empty strings to null for specific fields
+    for (const field of NULLABLE_IF_EMPTY_FIELDS) {
+        if (field in filtered && filtered[field] === '') {
+            filtered[field] = null;
+        }
+    }
+
+    return filtered;
+}
+
 export async function getEmployees(filters: EmployeeFilters = {}): Promise<Employee[]> {
     const params = new URLSearchParams();
 
@@ -41,24 +81,24 @@ export async function getEmployeeById(id: string): Promise<Employee> {
     return response.data.employee;
 }
 
-export async function createEmployee(data: Partial<Employee>): Promise<Employee> {
+export async function createEmployee(data: Partial<Employee> | Record<string, unknown>): Promise<Employee> {
+    const payload = sanitizeEmployeePayload(data as Record<string, unknown>);
+    console.log('👤 [employeeApi] createEmployee sanitized payload:', JSON.stringify(payload, null, 2));
+
     const response = await httpClient.post<{ success: boolean; data: { employee: Employee } }>(
         '/employees',
-        data
+        payload
     );
     return response.data.employee;
 }
 
-export async function updateEmployee(id: string, data: Partial<{
-    departmentId: string;
-    fullName: string;
-    position: string;
-    personnelNumber: string;
-    isActive: boolean;
-}>): Promise<Employee> {
+export async function updateEmployee(id: string, data: Partial<Employee> | Record<string, unknown>): Promise<Employee> {
+    const payload = sanitizeEmployeePayload(data as Record<string, unknown>);
+    console.log('👤 [employeeApi] updateEmployee sanitized payload:', JSON.stringify(payload, null, 2));
+
     const response = await httpClient.put<{ success: boolean; data: { employee: Employee } }>(
         `/employees/${id}`,
-        data
+        payload
     );
     return response.data.employee;
 }
@@ -66,3 +106,4 @@ export async function updateEmployee(id: string, data: Partial<{
 export async function deleteEmployee(id: string): Promise<void> {
     await httpClient.delete(`/employees/${id}`);
 }
+

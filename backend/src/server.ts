@@ -3,6 +3,7 @@ import { createApp } from './app';
 import { env } from './config/env';
 import { logger } from './utils/logger';
 import { ensureAdminExists } from './services/authService';
+import { startSchedulers, stopSchedulers } from './jobs/scheduler';
 
 async function bootstrap() {
     try {
@@ -17,17 +18,22 @@ async function bootstrap() {
         // Graceful shutdown
         process.on('SIGINT', async () => {
             logger.info('Shutting down gracefully (SIGINT)...');
+            stopSchedulers();
             process.exit(0);
         });
 
         process.on('SIGTERM', async () => {
             logger.info('Shutting down gracefully (SIGTERM)...');
+            stopSchedulers();
             process.exit(0);
         });
 
         app.listen(env.PORT, () => {
             logger.info({ port: env.PORT, env: env.NODE_ENV }, '🚀 Backend server started');
             logger.info({ healthCheck: `http://localhost:${env.PORT}/api/health` }, 'Endpoints available');
+
+            // Start background job schedulers
+            startSchedulers();
         });
     } catch (error) {
         logger.fatal({ err: error }, '❌ Failed to start server');
@@ -36,3 +42,4 @@ async function bootstrap() {
 }
 
 bootstrap();
+

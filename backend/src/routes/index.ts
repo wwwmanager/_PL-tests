@@ -20,6 +20,7 @@ import { router as dashboardRoutes } from './dashboardRoutes';
 import adminRoutes from './adminRoutes';
 import { calendarRouter } from './calendarRoutes';
 import { router as meRoutes } from './meRoutes';
+import stockLocationRoutes from './stockLocationRoutes';
 
 export const router = Router();
 
@@ -39,6 +40,7 @@ router.use('/warehouses', warehouseRoutes);
 router.use('/fuel-types', fuelTypeRoutes);
 router.use('/routes', routeRoutes);
 router.use('/stock', stockRoutes);
+router.use('/stock/locations', stockLocationRoutes);  // REL-101: Stock Locations
 router.use('/drivers', driverRoutes);
 router.use('/fuel-cards', fuelCardRoutes);
 router.use('/users', userRoutes);

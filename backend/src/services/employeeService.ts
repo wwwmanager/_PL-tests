@@ -83,6 +83,9 @@ export async function createEmployee(data: any) {
         throw new BadRequestError('fullName is required');
     }
 
+    // FIX: Use consistent status variable to avoid isActive mismatch
+    const status = data.status ?? 'Active';
+
     // REL-011: Use transaction to create employee and auto-create Driver if needed
     return prisma.$transaction(async (tx) => {
         const employee = await tx.employee.create({
@@ -93,7 +96,7 @@ export async function createEmployee(data: any) {
                 shortName: data.shortName || null,
                 employeeType: data.employeeType || 'driver',
                 position: data.position || null,
-                status: data.status || 'Active',
+                status: status,
                 phone: data.phone || null,
                 address: data.address || null,
                 email: data.email || null,
@@ -117,11 +120,11 @@ export async function createEmployee(data: any) {
                 dispatcherId: data.dispatcherId || null,
                 controllerId: data.controllerId || null,
                 notes: data.notes || null,
-                isActive: data.status === 'Active',
+                isActive: status === 'Active',  // FIX: Now derived from consistent status variable
             },
         });
 
-        // REL-011: Auto-create Driver record if employeeType is 'driver'
+        // REL-302: Auto-create Driver record if employeeType is 'driver'
         const employeeType = data.employeeType || 'driver';
         if (employeeType === 'driver') {
             await tx.driver.create({
@@ -129,10 +132,11 @@ export async function createEmployee(data: any) {
                     employeeId: employee.id,
                     licenseNumber: data.documentNumber || `AUTO-${employee.id.slice(0, 8)}`,
                     licenseCategory: data.licenseCategory || 'B',
-                    licenseValidTo: data.documentExpiry || null,
+                    // Safe parse date if string
+                    licenseValidTo: data.documentExpiry ? new Date(data.documentExpiry) : null,
                 },
             });
-            console.log(`[REL-011] Auto-created Driver for employee ${employee.id} (${employee.fullName})`);
+            console.log(`[REL-302] Auto-created Driver for new employee ${employee.id} (${employee.fullName})`);
         }
 
         return employee;
@@ -186,11 +190,9 @@ export async function updateEmployee(id: string, data: any) {
     if (data.notes !== undefined) updateData.notes = data.notes;
     if (data.organizationId !== undefined) updateData.organizationId = data.organizationId;
 
-    // REL-011: Check if we need to auto-create Driver when type changes to 'driver'
+    // REL-302: Check if we need to ensure Driver exists for driver-type employees
     const newEmployeeType = data.employeeType || employee.employeeType;
-    const wasNotDriver = employee.employeeType !== 'driver';
-    const isNowDriver = newEmployeeType === 'driver';
-    const shouldCreateDriver = wasNotDriver && isNowDriver;
+    const isDriverType = newEmployeeType === 'driver';
 
     return prisma.$transaction(async (tx) => {
         const updatedEmployee = await tx.employee.update({
@@ -198,8 +200,8 @@ export async function updateEmployee(id: string, data: any) {
             data: updateData,
         });
 
-        // REL-011: Auto-create Driver if employee type changed to 'driver'
-        if (shouldCreateDriver) {
+        // REL-302: Ensure Driver exists for ANY driver-type employee (fixes historical data)
+        if (isDriverType) {
             const existingDriver = await tx.driver.findUnique({
                 where: { employeeId: id }
             });
@@ -210,11 +212,13 @@ export async function updateEmployee(id: string, data: any) {
                         employeeId: id,
                         licenseNumber: data.documentNumber || employee.documentNumber || `AUTO-${id.slice(0, 8)}`,
                         licenseCategory: data.licenseCategory || employee.licenseCategory || 'B',
-                        licenseValidTo: data.documentExpiry || employee.documentExpiry || null,
+                        licenseValidTo: (data.documentExpiry || employee.documentExpiry)
+                            ? new Date(data.documentExpiry || employee.documentExpiry)
+                            : null,
                     },
                 });
 
-                console.log(`[REL-011] Auto-created Driver for employee ${id} (type changed to driver)`);
+                console.log(`[REL-302] Auto-created missing Driver for employee ${id} (${updatedEmployee.fullName})`);
             }
         }
 

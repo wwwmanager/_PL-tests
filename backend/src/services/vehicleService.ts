@@ -1,11 +1,37 @@
 import { prisma } from '../db/prisma';
 import { BadRequestError, NotFoundError } from '../utils/errors';
+import * as fs from 'fs';
+
+const LOG_FILE = 'c:/_PL-tests/vehicle_debug_v2.log';
+
+function logToDebugFile(message: string) {
+    try {
+        const timestamp = new Date().toISOString();
+        fs.appendFileSync(LOG_FILE, `[${timestamp}] ${message}\n`);
+    } catch (e) {
+        console.error('Failed to write to debug log', e);
+    }
+}
+
+// Common logic for status resolution
+function resolveIsActive(status: string | undefined, isActive: boolean | undefined): boolean | undefined {
+    // Log resolution attempt
+    const resolved = (() => {
+        if (!status) return isActive;
+        const s = status.trim().toUpperCase();
+        if (['ACTIVE', 'ACT', 'АКТИВЕН', 'АКТИВНЫЙ', 'РАБОТАЕТ'].includes(s)) return true;
+        if (['ARCHIVED', 'INACTIVE', 'НЕАКТИВЕН', 'НЕ АКТИВЕН', 'АРХИВ', 'СПИСАН'].includes(s)) return false;
+        return isActive;
+    })();
+
+    logToDebugFile(`resolveIsActive input: status="${status}", isActive=${isActive} -> result=${resolved}`);
+    return resolved;
+}
 
 export async function listVehicles(organizationId: string, departmentId?: string | null) {
     console.log(`📊 [vehicleService] Listing vehicles for org: ${organizationId}, dept: ${departmentId || 'ALL'}`);
     const where: any = { organizationId };
 
-    // Only filter by department if explicitly provided and not null
     if (departmentId) {
         where.departmentId = departmentId;
     }
@@ -16,14 +42,15 @@ export async function listVehicles(organizationId: string, departmentId?: string
         include: {
             organization: true,
             department: true,
+            fuelTypeRelation: true,
         },
     });
     console.log(`📊 [vehicleService] Found ${vehicles.length} vehicles`);
 
-    // Map database isActive to frontend status enum
     return vehicles.map((v: any) => ({
         ...v,
-        status: v.isActive ? 'ACTIVE' : 'ARCHIVED'
+        // FIX: Используем PascalCase для соответствия frontend enum VehicleStatus
+        status: v.isActive ? 'Active' : 'Archived'
     }));
 }
 
@@ -33,22 +60,21 @@ export async function getVehicleById(organizationId: string, id: string) {
         include: {
             organization: true,
             department: true,
+            fuelTypeRelation: true,
         },
     });
 
     if (!vehicle) return null;
 
-    // Map database isActive to frontend status enum
     return {
         ...vehicle,
-        status: (vehicle as any).isActive ? 'ACTIVE' : 'ARCHIVED'
+        // FIX: Используем PascalCase для соответствия frontend enum VehicleStatus
+        status: (vehicle as any).isActive ? 'Active' : 'Archived'
     } as any;
 }
 
 /**
  * Validate fuelConsumptionRates structure
- * Expected: { winterRate?, summerRate?, cityIncreasePercent?, warmingIncreasePercent? }
- * All values must be non-negative numbers
  */
 function validateFuelConsumptionRates(rates: any): void {
     if (rates === null || rates === undefined) return;
@@ -76,15 +102,37 @@ function validateFuelConsumptionRates(rates: any): void {
     }
 }
 
+// Helper to handle frontend misbehavior where UUID is sent in the text 'fuelType' field
+function normalizeFuelTypeData(data: any) {
+    let { fuelType, fuelTypeId } = data;
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+    // If fuelType looks like a UUID and fuelTypeId is missing, swap them
+    if (fuelType && typeof fuelType === 'string' && uuidRegex.test(fuelType) && !fuelTypeId) {
+        logToDebugFile(`⚠️ normalization: Detected UUID in fuelType field (${fuelType}). Swapping.`);
+        fuelTypeId = fuelType;
+        fuelType = null;
+    }
+
+    // Standard cleanup
+    if (fuelType === '' || fuelType === null) fuelType = null;
+
+    return { fuelType, fuelTypeId };
+}
+
 export async function createVehicle(organizationId: string, data: any) {
+    logToDebugFile(`CREATE input: ${JSON.stringify(data, null, 2)}`);
+
     // Validate required fields
     if (!data.registrationNumber) {
         throw new BadRequestError('Номер регистрации обязателен');
     }
 
-    console.log(`📊 [vehicleService] Creating vehicle for org: ${organizationId}. Data.orgId: ${data.organizationId}`);
+    console.log(`📊 [vehicleService] Creating vehicle for org: ${organizationId}. Data:`, JSON.stringify(data, null, 2));
     const actualOrgId = data.organizationId || organizationId;
     console.log(`📊 [vehicleService] Final organizationId for new vehicle: ${actualOrgId}`);
+
+    const { fuelType, fuelTypeId } = normalizeFuelTypeData(data);
 
     try {
         const vehicle = await prisma.vehicle.create({
@@ -96,8 +144,8 @@ export async function createVehicle(organizationId: string, data: any) {
                 brand: data.brand || null,
                 model: data.model || null,
                 vin: data.vin || null,
-                fuelType: data.fuelType || null,
-                fuelTypeId: data.fuelTypeId || null,
+                fuelType,
+                fuelTypeId: fuelTypeId || null,
                 fuelTankCapacity: data.fuelTankCapacity ? Number(data.fuelTankCapacity) : null,
                 mileage: data.mileage ? Number(data.mileage) : 0,
                 currentFuel: data.currentFuel ? Number(data.currentFuel) : 0,
@@ -130,10 +178,9 @@ export async function createVehicle(organizationId: string, data: any) {
                 notes: data.notes || null,
                 disableFuelCapacityCheck: !!data.disableFuelCapacityCheck,
 
-                isActive: data.status === 'ACTIVE' ? true : (data.status === 'ARCHIVED' ? false : (data.isActive !== undefined ? data.isActive : true)),
+                isActive: resolveIsActive(data.status, data.isActive) ?? true,
             } as any,
         });
-        console.log(`📊 [vehicleService] Created vehicle internal ID: ${vehicle.id}`);
         return vehicle;
     } catch (error: any) {
         if (error.code === 'P2002') {
@@ -144,6 +191,8 @@ export async function createVehicle(organizationId: string, data: any) {
 }
 
 export async function updateVehicle(organizationId: string, id: string, data: any) {
+    logToDebugFile(`UPDATE input for ${id}: ${JSON.stringify(data, null, 2)}`);
+
     const vehicle = await prisma.vehicle.findFirst({
         where: { id, organizationId },
     });
@@ -157,6 +206,8 @@ export async function updateVehicle(organizationId: string, id: string, data: an
         validateFuelConsumptionRates(data.fuelConsumptionRates);
     }
 
+    const { fuelType, fuelTypeId } = normalizeFuelTypeData(data);
+
     return prisma.vehicle.update({
         where: { id },
         data: {
@@ -165,8 +216,8 @@ export async function updateVehicle(organizationId: string, id: string, data: an
             brand: data.brand,
             model: data.model,
             vin: data.vin,
-            fuelType: data.fuelType,
-            fuelTypeId: data.fuelTypeId,
+            fuelType,
+            fuelTypeId,
             fuelTankCapacity: data.fuelTankCapacity !== undefined ? Number(data.fuelTankCapacity) : undefined,
             mileage: data.mileage !== undefined ? Number(data.mileage) : undefined,
             currentFuel: data.currentFuel !== undefined ? Number(data.currentFuel) : undefined,
@@ -199,7 +250,7 @@ export async function updateVehicle(organizationId: string, id: string, data: an
             notes: data.notes,
             disableFuelCapacityCheck: data.disableFuelCapacityCheck !== undefined ? !!data.disableFuelCapacityCheck : undefined,
 
-            isActive: data.status === 'ACTIVE' ? true : (data.status === 'ARCHIVED' ? false : data.isActive),
+            isActive: resolveIsActive(data.status, data.isActive),
             departmentId: data.departmentId,
             organizationId: data.organizationId || organizationId,
         } as any,

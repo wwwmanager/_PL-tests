@@ -26,6 +26,7 @@ enum StockMovementType {
   INCOME
   EXPENSE
   ADJUSTMENT
+  TRANSFER  // REL-102: перемещение между локациями
 }
 
 /// Выровнено с frontend: AVAILABLE вместо FREE, добавлены RESERVED/RETURNED
@@ -74,6 +75,33 @@ enum TopUpScheduleType {
   MONTHLY
 }
 
+// REL-101: Stock Location Types
+enum StockLocationType {
+  WAREHOUSE
+  FUEL_CARD
+  VEHICLE_TANK
+}
+
+// REL-105: Fuel Card Reset Enums
+enum ResetFrequency {
+  MONTHLY
+  QUARTERLY
+  YEARLY
+  MANUAL
+}
+
+enum ResetMode {
+  TRANSFER_TO_WAREHOUSE  // вернуть остатки в поол
+  EXPIRE_EXPENSE         // сгорание/списание
+}
+
+enum ResetScope {
+  ALL_CARDS       // все карты организации
+  BY_PROVIDER     // по поставщику
+  BY_DEPARTMENT   // по подразделению
+  SPECIFIC_CARDS  // конкретный список
+}
+
 // ============================================================================
 // ОРГАНИЗАЦИИ И ПОДРАЗДЕЛЕНИЯ
 // ============================================================================
@@ -116,28 +144,34 @@ model Organization {
   blanks         Blank[]
   waybills       Waybill[]
   stockMovements StockMovement[]
+  stockLocations StockLocation[]
   auditLogs      AuditLog[]
+  resetRules     FuelCardResetRule[]  // REL-105
 
   @@map("organizations")
 }
 
 model Department {
-  id             String   @id @default(uuid()) @db.Uuid
-  organizationId String   @db.Uuid
-  code           String?  @db.Text
-  name           String   @db.Text
-  address        String?  @db.Text
-  createdAt      DateTime @default(now()) @db.Timestamp(6)
-  updatedAt      DateTime @default(now()) @updatedAt @db.Timestamp(6)
+  id                 String   @id @default(uuid()) @db.Uuid
+  organizationId     String   @db.Uuid
+  code               String?  @db.Text
+  name               String   @db.Text
+  address            String?  @db.Text
+  defaultWarehouseId String?  @db.Uuid  // WH-DEC-001: Default warehouse for stock movements
+  createdAt          DateTime @default(now()) @db.Timestamp(6)
+  updatedAt          DateTime @default(now()) @updatedAt @db.Timestamp(6)
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  users        User[]
-  employees    Employee[]
-  vehicles     Vehicle[]
-  warehouses   Warehouse[]
-  blankBatches BlankBatch[]
-  blanks       Blank[]
-  waybills     Waybill[]
+  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  defaultWarehouse Warehouse?   @relation("DefaultWarehouse", fields: [defaultWarehouseId], references: [id], onDelete: SetNull)
+  users            User[]
+  employees        Employee[]
+  vehicles         Vehicle[]
+  warehouses       Warehouse[]
+  blankBatches     BlankBatch[]
+  blanks           Blank[]
+  waybills         Waybill[]
+  stockLocations   StockLocation[]
+  resetRulesForDept FuelCardResetRule[] @relation("ResetRuleDepartment")  // REL-105
 
   @@map("departments")
 }
@@ -299,6 +333,7 @@ model Driver {
   waybills     Waybill[]
   fuelCards    FuelCard[] @relation("FuelCardDriver")
   blanksIssued Blank[]    @relation("BlankIssuedToDriver")
+  cardAssignments FuelCardAssignment[] @relation("AssignmentDriver")  // REL-106
 
   @@map("drivers")
 }
@@ -364,6 +399,8 @@ model Vehicle {
   waybills     Waybill[]
   fuelCards    FuelCard[]   @relation("FuelCardVehicle")
   blanksIssued Blank[]      @relation("BlankIssuedToVehicle")
+  stockLocation StockLocation? @relation("VehicleTankLocation")
+  cardAssignments FuelCardAssignment[] @relation("AssignmentVehicle")  // REL-106
 
   @@map("vehicles")
 }
@@ -386,8 +423,39 @@ model FuelCard {
   waybills          Waybill[]
   transactions      FuelCardTransaction[] // FUEL-001
   topUpRules        FuelCardTopUpRule[]   // FUEL-001
+  stockLocation     StockLocation? @relation("FuelCardLocation")
+  assignments       FuelCardAssignment[]  // REL-106
 
   @@map("fuel_cards")
+}
+
+/// REL-106: История назначений топливных карт
+model FuelCardAssignment {
+  id             String    @id @default(uuid()) @db.Uuid
+  fuelCardId     String    @db.Uuid
+  
+  // Период действия
+  validFrom      DateTime  @db.Timestamp(6)  // начало действия
+  validTo        DateTime? @db.Timestamp(6)  // конец действия (null = бессрочно)
+  
+  // Назначение
+  driverId       String?   @db.Uuid
+  vehicleId      String?   @db.Uuid
+  
+  // Дополнительная информация
+  providerName   String?   @db.Text  // имя поставщика на момент назначения
+  comment        String?   @db.Text
+  
+  createdAt      DateTime  @default(now()) @db.Timestamp(6)
+  updatedAt      DateTime  @default(now()) @updatedAt @db.Timestamp(6)
+
+  fuelCard       FuelCard  @relation(fields: [fuelCardId], references: [id], onDelete: Cascade)
+  driver         Driver?   @relation("AssignmentDriver", fields: [driverId], references: [id], onDelete: SetNull)
+  vehicle        Vehicle?  @relation("AssignmentVehicle", fields: [vehicleId], references: [id], onDelete: SetNull)
+
+  @@index([fuelCardId, validFrom, validTo])
+  @@index([driverId, validFrom, validTo])
+  @@map("fuel_card_assignments")
 }
 
 // ============================================================================
@@ -409,6 +477,8 @@ model StockItem {
   organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   stockMovements StockMovement[]
   waybillFuel    WaybillFuel[]
+  topUpRules     FuelCardTopUpRule[] @relation("TopUpRuleStockItem")  // REL-104
+  resetRules     FuelCardResetRule[] @relation("ResetRuleStockItem")  // REL-105
 
   @@map("stock_items")
 }
@@ -422,10 +492,12 @@ model Warehouse {
   createdAt      DateTime @default(now()) @db.Timestamp(6)
   updatedAt      DateTime @default(now()) @updatedAt @db.Timestamp(6)
 
-  organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  department     Department?     @relation(fields: [departmentId], references: [id], onDelete: SetNull)
-  stockMovements StockMovement[]
-  vehicles       Vehicle[]
+  organization          Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  department            Department?     @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  defaultForDepartments Department[]    @relation("DefaultWarehouse") // WH-DEC-001
+  stockMovements        StockMovement[]
+  vehicles              Vehicle[]
+  stockLocation         StockLocation? @relation("WarehouseLocation")
 
   @@map("warehouses")
 }
@@ -462,22 +534,78 @@ model Route {
 model StockMovement {
   id              String            @id @default(uuid()) @db.Uuid
   organizationId  String            @db.Uuid
-  warehouseId     String?           @db.Uuid
+  warehouseId     String?           @db.Uuid  // deprecated: сохранено для обратной совместимости
   stockItemId     String            @db.Uuid
   movementType    StockMovementType
   quantity        Decimal           @db.Decimal(14, 3)
+  
+  // REL-102: Location support
+  stockLocationId     String?       @db.Uuid  // локация для INCOME/EXPENSE/ADJUSTMENT
+  fromStockLocationId String?       @db.Uuid  // источник для TRANSFER
+  toStockLocationId   String?       @db.Uuid  // назначение для TRANSFER
+  
+  // REL-102: Temporal support
+  occurredAt      DateTime          @default(now()) @db.Timestamp(6)  // когда произошла операция
+  occurredSeq     Int               @default(0)  // порядок в пределах одного occurredAt
+  
   documentType    String?           @db.Text
   documentId      String?           @db.Uuid
+  externalRef     String?           @db.Text  // REL-102: для идемпотентности (TOPUP:ruleId:date)
   comment         String?           @db.Text
   createdByUserId String?           @db.Uuid
   createdAt       DateTime          @default(now()) @db.Timestamp(6)
 
-  organization  Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  warehouse     Warehouse?   @relation(fields: [warehouseId], references: [id], onDelete: SetNull)
-  stockItem     StockItem    @relation(fields: [stockItemId], references: [id], onDelete: Restrict)
-  createdByUser User?        @relation("StockMovementCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  organization      Organization   @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  warehouse         Warehouse?     @relation(fields: [warehouseId], references: [id], onDelete: SetNull)
+  stockItem         StockItem      @relation(fields: [stockItemId], references: [id], onDelete: Restrict)
+  stockLocation     StockLocation? @relation("LocationMovements", fields: [stockLocationId], references: [id], onDelete: SetNull)
+  fromStockLocation StockLocation? @relation("FromLocationTransfers", fields: [fromStockLocationId], references: [id], onDelete: SetNull)
+  toStockLocation   StockLocation? @relation("ToLocationTransfers", fields: [toStockLocationId], references: [id], onDelete: SetNull)
+  createdByUser     User?          @relation("StockMovementCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
 
+  @@unique([organizationId, externalRef])
+  @@index([stockLocationId, stockItemId, occurredAt])
+  @@index([fromStockLocationId, stockItemId, occurredAt])
+  @@index([toStockLocationId, stockItemId, occurredAt])
   @@map("stock_movements")
+}
+
+// REL-101: Универсальные локации хранения топлива и ТМЦ
+model StockLocation {
+  id             String            @id @default(uuid()) @db.Uuid
+  organizationId String            @db.Uuid
+  departmentId   String?           @db.Uuid
+  type           StockLocationType
+  name           String            @db.Text
+  
+  // Привязки (одна из них заполнена в зависимости от type)
+  warehouseId    String?           @unique @db.Uuid
+  fuelCardId     String?           @unique @db.Uuid
+  vehicleId      String?           @unique @db.Uuid
+  
+  isActive       Boolean           @default(true)
+  createdAt      DateTime          @default(now()) @db.Timestamp(6)
+  updatedAt      DateTime          @default(now()) @updatedAt @db.Timestamp(6)
+
+  organization   Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  department     Department?       @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  warehouse      Warehouse?        @relation("WarehouseLocation", fields: [warehouseId], references: [id], onDelete: Cascade)
+  fuelCard       FuelCard?         @relation("FuelCardLocation", fields: [fuelCardId], references: [id], onDelete: Cascade)
+  vehicle        Vehicle?          @relation("VehicleTankLocation", fields: [vehicleId], references: [id], onDelete: Cascade)
+  
+  // REL-102: Обратные связи для движений
+  movements      StockMovement[]   @relation("LocationMovements")
+  transfersFrom  StockMovement[]   @relation("FromLocationTransfers")
+  transfersTo    StockMovement[]   @relation("ToLocationTransfers")
+  
+  // REL-104: Обратные связи для правил пополнения
+  topUpRulesAsSource FuelCardTopUpRule[] @relation("TopUpRuleSource")
+  
+  // REL-105: Обратные связи для правил обнуления
+  resetRulesAsTarget FuelCardResetRule[] @relation("ResetRuleTarget")
+
+  @@index([organizationId, type])
+  @@map("stock_locations")
 }
 
 // ============================================================================
@@ -552,6 +680,11 @@ model Waybill {
   isCityDriving     Boolean       @default(false) // Added WB-102
   isWarming         Boolean       @default(false) // Added WB-102
   fuelCalculationMethod FuelCalculationMethod @default(BOILER)
+  
+  // REL-103: Время начала и окончания рейса
+  startAt           DateTime?     @db.Timestamp(6)  // время выезда
+  endAt             DateTime?     @db.Timestamp(6)  // время возврата
+  
   createdByUserId   String?       @db.Uuid
   approvedByUserId  String?       @db.Uuid
   completedByUserId String?       @db.Uuid
@@ -606,6 +739,11 @@ model WaybillFuel {
   fuelConsumed Decimal? @db.Decimal(10, 2)
   fuelEnd      Decimal? @db.Decimal(10, 2)
   fuelPlanned  Decimal? @db.Decimal(10, 2) // Added WB-102
+  
+  // REL-103: Время и источник заправки
+  refueledAt   DateTime? @db.Timestamp(6)  // время заправки
+  sourceType   String?   @db.Text          // "FUEL_CARD" | "WAREHOUSE"
+  
   comment      String?  @db.Text
 
   waybill   Waybill    @relation(fields: [waybillId], references: [id], onDelete: Cascade)
@@ -707,11 +845,53 @@ model FuelCardTopUpRule {
   timezone         String            @default("Europe/Moscow") @db.Text
   nextRunAt        DateTime
   lastRunAt        DateTime?
+  
+  // REL-104: Для интеграции с StockMovement TRANSFER
+  stockItemId      String?           @db.Uuid  // какой тип топлива (номенклатура)
+  sourceLocationId String?           @db.Uuid  // откуда брать (обычно склад)
+  
   createdAt        DateTime          @default(now()) @db.Timestamp(6)
   updatedAt        DateTime          @default(now()) @updatedAt @db.Timestamp(6)
 
-  fuelCard         FuelCard @relation(fields: [fuelCardId], references: [id], onDelete: Cascade)
+  fuelCard         FuelCard       @relation(fields: [fuelCardId], references: [id], onDelete: Cascade)
+  stockItem        StockItem?     @relation("TopUpRuleStockItem", fields: [stockItemId], references: [id], onDelete: SetNull)
+  sourceLocation   StockLocation? @relation("TopUpRuleSource", fields: [sourceLocationId], references: [id], onDelete: SetNull)
 
   @@index([organizationId, isActive, nextRunAt])
   @@map("fuel_card_topup_rules")
+}
+
+/// REL-105: Правила обнуления топливных карт
+model FuelCardResetRule {
+  id               String          @id @default(uuid()) @db.Uuid
+  organizationId   String          @db.Uuid
+  name             String          @db.Text  // название правила
+  isActive         Boolean         @default(true)
+  
+  // Параметры расписания
+  frequency        ResetFrequency
+  nextRunAt        DateTime?       @db.Timestamp(6)
+  lastRunAt        DateTime?       @db.Timestamp(6)
+  
+  // Область действия
+  scope            ResetScope      @default(ALL_CARDS)
+  providerFilter   String?         @db.Text  // для BY_PROVIDER
+  departmentId     String?         @db.Uuid  // для BY_DEPARTMENT
+  cardIds          String[]        @db.Uuid  // для SPECIFIC_CARDS
+  
+  // Режим обнуления
+  mode             ResetMode       @default(EXPIRE_EXPENSE)
+  targetLocationId String?         @db.Uuid  // куда переводим при TRANSFER
+  stockItemId      String?         @db.Uuid  // какой тип топлива
+  
+  createdAt        DateTime        @default(now()) @db.Timestamp(6)
+  updatedAt        DateTime        @default(now()) @updatedAt @db.Timestamp(6)
+
+  organization     Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  department       Department?     @relation("ResetRuleDepartment", fields: [departmentId], references: [id], onDelete: SetNull)
+  targetLocation   StockLocation?  @relation("ResetRuleTarget", fields: [targetLocationId], references: [id], onDelete: SetNull)
+  stockItem        StockItem?      @relation("ResetRuleStockItem", fields: [stockItemId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, isActive, nextRunAt])
+  @@map("fuel_card_reset_rules")
 }

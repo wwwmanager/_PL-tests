@@ -17,6 +17,11 @@ export interface IssueBlankDto {
 }
 
 export async function createBatch(organizationId: string, userId: string, data: CreateBatchDto) {
+    // [FIX] Валидация диапазона перед созданием
+    if (data.numberTo < data.numberFrom) {
+        throw new Error('Конечный номер партии не может быть меньше начального');
+    }
+
     // 1. Create Batch Record
     const batch = await prisma.blankBatch.create({
         data: {
@@ -30,8 +35,6 @@ export async function createBatch(organizationId: string, userId: string, data: 
     });
 
     // 2. Generate individual blanks
-    // This can be heavy for large batches, so we might want to do it in chunks or background job in real prod
-    // For now (up to 1000 items) it's fine.
     const blanksData = [];
     for (let i = data.numberFrom; i <= data.numberTo; i++) {
         blanksData.push({
@@ -46,7 +49,7 @@ export async function createBatch(organizationId: string, userId: string, data: 
 
     await prisma.blank.createMany({
         data: blanksData,
-        skipDuplicates: true // In case some numbers already exist (shouldn't happen if validated)
+        skipDuplicates: true
     });
 
     return batch;
@@ -95,12 +98,12 @@ export async function materializeBatch(organizationId: string | undefined, batch
         };
     }
 
-    // Generate individual blanks (same logic as createBatch)
+    // Generate individual blanks
     const blanksData = [];
     for (let i = batch.numberFrom; i <= batch.numberTo; i++) {
         blanksData.push({
             organizationId: batch.organizationId,
-            departmentId: batch.departmentId,
+            departmentId: batch.departmentId, // [FIX] Восстановлена привязка к департаменту
             batchId: batch.id,
             series: batch.series || '',
             number: i,
@@ -183,26 +186,10 @@ export async function issueBlank(organizationId: string, data: IssueBlankDto) {
         throw new Error(`Бланк не доступен (статус: ${blank.status})`);
     }
 
-    // REL-702: Validate driverId references Driver table, not Employee
-    let actualDriverId = data.driverId;
+    // [FIX] Strict Mode: Только прямой поиск Driver.id
     if (data.driverId) {
-        // First try direct Driver lookup
-        let driver = await prisma.driver.findUnique({
-            where: { id: data.driverId }
-        });
-
+        const driver = await prisma.driver.findUnique({ where: { id: data.driverId } });
         if (!driver) {
-            // Fallback: maybe frontend sent Employee.id instead of Driver.id
-            driver = await prisma.driver.findUnique({
-                where: { employeeId: data.driverId }
-            });
-            if (driver) {
-                console.warn(`[REL-702] WARNING: issueBlank received employeeId '${data.driverId}' instead of driverId '${driver.id}'. Frontend should send Driver.id.`);
-                actualDriverId = driver.id;
-            }
-        }
-
-        if (!driver && !actualDriverId) {
             throw new Error('Водитель не найден');
         }
     }
@@ -212,7 +199,7 @@ export async function issueBlank(organizationId: string, data: IssueBlankDto) {
         where: { id: blank.id },
         data: {
             status: BlankStatus.ISSUED,
-            issuedToDriverId: actualDriverId || null,
+            issuedToDriverId: data.driverId || null, // data.driverId уже проверен выше
             issuedToVehicleId: data.vehicleId,
             issuedAt: new Date()
         }
@@ -245,29 +232,13 @@ export async function issueBlanksRange(organizationId: string | undefined, data:
         throw new Error('Нет доступных бланков в указанном диапазоне');
     }
 
-    // Find the driver record for this employee, or create if missing
-    let driver = await prisma.driver.findUnique({
-        where: { employeeId: data.driverId }
+    // [FIX] Strict Mode: Ищем строго Driver по ID. Никаких fallback'ов или employeeId.
+    const driver = await prisma.driver.findUnique({
+        where: { id: data.driverId }
     });
 
     if (!driver) {
-        // Check if employee exists
-        const employee = await prisma.employee.findUnique({
-            where: { id: data.driverId }
-        });
-
-        if (!employee) {
-            throw new Error('Сотрудник не найден');
-        }
-
-        // Auto-create Driver record for this employee
-        console.log('[issueBlanksRange] Auto-creating Driver record for employee:', data.driverId);
-        driver = await prisma.driver.create({
-            data: {
-                employeeId: data.driverId,
-                licenseNumber: employee.documentNumber || 'НЕ УКАЗАНО'
-            }
-        });
+        throw new Error('Водитель не найден (убедитесь, что водитель создан в системе)');
     }
 
     // Update all blanks
@@ -458,13 +429,13 @@ export async function reserveNextBlankForDriver(
         const { Prisma } = require('@prisma/client');
 
         const departmentFilter = departmentId
-            ? Prisma.sql`AND "departmentId" = ${departmentId} `
+            ? Prisma.sql`AND "departmentId" = ${departmentId}::uuid `
             : Prisma.empty;
 
         const blanks = await tx.$queryRaw<Array<{ id: string; series: string; number: number }>>`
             SELECT id, series, number 
             FROM blanks 
-            WHERE "organizationId" = ${organizationId}
+            WHERE "organizationId" = ${organizationId}::uuid
               AND status = 'AVAILABLE'
               ${departmentFilter}
             ORDER BY series ASC, number ASC
@@ -520,7 +491,10 @@ export async function reserveSpecificBlank(
             where: {
                 id: blankId,
                 organizationId,
-                status: BlankStatus.AVAILABLE,
+                OR: [
+                    { status: BlankStatus.AVAILABLE },
+                    { status: BlankStatus.ISSUED, issuedToDriverId: driverId }
+                ],
                 ...(departmentId ? { departmentId } : {})
             }
         });

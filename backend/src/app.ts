@@ -9,11 +9,33 @@ import { requestIdMiddleware } from './middleware/requestId';
 export const createApp = () => {
     const app = express();
 
-    // CORS configuration
-    app.use(cors({
-        origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
-        credentials: true  // Required for cookies
-    }));
+    // CORS configuration - support multiple frontend origins
+    const allowedOrigins = [
+        'http://localhost:5173', // Vite default
+        'http://localhost:3000', // Alternative port
+        process.env.CORS_ORIGIN, // Custom via env var
+    ].filter(Boolean) as string[];
+
+    const corsOptions: cors.CorsOptions = {
+        origin: (origin, callback) => {
+            // Allow non-browser clients (curl, postman) without Origin header
+            if (!origin) {
+                return callback(null, true);
+            }
+            if (allowedOrigins.includes(origin)) {
+                return callback(null, true);
+            }
+            console.warn(`[CORS] Blocked origin: ${origin}`);
+            return callback(new Error(`CORS blocked origin: ${origin}`));
+        },
+        credentials: true, // Required for HttpOnly refresh token cookie
+        methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+        allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-Id'],
+    };
+
+    // Handle preflight OPTIONS requests
+    app.options('*', cors(corsOptions));
+    app.use(cors(corsOptions));
 
     // Cookie parsing (required for refresh token in HttpOnly cookie)
     app.use(cookieParser());
