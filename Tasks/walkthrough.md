@@ -328,3 +328,144 @@ JOIN employees e ON d."employeeId" = e.id;
 - [ ] Логи консоли показывают полный поток выполнения (ожидает ручного теста)
 
 **Текущий статус:** Готов к фазе ручного тестирования через браузер.
+
+---
+
+# Отчет по отладке Складского Учета (Stock Management)
+
+## Выполненные задачи (REL-100+)
+
+### 1. Исправление Backend
+- ✅ Исправлены ошибки типизации в `stockController.ts` и `stockLocationController.ts`.
+- ✅ Проверена работа `prisma generate` и генерация корректных типов для `StockLocationType`.
+- ✅ Backend успешно запускается на порту 3001.
+
+### 2. Исправление E2E Тестов
+- ✅ Обновлен конфигурационный файл `playwright.config.ts`, порт по умолчанию скорректирован через ENV (3000).
+- ✅ Исправлены селекторы в `warehouse-management.e2e.spec.ts` для поддержки модальных окон (Strict Mode Violation fix).
+- ✅ Реализована поддержка `INCOME` (Приход) и `TRANSFER` (Перемещение) в тестах.
+
+### 3. Результаты тестов
+```bash
+Running 3 tests using 1 worker
+  ✓  1 … should navigate to Warehouse and switch tabs (2.4s)
+  ✓  2 …Warehouse Management › should create INCOME movement
+  ✓  3 … Management › should create TRANSFER movement (5.9s)
+  3 passed (15.3s)
+```
+
+## Критерии успеха (WH-008)
+- [x] Backend стартует и принимает запросы.
+- [x] Тест "INCOME": создание прихода через UI работает.
+- [x] Тест "TRANSFER": создание перемещения между локациями работает.
+- [x] Все тесты в `warehouse-management.e2e.spec.ts` проходят успешно.
+
+# Отчет по миграции топлива (MIG-FT-003) - Frontend Removal
+
+All frontend components have been refactored to remove dependency on the legacy `FuelType` entity. The system now uses `StockItem` with `categoryEnum='FUEL'` directly.
+
+## Refactored Components
+
+### 1. `VehicleList.tsx`
+- **Change**: Replaced `fuelTypeApi` with `stockItemApi`.
+- **Change**: Replaced `fuelTypeId` field in form with `fuelStockItemId`.
+- **Change**: `fuelTypeId` in schema defaults to empty/optional.
+- **Result**: Vehicle form now selects fuel directly from Stock Items (filtered by FUEL category).
+
+### 2. `WaybillDetail.tsx`
+- **Change**: Replaced `fuelTypeApi` import with `stockItemApi`.
+- **Change**: Removed `fuelTypes` state, replaced with `fuelItems` (StockItem[]).
+- **Change**: Updated fuel selection logic to lazy-load `StockItem` based on `fuelStockItemId` (or legacy `fuelTypeId`).
+- **Change**: Garage transaction linking now detects fuel items by `categoryEnum='FUEL'` instead of `fuelTypeId`.
+
+### 3. `GarageManagement.tsx`
+- **Change**: Removed `fuelTypeApi` usage.
+- **Change**: Removed `fuelTypeId` from `StockItemFormData` schema.
+- **Change**: Added `density` field to schema (required for fuel items).
+- **Change**: `onSubmit` logic sets `categoryEnum='FUEL'` and `group='ГСМ'` if `isFuel` checkbox is selected.
+- **Result**: Creating a "Fuel" item now creates a standard `StockItem` with correct category metadata, without needing a separate `FuelType` entity.
+
+## Type Definition Updates (`types.ts`)
+- `GarageStockItem`: Added `categoryEnum`, deprecated `fuelTypeId`.
+- `Vehicle`: Added `fuelStockItemId`, deprecated `fuelTypeId`.
+- `FuelType`: Marked interface as Deprecated.
+
+## Verification
+- **Compilation**: `npx tsc --noEmit` passed for refactored components.
+- **Logic**: All fuel-related logic (consumption calculation, garage linking) now operates on `StockItem` properties (`density` is available on StockItem).
+
+## Next Steps
+- Verify E2E tests for Vehicle and Waybill creation (may require updating selectors if names changed, though `name` attributes mostly remained).
+- Monitor for any legacy `FuelType` calls in logs (should be warned via deprecated wrapper).
+
+# Отчет по миграции БД (MIG-FT-004) - Phase A
+
+Completed Phase A (Compatibility) of database migration.
+
+## Changes
+1. **Schema**: Confirmed `Vehicle` model has `fuelStockItemId` (FK to `StockItem`).
+2. **Backfill Script**: Updated `scripts/backfill-fuel-type-to-stock-item.ts` to:
+   - Use `fuelTypeLegacyId` for StockItem mapping.
+   - Idempotently create/link StockItems.
+   - **New**: Backfill `Vehicle.fuelStockItemId` by resolving legacy `FuelType` code/id.
+3. **Backend API**: Verified `vehicleService.ts` returns `fuelStockItemId` (via `fuelStockItem` relation).
+
+## Execution
+- Ran backfill script: Success (0 records found in current environment, but logic is in place).
+- Note: `prisma generate` encountered EPERM (locked file), implying backend is running. Usage of `fuelTypeLegacyId` relies on previously generated client (REL-201).
+
+## Next Steps (Phase B)
+- When ready to drop compatibility:
+  - Delete `FuelType` table.
+  - Drop `fuelTypeId` columns.
+  - Remove `fuelTypeController` and related code.
+
+
+---
+
+# Отчет по миграции топлива (MIG-FT-001 / MIG-FT-002)
+
+## Цель
+Полный отказ от legacy сущности `FuelType` в пользу единого справочника `StockItem` (category=FUEL).
+
+## Выполненные изменения (MIG-FT-001 Frontend / MIG-FT-002 Backend)
+
+### 1. Единый источник истины
+- **StockItem** теперь является единственной сущностью для хранения ГСМ.
+- Поле `categoryEnum` = 'FUEL' определяет топливо.
+- Существующие записи `FuelType` мигрированы в `StockItem` (скриптом `backfill-fuel-type-to-stock-item.ts` или через seed).
+
+### 2. Frontend адаптация
+- **`services/fuelTypeApi.ts`**: Переписан как deprecated wrapper.
+  - `getFuelTypes()` -> вызывает `stockItemApi.getStockItems({ categoryEnum: 'FUEL', isActive: true })`.
+  - CRUD методы -> вызывают `console.warn` и делегируют `stockItemApi` (с маппингом).
+- Компоненты (`VehicleList`, `WaybillDetail`, `GarageManagement`) продолжают работать "как есть", используя wrapper.
+
+### 3. Backend ограничения (MIG-FT-002)
+- **`fuelTypeController.ts`**:
+  - `GET /api/fuel-types`: Возвращает `StockItem` (FUEL), отформатированные как старые `FuelType`.
+  - `GET /api/fuel-types/:id`: Возвращает `StockItem` (если он FUEL).
+  - `POST / PUT / DELETE`: **Отключены** (возвращают 410 Gone).
+  - Генерация Prisma Client обновлена для поддержки `StockItemCategory` и `density`.
+
+### 4. Результат
+- Старый API `/api/fuel-types` работает только на чтение (как alias).
+- Фронтенд переведен на использование данных из `StockItem` (через wrapper).
+- Создание/удаление топлива теперь возможно только через раздел "Номенклатура" (StockItem).
+
+## Критерии успеха
+- [x] `npm run dev` на backend запускается без TS ошибок.
+- [x] GET `/api/fuel-types` возвращает список топлива (из StockItems).
+- [x] Попытка создания `FuelType` через старый API возвращает ошибку 410 Gone.
+- [x] Приложение (Vehicle, Waybill) отображает списки топлива корректно.
+
+---
+
+# Отчет по E2E Refactor (MIG-FT-005)
+
+## Changes
+1. **Disabled FuelType Creation**: Confirmed `POST /fuel-types` returns 410.
+2. **Refactored E2E Test**: `tests/e2e/full-business-chain.e2e.spec.ts`:
+   - Step 2: Now fetches `StockItem` (category=FUEL) instead of `FuelType`.
+   - Step 5: Creates `Vehicle` using `fuelStockItemId`.
+   - **Verification**: Code refactoring complete. (E2E Run incomplete due to environment/backend instability, but logic verified statically).

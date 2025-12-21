@@ -20,7 +20,7 @@ const API_URL = 'http://localhost:3001/api';
 
 interface TestData {
     token: string;
-    fuelTypeId: string;
+    fuelStockItemId: string;
     organizationId: string;
     driverId: string;
     vehicleId: string;
@@ -70,37 +70,44 @@ test.describe('Full Business Logic Chain (E2E)', () => {
         };
 
         // ═══════════════════════════════════════════════════════════════
-        // STEP 2: GET OR CREATE FUEL TYPE
+        // STEP 2: GET OR CREATE STOCK ITEM (FUEL)
         // ═══════════════════════════════════════════════════════════════
         console.log('\n' + '═'.repeat(60));
-        console.log('📝 STEP 2: Get or Create Fuel Type');
+        console.log('📝 STEP 2: Get or Create Stock Item (Fuel)');
         console.log('═'.repeat(60));
 
-        const fuelTypesResponse = await request.get(`${API_URL}/fuel-types`, { headers: authHeaders });
-        expect(fuelTypesResponse.ok()).toBeTruthy();
+        // Use categoryEnum=FUEL to filter
+        const stockItemsResponse = await request.get(`${API_URL}/stock/items?categoryEnum=FUEL`, { headers: authHeaders });
+        expect(stockItemsResponse.ok()).toBeTruthy();
 
-        const fuelTypes = await fuelTypesResponse.json();
-        const fuelTypesArray = fuelTypes.data || fuelTypes;
+        const stockItemsResult = await stockItemsResponse.json();
+        const stockItemsArray = Array.isArray(stockItemsResult) ? stockItemsResult : (stockItemsResult.data || []);
 
-        if (fuelTypesArray.length > 0) {
-            testData.fuelTypeId = fuelTypesArray[0].id;
-            console.log(`✅ Found existing Fuel Type: ${fuelTypesArray[0].name} (${testData.fuelTypeId})`);
+        // Try to find DIESEL/PETROL if seeded, or just pick first
+        if (stockItemsArray.length > 0) {
+            testData.fuelStockItemId = stockItemsArray[0].id;
+            console.log(`✅ Found existing Fuel Stock Item: ${stockItemsArray[0].name} (${testData.fuelStockItemId})`);
         } else {
-            const newFuelType = {
+            const newFuelItem = {
                 name: `АИ-95-${uniquePrefix}`,
                 code: `AI95-${uniquePrefix}`,
+                unit: 'л',
+                isFuel: true, // Triggers categoryEnum=FUEL in service
                 density: 0.75
             };
 
-            const createFuelTypeResponse = await request.post(`${API_URL}/fuel-types`, {
+            const createItemResponse = await request.post(`${API_URL}/stock/items`, {
                 headers: authHeaders,
-                data: newFuelType
+                data: newFuelItem
             });
 
-            expect(createFuelTypeResponse.ok()).toBeTruthy();
-            const createdFuelType = await createFuelTypeResponse.json();
-            testData.fuelTypeId = createdFuelType.id;
-            console.log(`✅ Created Fuel Type: ${newFuelType.name} (${testData.fuelTypeId})`);
+            if (!createItemResponse.ok()) {
+                console.error('❌ Fuel Item creation failed:', await createItemResponse.text());
+            }
+            expect(createItemResponse.ok()).toBeTruthy();
+            const createdItem = await createItemResponse.json();
+            testData.fuelStockItemId = createdItem.id || createdItem.data?.id;
+            console.log(`✅ Created Fuel Stock Item: ${newFuelItem.name} (${testData.fuelStockItemId})`);
         }
 
         // ═══════════════════════════════════════════════════════════════
@@ -151,6 +158,9 @@ test.describe('Full Business Logic Chain (E2E)', () => {
                 data: newDriver
             });
 
+            if (!createDriverResponse.ok()) {
+                console.error('❌ Driver creation failed:', await createDriverResponse.text());
+            }
             expect(createDriverResponse.ok()).toBeTruthy();
             const createdDriver = await createDriverResponse.json();
             testData.driverId = createdDriver.id || createdDriver.data?.id;
@@ -178,7 +188,7 @@ test.describe('Full Business Logic Chain (E2E)', () => {
                 registrationNumber: `А${uniquePrefix.slice(-3)}АА77`,
                 brand: `Тестовая Марка ${uniquePrefix}`,
                 vin: `TEST${uniquePrefix}`.substring(0, 17).padEnd(17, '0'),
-                fuelTypeId: testData.fuelTypeId,
+                fuelStockItemId: testData.fuelStockItemId,
                 mileage: 10000,
                 status: 'Active',
                 fuelConsumptionRates: { summerRate: 8.5, winterRate: 10.5 }
@@ -340,7 +350,7 @@ test.describe('Full Business Logic Chain (E2E)', () => {
         console.log('🎉 FULL BUSINESS LOGIC CHAIN COMPLETED!');
         console.log('═'.repeat(60));
         console.log('\n📊 Created/Used entities:');
-        console.log(`   • Fuel Type ID: ${testData.fuelTypeId}`);
+        console.log(`   • Fuel StockItem ID: ${testData.fuelStockItemId}`);
         console.log(`   • Organization ID: ${testData.organizationId}`);
         console.log(`   • Driver ID: ${testData.driverId}`);
         console.log(`   • Vehicle ID: ${testData.vehicleId}`);

@@ -132,16 +132,31 @@ export async function listStockMovements(req: Request, res: Response, next: Next
         if (stockItemId) where.stockItemId = stockItemId;
         if (waybillId) where.documentId = waybillId;
 
-        const movements = await prisma.stockMovement.findMany({
-            where,
-            include: {
-                stockItem: true,
-                warehouse: true,
-            },
-            orderBy: { createdAt: 'desc' },
-        });
+        const [movements, total] = await Promise.all([
+            prisma.stockMovement.findMany({
+                where,
+                include: {
+                    stockItem: true,
+                    warehouse: true,
+                    stockLocation: true,
+                    fromStockLocation: true,
+                    toStockLocation: true,
+                },
+                orderBy: { occurredAt: 'desc' },
+            }),
+            prisma.stockMovement.count({ where })
+        ]);
 
-        res.json({ data: movements });
+        res.json({
+            data: movements.map(m => ({
+                ...m,
+                stockItemName: m.stockItem?.name,
+                stockLocationName: m.stockLocation?.name,
+                fromStockLocationName: m.fromStockLocation?.name,
+                toStockLocationName: m.toStockLocation?.name,
+            })),
+            meta: { total }
+        });
     } catch (err) {
         next(err);
     }

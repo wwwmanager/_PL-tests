@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { getVehicles, createVehicle as addVehicle, updateVehicle, deleteVehicle } from '../../services/api/vehicleApi';
 import { getEmployees } from '../../services/api/employeeApi';
-import { getFuelTypes } from '../../services/api/fuelTypeApi';
+import { getStockItems, StockItem } from '../../services/stockItemApi';
 import { getOrganizations } from '../../services/organizationApi';
 import { validation } from '../../services/faker';
 import { PencilIcon, TrashIcon, PlusIcon, ArrowUpIcon, ArrowDownIcon, ArchiveBoxIcon, ArrowUpTrayIcon } from '../Icons';
@@ -52,7 +52,8 @@ const vehicleSchema = z.object({
     }),
     // FIX: Removed `required_error` which was causing a compilation issue. The field is still required by default.
     mileage: z.number().min(0, "Пробег не может быть отрицательным"),
-    fuelTypeId: z.string().min(1, "Тип топлива обязателен"),
+    fuelStockItemId: z.string().min(1, "Тип топлива обязателен"),
+    fuelTypeId: z.any().optional(), // Deprecated
     fuelConsumptionRates: fuelConsumptionRatesSchema,
     assignedDriverId: z.string().nullable(),
     organizationId: z.string().optional().nullable(),
@@ -85,7 +86,7 @@ type VehicleFormData = z.infer<typeof vehicleSchema>;
 // --- Main Component ---
 export const VehicleList: React.FC = () => {
     const [vehicles, setVehicles] = useState<Vehicle[]>([]);
-    const [fuelTypes, setFuelTypes] = useState<FuelType[]>([]);
+    const [fuelItems, setFuelItems] = useState<StockItem[]>([]);
     const [employees, setEmployees] = useState<Employee[]>([]);
     const [organizations, setOrganizations] = useState<Organization[]>([]);
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -124,15 +125,15 @@ export const VehicleList: React.FC = () => {
             setIsLoading(true);
             setLoadError(null);
             console.log('🔍 [VehicleList] Calling getVehicles()...');
-            const [vehiclesData, fuelTypesData, employeesData, organizationsData] = await Promise.all([
+            const [vehiclesData, fuelItemsData, employeesData, organizationsData] = await Promise.all([
                 getVehicles(),
-                getFuelTypes(),
+                getStockItems({ categoryEnum: 'FUEL', isActive: true }),
                 getEmployees(),
                 getOrganizations()
             ]);
             console.log('🔍 [VehicleList] Received data:', { vehiclesCount: vehiclesData.length });
             setVehicles(vehiclesData);
-            setFuelTypes(fuelTypesData);
+            setFuelItems(fuelItemsData);
             setEmployees(employeesData.filter(e => e.employeeType === 'driver'));
             setOrganizations(organizationsData);
         } catch (e: any) {
@@ -288,7 +289,7 @@ export const VehicleList: React.FC = () => {
                     </CollapsibleSection>
                     <CollapsibleSection title="Топливо и пробег" isCollapsed={collapsedSections.fuel || false} onToggle={() => toggleSection('fuel')}>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
-                            <FormField label="Тип топлива" error={errors.fuelTypeId?.message} required><FormSelect {...register("fuelTypeId")}><option value="">-</option>{fuelTypes.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}</FormSelect></FormField>
+                            <FormField label="Тип топлива" error={errors.fuelStockItemId?.message} required><FormSelect {...register("fuelStockItemId")}><option value="">-</option>{fuelItems.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}</FormSelect></FormField>
                             <FormField label="Объем бака, л"><FormInput type="number" step="0.01" {...register("fuelTankCapacity", { valueAsNumber: true, setValueAs: v => v || null })} /></FormField>
                             <FormField label="Текущий остаток, л"><FormInput type="number" step="0.01" {...register("currentFuel", { valueAsNumber: true, setValueAs: v => v || null })} /></FormField>
                             <FormField label="Пробег, км" error={errors.mileage?.message} required><FormInput type="number" {...register("mileage", { valueAsNumber: true })} /></FormField>

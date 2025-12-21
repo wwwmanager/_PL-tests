@@ -43,6 +43,7 @@ export async function listVehicles(organizationId: string, departmentId?: string
             organization: true,
             department: true,
             fuelTypeRelation: true,
+            fuelStockItem: true,  // REL-202
         },
     });
     console.log(`📊 [vehicleService] Found ${vehicles.length} vehicles`);
@@ -61,6 +62,7 @@ export async function getVehicleById(organizationId: string, id: string) {
             organization: true,
             department: true,
             fuelTypeRelation: true,
+            fuelStockItem: true,  // REL-202
         },
     });
 
@@ -146,6 +148,7 @@ export async function createVehicle(organizationId: string, data: any) {
                 vin: data.vin || null,
                 fuelType,
                 fuelTypeId: fuelTypeId || null,
+                fuelStockItemId: data.fuelStockItemId || null,  // REL-202
                 fuelTankCapacity: data.fuelTankCapacity ? Number(data.fuelTankCapacity) : null,
                 mileage: data.mileage ? Number(data.mileage) : 0,
                 currentFuel: data.currentFuel ? Number(data.currentFuel) : 0,
@@ -218,6 +221,7 @@ export async function updateVehicle(organizationId: string, id: string, data: an
             vin: data.vin,
             fuelType,
             fuelTypeId,
+            fuelStockItemId: data.fuelStockItemId,  // REL-202
             fuelTankCapacity: data.fuelTankCapacity !== undefined ? Number(data.fuelTankCapacity) : undefined,
             mileage: data.mileage !== undefined ? Number(data.mileage) : undefined,
             currentFuel: data.currentFuel !== undefined ? Number(data.currentFuel) : undefined,

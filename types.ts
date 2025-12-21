@@ -25,6 +25,8 @@ export type Capability =
   | 'blanks.spoil.override'
   | 'rbac.delegate'
   | 'audit.business.read'
+  | 'stock.read'
+  | 'stock.manage'
   // существующие:
   | 'admin.panel'
   | 'import.run'
@@ -181,7 +183,9 @@ export interface Vehicle {
   brand: string;
   vin: string;
   mileage: number;
+  /** @deprecated Use fuelStockItemId instead. */
   fuelTypeId: string;
+  fuelStockItemId?: string | null;
   fuelConsumptionRates: FuelConsumptionRates;
   assignedDriverId: string | null;
   organizationId: string | null;
@@ -272,6 +276,7 @@ export enum OrganizationStatus {
   LIQUIDATED = 'Liquidated',
 }
 
+/** @deprecated Use StockItem with category='FUEL' instead */
 export interface FuelType {
   id: string;
   name: string;
@@ -413,6 +418,8 @@ export interface GarageStockItem {
   balanceAccount?: string;
   budgetCode?: string;
   notes?: string;
+  categoryEnum?: 'FUEL' | 'TIRES' | 'PARTS' | 'OTHER';
+  /** @deprecated Use categoryEnum='FUEL' */
   fuelTypeId?: string;
   density?: number;
   isActive: boolean;
@@ -513,4 +520,53 @@ export interface CalendarEvent {
   note?: string;
   createdAt?: string;
   updatedAt?: string;
+}
+
+/**
+ * Stock location from backend
+ */
+export interface StockLocation {
+  id: string;
+  organizationId: string;
+  type: 'WAREHOUSE' | 'FUEL_CARD' | 'VEHICLE_TANK';
+  name: string;
+  warehouseId?: string;
+  fuelCardId?: string;
+  vehicleId?: string;
+}
+
+/**
+ * Balance at a specific date
+ */
+export interface LocationBalance {
+  locationId: string;
+  locationName: string;
+  locationType: string;
+  stockItemId: string;
+  stockItemName: string;
+  balance: number;
+  unit: string;
+}
+
+/**
+ * Movement from backend with full details
+ */
+export interface StockMovementV2 {
+  id: string;
+  movementType: 'INCOME' | 'EXPENSE' | 'ADJUSTMENT' | 'TRANSFER';
+  quantity: number;
+  stockItemId: string;
+  stockItemName?: string;
+  stockLocationId?: string;
+  stockLocationName?: string;
+  fromStockLocationId?: string;
+  fromStockLocationName?: string;
+  toStockLocationId?: string;
+  toStockLocationName?: string;
+  occurredAt: string;
+  createdAt: string;
+  documentType?: string;
+  documentId?: string;
+  externalRef?: string;
+  comment?: string;
 }

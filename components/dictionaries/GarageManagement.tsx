@@ -5,7 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { GarageStockItem, StockTransaction, StockTransactionItem, Vehicle, Employee, StockTransactionType, Organization, FuelType, Waybill } from '../../types';
 // API facades
 import { getGarageStockItems, addGarageStockItem, updateGarageStockItem, deleteGarageStockItem, getStockTransactions, addStockTransaction, updateStockTransaction, deleteStockTransaction } from '../../services/stockApi';
-import { getFuelTypes } from '../../services/fuelTypeApi';
+// getFuelTypes removed
 import { fetchStorages, Storage as StorageLocation } from '../../services/warehouseApi';
 import { getWaybillById } from '../../services/waybillApi';
 import { getOrganizations } from '../../services/organizationApi';
@@ -36,12 +36,9 @@ const stockItemSchema = z.object({
     balanceAccount: z.string().optional(),
     budgetCode: z.string().optional(),
     isFuel: z.boolean().optional(),
-    fuelTypeId: z.string().optional(),
+    density: z.number().min(0, "Плотность должна быть положительной").optional(),
     isActive: z.boolean(),
     organizationId: z.string().optional(),
-}).refine(data => !data.isFuel || (data.isFuel && data.fuelTypeId), {
-    message: "Выберите тип топлива",
-    path: ["fuelTypeId"],
 });
 
 type StockItemFormData = z.infer<typeof stockItemSchema>;
@@ -91,20 +88,15 @@ const StockItemList = () => {
     const isFuel = watch('isFuel');
 
     const fetchData = useCallback(async () => {
-        const [data, fuelData, orgsData, storagesData] = await Promise.all([getGarageStockItems(), getFuelTypes(), getOrganizations(), fetchStorages()]);
+        const [data, orgsData, storagesData] = await Promise.all([getGarageStockItems(), getOrganizations(), fetchStorages()]);
         setItems(data);
-        setFuelTypes(fuelData);
         setOrganizations(orgsData);
         setStorages(storagesData);
     }, []);
 
     useEffect(() => { fetchData(); }, [fetchData]);
 
-    useEffect(() => {
-        if (isFuel === false) {
-            setValue('fuelTypeId', undefined);
-        }
-    }, [isFuel, setValue]);
+
 
     const { rows } = useTable(items, [
         { key: 'name', label: 'Наименование' },
@@ -114,7 +106,7 @@ const StockItemList = () => {
         { key: 'isActive', label: 'Статус' },
     ]);
 
-    const handleEdit = (item: GarageStockItem) => { reset({ ...item, isFuel: !!item.fuelTypeId }); setCurrentItem(item); };
+    const handleEdit = (item: GarageStockItem) => { reset({ ...item, isFuel: item.categoryEnum === 'FUEL', density: item.density }); setCurrentItem(item); };
     const handleAddNew = () => {
         reset({
             name: '',
@@ -128,7 +120,7 @@ const StockItemList = () => {
             balanceAccount: '',
             budgetCode: '',
             isFuel: false,
-            fuelTypeId: undefined,
+            density: undefined,
             isActive: true,
             organizationId: undefined,
         });
@@ -139,10 +131,14 @@ const StockItemList = () => {
     const onSubmit = async (data: StockItemFormData) => {
         try {
             const dataToSave: any = { ...data };
-            delete dataToSave.isFuel; // Don't save transient state
-            if (!dataToSave.isFuel) {
-                dataToSave.fuelTypeId = undefined;
+            if (data.isFuel) {
+                dataToSave.categoryEnum = 'FUEL';
+                dataToSave.group = 'ГСМ'; // Enforce group
+            } else {
+                dataToSave.categoryEnum = 'OTHER';
             }
+            delete dataToSave.isFuel;
+
             if (data.id) {
                 await updateGarageStockItem(dataToSave as GarageStockItem);
             } else {
@@ -221,25 +217,15 @@ const StockItemList = () => {
                         <span>Является топливом</span>
                     </label>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
                         {isFuel ? (
-                            <FormField label="Тип топлива" error={errors.fuelTypeId?.message}>
-                                <FormSelect {...register("fuelTypeId")} onChange={(e) => {
-                                    const fuelId = e.target.value;
-                                    const selectedFuel = fuelTypes.find(f => f.id === fuelId);
-                                    setValue('fuelTypeId', fuelId, { shouldValidate: true });
-                                    if (selectedFuel) {
-                                        setValue('name', `Топливо ${selectedFuel.name}`, { shouldValidate: true });
-                                        setValue('group', 'ГСМ');
-                                        setValue('unit', 'л');
-                                    }
-                                }}>
-                                    <option value="">Выберите топливо</option>
-                                    {fuelTypes.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
-                                </FormSelect>
+                            <FormField label="Плотность (кг/л)" error={errors.density?.message}>
+                                <FormInput type="number" step="0.001" {...register("density", { valueAsNumber: true })} />
                             </FormField>
                         ) : (
                             <FormField label="Наименование" error={errors.name?.message}><FormInput {...register("name")} /></FormField>
                         )}
+                        {isFuel && <FormField label="Наименование" error={errors.name?.message}><FormInput {...register("name")} /></FormField>}
                         <FormField label="Код" error={errors.code?.message}><FormInput {...register("code")} /></FormField>
                         <FormField label="Группа" error={errors.group?.message}><FormInput {...register("group")} readOnly={isFuel} /></FormField>
                         <FormField label="Ед. изм." error={errors.unit?.message}><FormInput {...register("unit")} readOnly={isFuel} /></FormField>

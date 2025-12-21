@@ -1,0 +1,404 @@
+/**
+ * REL-203: Stock Item List (Номенклатура)
+ * CRUD component for unified stock items catalog
+ */
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+    getStockItems,
+    createStockItem,
+    updateStockItem,
+    deleteStockItem,
+    StockItem,
+    StockItemCategory,
+    StockItemCreateInput,
+    StockItemUpdateInput
+} from '../../services/stockItemApi';
+import { useToast } from '../../hooks/useToast';
+import { PlusIcon } from '../Icons';
+
+interface StockItemFormData {
+    code: string;
+    name: string;
+    unit: string;
+    categoryEnum: StockItemCategory | '';
+    isFuel: boolean;
+    density: string;
+}
+
+const CATEGORY_LABELS: Record<StockItemCategory, string> = {
+    FUEL: '⛽ Топливо',
+    MATERIAL: '📦 Материалы',
+    SPARE_PART: '🔧 Запчасти',
+    SERVICE: '🛠️ Услуги',
+    OTHER: '📋 Прочее',
+};
+
+const StockItemList: React.FC = () => {
+    const [items, setItems] = useState<StockItem[]>([]);
+    const [loading, setLoading] = useState(false);
+    const [showModal, setShowModal] = useState(false);
+    const [editingItem, setEditingItem] = useState<StockItem | null>(null);
+    const [formData, setFormData] = useState<StockItemFormData>({
+        code: '',
+        name: '',
+        unit: 'л',
+        categoryEnum: 'FUEL',
+        isFuel: true,
+        density: '',
+    });
+
+    const [filters, setFilters] = useState({
+        categoryEnum: '' as StockItemCategory | '',
+        isActive: 'true',
+        search: '',
+    });
+
+    const { showToast } = useToast();
+
+    const loadData = useCallback(async () => {
+        setLoading(true);
+        try {
+            const filter: any = {};
+            if (filters.categoryEnum) filter.categoryEnum = filters.categoryEnum;
+            if (filters.isActive) filter.isActive = filters.isActive === 'true';
+            if (filters.search) filter.search = filters.search;
+
+            const data = await getStockItems(filter);
+            setItems(data);
+        } catch (err: any) {
+            showToast('Ошибка загрузки: ' + err.message, 'error');
+        } finally {
+            setLoading(false);
+        }
+    }, [filters, showToast]);
+
+    useEffect(() => {
+        loadData();
+    }, [loadData]);
+
+    const handleFilterChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+        const { name, value } = e.target;
+        setFilters(prev => ({ ...prev, [name]: value }));
+    };
+
+    const openCreateModal = () => {
+        setEditingItem(null);
+        setFormData({
+            code: '',
+            name: '',
+            unit: 'л',
+            categoryEnum: 'FUEL',
+            isFuel: true,
+            density: '',
+        });
+        setShowModal(true);
+    };
+
+    const openEditModal = (item: StockItem) => {
+        setEditingItem(item);
+        setFormData({
+            code: item.code || '',
+            name: item.name,
+            unit: item.unit,
+            categoryEnum: item.categoryEnum || 'OTHER',
+            isFuel: item.isFuel,
+            density: item.density?.toString() || '',
+        });
+        setShowModal(true);
+    };
+
+    const handleFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+        const { name, value, type } = e.target;
+        const isCheckbox = type === 'checkbox';
+        setFormData(prev => ({
+            ...prev,
+            [name]: isCheckbox ? (e.target as HTMLInputElement).checked : value,
+            // Auto-update isFuel when category changes
+            ...(name === 'categoryEnum' && { isFuel: value === 'FUEL' }),
+            ...(name === 'categoryEnum' && value === 'FUEL' && { unit: 'л' }),
+        }));
+    };
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!formData.name.trim()) {
+            showToast('Название обязательно', 'error');
+            return;
+        }
+
+        try {
+            if (editingItem) {
+                const updateData: StockItemUpdateInput = {
+                    code: formData.code || undefined,
+                    name: formData.name,
+                    unit: formData.unit,
+                    categoryEnum: formData.categoryEnum as StockItemCategory || undefined,
+                    isFuel: formData.isFuel,
+                    density: formData.density ? parseFloat(formData.density) : undefined,
+                };
+                await updateStockItem(editingItem.id, updateData);
+                showToast('Номенклатура обновлена', 'success');
+            } else {
+                const createData: StockItemCreateInput = {
+                    code: formData.code || undefined,
+                    name: formData.name,
+                    unit: formData.unit,
+                    categoryEnum: formData.categoryEnum as StockItemCategory || undefined,
+                    isFuel: formData.isFuel,
+                    density: formData.density ? parseFloat(formData.density) : undefined,
+                };
+                await createStockItem(createData);
+                showToast('Номенклатура создана', 'success');
+            }
+            setShowModal(false);
+            loadData();
+        } catch (err: any) {
+            showToast('Ошибка: ' + err.message, 'error');
+        }
+    };
+
+    const handleDelete = async (item: StockItem) => {
+        if (!confirm(`Архивировать "${item.name}"?`)) return;
+        try {
+            await deleteStockItem(item.id);
+            showToast('Номенклатура архивирована', 'success');
+            loadData();
+        } catch (err: any) {
+            showToast('Ошибка: ' + err.message, 'error');
+        }
+    };
+
+    return (
+        <div className="p-4 space-y-4">
+            {/* Filters */}
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-4 bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
+                <div>
+                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Категория</label>
+                    <select
+                        name="categoryEnum"
+                        value={filters.categoryEnum}
+                        onChange={handleFilterChange}
+                        className="w-full text-sm bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:text-white"
+                    >
+                        <option value="">Все категории</option>
+                        {Object.entries(CATEGORY_LABELS).map(([key, label]) => (
+                            <option key={key} value={key}>{label}</option>
+                        ))}
+                    </select>
+                </div>
+                <div>
+                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Статус</label>
+                    <select
+                        name="isActive"
+                        value={filters.isActive}
+                        onChange={handleFilterChange}
+                        className="w-full text-sm bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:text-white"
+                    >
+                        <option value="true">Активные</option>
+                        <option value="false">Архивные</option>
+                        <option value="">Все</option>
+                    </select>
+                </div>
+                <div className="md:col-span-2">
+                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Поиск</label>
+                    <input
+                        type="text"
+                        name="search"
+                        value={filters.search}
+                        onChange={handleFilterChange}
+                        placeholder="Название или код..."
+                        className="w-full text-sm bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:text-white"
+                    />
+                </div>
+                <div className="flex items-end gap-2">
+                    <button
+                        onClick={loadData}
+                        disabled={loading}
+                        className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 disabled:opacity-50"
+                    >
+                        Обновить
+                    </button>
+                    <button
+                        onClick={openCreateModal}
+                        className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center gap-1"
+                    >
+                        <PlusIcon className="w-4 h-4" /> Добавить
+                    </button>
+                </div>
+            </div>
+
+            {/* Table */}
+            <div className="overflow-x-auto border dark:border-gray-700 rounded-lg shadow-sm">
+                <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                    <thead className="bg-gray-50 dark:bg-gray-800">
+                        <tr>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Код</th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Название</th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Категория</th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Ед. изм.</th>
+                            <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Остаток</th>
+                            <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Действия</th>
+                        </tr>
+                    </thead>
+                    <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-800">
+                        {loading ? (
+                            <tr>
+                                <td colSpan={6} className="px-4 py-12 text-center text-gray-500">Загрузка...</td>
+                            </tr>
+                        ) : items.length === 0 ? (
+                            <tr>
+                                <td colSpan={6} className="px-4 py-12 text-center text-gray-500">
+                                    Номенклатура не найдена
+                                </td>
+                            </tr>
+                        ) : (
+                            items.map(item => (
+                                <tr key={item.id} className={`hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors ${!item.isActive ? 'opacity-50' : ''}`}>
+                                    <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-300 font-mono">
+                                        {item.code || '—'}
+                                    </td>
+                                    <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">
+                                        {item.name}
+                                        {item.isFuel && item.density && (
+                                            <span className="ml-2 text-xs text-gray-400">ρ={item.density}</span>
+                                        )}
+                                    </td>
+                                    <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-300">
+                                        {item.categoryEnum ? CATEGORY_LABELS[item.categoryEnum] : item.category || '—'}
+                                    </td>
+                                    <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-300">
+                                        {item.unit}
+                                    </td>
+                                    <td className="px-4 py-3 text-sm text-right">
+                                        <span className={`font-bold ${Number(item.balance) < 0 ? 'text-red-600' : 'text-green-600'}`}>
+                                            {Number(item.balance).toLocaleString('ru-RU', { minimumFractionDigits: 2 })}
+                                        </span>
+                                    </td>
+                                    <td className="px-4 py-3 text-center space-x-2">
+                                        <button
+                                            onClick={() => openEditModal(item)}
+                                            className="text-blue-600 hover:text-blue-800 text-sm"
+                                        >
+                                            ✏️
+                                        </button>
+                                        {item.isActive && (
+                                            <button
+                                                onClick={() => handleDelete(item)}
+                                                className="text-red-600 hover:text-red-800 text-sm"
+                                            >
+                                                🗑️
+                                            </button>
+                                        )}
+                                    </td>
+                                </tr>
+                            ))
+                        )}
+                    </tbody>
+                </table>
+            </div>
+
+            {/* Create/Edit Modal */}
+            {showModal && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-md p-6">
+                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                            {editingItem ? 'Редактировать номенклатуру' : 'Новая номенклатура'}
+                        </h3>
+                        <form onSubmit={handleSubmit} className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                    Категория *
+                                </label>
+                                <select
+                                    name="categoryEnum"
+                                    value={formData.categoryEnum}
+                                    onChange={handleFormChange}
+                                    className="w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-md shadow-sm"
+                                    required
+                                >
+                                    {Object.entries(CATEGORY_LABELS).map(([key, label]) => (
+                                        <option key={key} value={key}>{label}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                    Код (артикул)
+                                </label>
+                                <input
+                                    type="text"
+                                    name="code"
+                                    value={formData.code}
+                                    onChange={handleFormChange}
+                                    className="w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-md shadow-sm"
+                                    placeholder="АИ-92"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                    Название *
+                                </label>
+                                <input
+                                    type="text"
+                                    name="name"
+                                    value={formData.name}
+                                    onChange={handleFormChange}
+                                    className="w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-md shadow-sm"
+                                    placeholder="Бензин АИ-92"
+                                    required
+                                />
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                        Ед. изм.
+                                    </label>
+                                    <input
+                                        type="text"
+                                        name="unit"
+                                        value={formData.unit}
+                                        onChange={handleFormChange}
+                                        className="w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-md shadow-sm"
+                                    />
+                                </div>
+                                {formData.categoryEnum === 'FUEL' && (
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                            Плотность (кг/л)
+                                        </label>
+                                        <input
+                                            type="number"
+                                            name="density"
+                                            value={formData.density}
+                                            onChange={handleFormChange}
+                                            step="0.001"
+                                            className="w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-md shadow-sm"
+                                            placeholder="0.735"
+                                        />
+                                    </div>
+                                )}
+                            </div>
+                            <div className="flex justify-end gap-3 pt-4">
+                                <button
+                                    type="button"
+                                    onClick={() => setShowModal(false)}
+                                    className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md"
+                                >
+                                    Отмена
+                                </button>
+                                <button
+                                    type="submit"
+                                    className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                                >
+                                    {editingItem ? 'Сохранить' : 'Создать'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
+
+export default StockItemList;

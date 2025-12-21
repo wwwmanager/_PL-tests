@@ -5,7 +5,7 @@
 
 import { onSessionExpired } from './session';
 
-const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3001/api';
+const API_URL = import.meta.env.VITE_API_URL ?? 'http://127.0.0.1:3001/api';
 
 /**
  * Custom HTTP Error class that includes status code and requestId
@@ -159,11 +159,12 @@ async function request<T>(path: string, options: RequestInit = {}, retryOn401 = 
             let errorMessage = `API error ${res.status}`;
             let errorData: any = null;
 
+            const responseText = await res.text();
             try {
-                errorData = await res.json();
+                errorData = JSON.parse(responseText);
                 errorMessage = errorData.message || errorData.error || errorMessage;
             } catch {
-                errorMessage = await res.text() || errorMessage;
+                errorMessage = responseText || errorMessage;
             }
 
             // 🔍 DEBUG: Log error response

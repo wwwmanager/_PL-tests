@@ -36,7 +36,7 @@ type AuthContextValue = {
 };
 const CURRENT_USER_KEY = '__current_user__';
 const TOKEN_KEY = '__auth_token__';
-const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:3001/api';
+const API_BASE = import.meta.env.VITE_API_URL ?? 'http://127.0.0.1:3001/api';
 
 // ---------- API helpers ----------
 
@@ -149,9 +149,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         toastContext.showToast(message, 'error');
       }
 
-      // Redirect to login
-      if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
-        window.location.href = '/login';
+      // Redirect to login (relative to basePath)
+      if (typeof window !== 'undefined' && !window.location.pathname.endsWith('/_PL-tests/')) {
+        window.location.href = (import.meta.env.BASE_URL || '/');
       }
     });
   }, [toastContext]);
@@ -206,7 +206,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   }, [fetchPolicies, token]);
 
   const roleCaps = useMemo(() => {
-    const role = currentUser?.role || 'user';
+    const role = currentUser?.role || 'viewer';
     const caps = rolePolicies[role] || [];
     // console.log('🔍 roleCaps computed:', { role, capsCount: caps.length, hasAdminPanel: caps.includes('admin.panel') });
     return caps;
@@ -333,7 +333,6 @@ export const DevRoleSwitcher: React.FC = () => {
   const roles: Role[] = [
     'admin',
     'auditor',
-    'user',
     'driver',
     'reviewer',
     'accountant',
@@ -360,7 +359,7 @@ export const DevRoleSwitcher: React.FC = () => {
         ))}
       </select>
       <span className="text-gray-500">
-        прав: {rolePolicies[currentUser?.role || 'user']?.length || 0}
+        прав: {rolePolicies[currentUser?.role || 'viewer']?.length || 0}
       </span>
     </div>
   );

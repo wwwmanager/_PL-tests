@@ -102,6 +102,15 @@ enum ResetScope {
   SPECIFIC_CARDS  // конкретный список
 }
 
+// REL-201: Stock Item Category for unified nomenclature
+enum StockItemCategory {
+  FUEL
+  MATERIAL
+  SPARE_PART
+  SERVICE
+  OTHER
+}
+
 // ============================================================================
 // ОРГАНИЗАЦИИ И ПОДРАЗДЕЛЕНИЯ
 // ============================================================================
@@ -171,6 +180,7 @@ model Department {
   blanks           Blank[]
   waybills         Waybill[]
   stockLocations   StockLocation[]
+  stockItems       StockItem[]  // REL-201
   resetRulesForDept FuelCardResetRule[] @relation("ResetRuleDepartment")  // REL-105
 
   @@map("departments")
@@ -351,8 +361,8 @@ model Vehicle {
   brand              String?  @db.Text
   model              String?  @db.Text
   vin                String?  @db.Text
-  fuelType           String?  @db.Text
-  fuelTypeId         String?  @db.Uuid
+  fuelType           String?  @db.Text   /// @deprecated REL-202: Use fuelStockItemId
+  fuelTypeId         String?  @db.Uuid   /// @deprecated REL-202: Use fuelStockItemId
   fuelTankCapacity   Decimal? @db.Decimal(10, 2)
   mileage            Decimal  @default(0) @db.Decimal(10, 1) // Added
   currentFuel        Decimal  @default(0) @db.Decimal(10, 2) // Added
@@ -381,6 +391,9 @@ model Vehicle {
   osagoStartDate     String?  @db.Text
   osagoEndDate       String?  @db.Text
   
+  // REL-200: New reference to StockItem (will replace fuelTypeId)
+  fuelStockItemId    String?  @db.Uuid
+  
   storageLocationId  String?  @db.Uuid
   notes              String?  @db.Text
   disableFuelCapacityCheck Boolean @default(false)
@@ -394,6 +407,7 @@ model Vehicle {
   
   assignedDriver  Employee?  @relation("VehicleDriver", fields: [assignedDriverId], references: [id], onDelete: SetNull)
   fuelTypeRelation FuelType? @relation(fields: [fuelTypeId], references: [id], onDelete: SetNull)
+  fuelStockItem    StockItem? @relation("VehicleFuelStockItem", fields: [fuelStockItemId], references: [id], onDelete: SetNull)  // REL-200
   storageLocation Warehouse? @relation(fields: [storageLocationId], references: [id], onDelete: SetNull)
 
   waybills     Waybill[]
@@ -465,21 +479,37 @@ model FuelCardAssignment {
 model StockItem {
   id             String   @id @default(uuid()) @db.Uuid
   organizationId String   @db.Uuid
-  code           String?  @db.Text
+  departmentId   String?  @db.Uuid  // REL-201: привязка к подразделению
+  code           String?  @db.Text  // артикул
   name           String   @db.Text
-  unit           String   @db.Text
-  isFuel         Boolean  @default(false)
-  balance        Decimal  @default(0) @db.Decimal(14, 3) // Added for caching
+  unit           String   @default("л") @db.Text
+  
+  // REL-201: Use enum instead of string for category
+  categoryEnum   StockItemCategory?  // FUEL, MATERIAL, SPARE_PART, SERVICE, OTHER
+  
+  isFuel         Boolean  @default(false)  // Kept for backward compatibility
+  balance        Decimal  @default(0) @db.Decimal(14, 3)
   isActive       Boolean  @default(true)
+  
+  // REL-200/201: Fields for fuel
+  density        Float?   @db.DoublePrecision  // плотность для топлива (кг/л)
+  category       String?  @db.Text             // Deprecated: use categoryEnum
+  fuelTypeLegacyId String?  @unique @db.Uuid   // REL-201: для миграции со старого FuelType
+  
   createdAt      DateTime @default(now()) @db.Timestamp(6)
   updatedAt      DateTime @default(now()) @updatedAt @db.Timestamp(6)
 
   organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  department     Department?     @relation(fields: [departmentId], references: [id], onDelete: SetNull)  // REL-201
+  fuelType       FuelType?       @relation(fields: [fuelTypeLegacyId], references: [id], onDelete: SetNull)
   stockMovements StockMovement[]
   waybillFuel    WaybillFuel[]
-  topUpRules     FuelCardTopUpRule[] @relation("TopUpRuleStockItem")  // REL-104
-  resetRules     FuelCardResetRule[] @relation("ResetRuleStockItem")  // REL-105
+  topUpRules     FuelCardTopUpRule[] @relation("TopUpRuleStockItem")
+  resetRules     FuelCardResetRule[] @relation("ResetRuleStockItem")
+  vehicles       Vehicle[]       @relation("VehicleFuelStockItem")
 
+  @@unique([organizationId, name])  // REL-201: уникальность по орг + имени
+  @@index([organizationId, categoryEnum])  // REL-201
   @@map("stock_items")
 }
 
@@ -502,6 +532,7 @@ model Warehouse {
   @@map("warehouses")
 }
 
+/// @deprecated REL-200: Use StockItem with isFuel=true and category="FUEL" instead
 model FuelType {
   id          String   @id @default(uuid()) @db.Uuid
   code        String   @unique @db.VarChar(20)  // AI-92, DT
@@ -512,6 +543,7 @@ model FuelType {
   
   waybillFuels WaybillFuel[]
   vehicles     Vehicle[]
+  stockItems   StockItem[]  // REL-200: обратная связь для миграции
   
   @@map("fuel_types")
 }
@@ -732,8 +764,8 @@ model WaybillRoute {
 model WaybillFuel {
   id           String   @id @default(uuid()) @db.Uuid
   waybillId    String   @db.Uuid
-  stockItemId  String   @db.Uuid
-  fuelTypeId   String?  @db.Uuid
+  stockItemId  String   @db.Uuid  // REL-202: Primary FK for stock movements
+  fuelTypeId   String?  @db.Uuid  /// @deprecated REL-202: Use stockItemId instead
   fuelStart    Decimal? @db.Decimal(10, 2)
   fuelReceived Decimal? @db.Decimal(10, 2)
   fuelConsumed Decimal? @db.Decimal(10, 2)

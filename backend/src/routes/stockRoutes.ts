@@ -1,6 +1,8 @@
 // Stock Routes - API endpoints for stock items and movements
 import { Router } from 'express';
 import { authMiddleware } from '../middleware/authMiddleware';
+import { validateDto } from '../middleware/validateDto';
+import { createMovementSchema } from '../dto/stockMovementDto';
 import {
     listStockItems, createStockItem, updateStockItem, deleteStockItem,
     listStockMovements, createStockMovement, updateStockMovement, deleteStockMovement,
@@ -27,11 +29,13 @@ router.delete('/items/:id', deleteStockItem);     // DELETE /api/stock/items/:id
 // Stock Movements (Transactions) CRUD
 router.get('/movements', listStockMovements);     // GET /api/stock/movements
 router.post('/movements', createStockMovement);   // POST /api/stock/movements (legacy)
-router.post('/movements/v2', createMovement);     // POST /api/stock/movements/v2 (REL-102: supports TRANSFER)
+// BE-002: v2 endpoint with Zod DTO validation
+router.post('/movements/v2', validateDto(createMovementSchema), createMovement);
 router.put('/movements/:id', updateStockMovement);// PUT /api/stock/movements/:id
 router.delete('/movements/:id', deleteStockMovement); // DELETE /api/stock/movements/:id
 
 // Helper endpoints
 router.get('/fuel-card-balance/:driverId', getFuelCardBalance);  // GET /api/stock/fuel-card-balance/:driverId
 router.get('/available-fuel-expenses/:driverId', getAvailableFuelExpenses); // GET /api/stock/available-fuel-expenses/:driverId
+
 

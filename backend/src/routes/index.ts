@@ -21,6 +21,7 @@ import adminRoutes from './adminRoutes';
 import { calendarRouter } from './calendarRoutes';
 import { router as meRoutes } from './meRoutes';
 import stockLocationRoutes from './stockLocationRoutes';
+import stockItemRoutes from './stockItemRoutes';  // REL-200: Nomenclature catalog
 
 export const router = Router();
 
@@ -49,10 +50,9 @@ router.use('/settings', settingsRoutes);
 router.use('/dashboard', dashboardRoutes);
 router.use('/admin', adminRoutes);
 router.use('/calendar', calendarRouter);
+router.use('/stock-items', stockItemRoutes);  // REL-200: Nomenclature catalog
 
 // Health check endpoint
 router.get('/health', (req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
-
-

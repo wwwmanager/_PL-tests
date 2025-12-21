@@ -1,19 +1,21 @@
-# Running E2E Tests
+# E2E Tests for Waybill Management System
+
+This directory contains end-to-end tests using Playwright.
 
 ## Prerequisites
 
-1. **Backend Running**
+1. **Backend** must be running:
    ```bash
-   cd backend
-   npm run dev
+   cd backend && npm run dev
    ```
    Backend should be accessible at `http://localhost:3001`
 
-2. **Frontend Running**
+2. **Frontend** is auto-started by Playwright via webServer config.
+   If you prefer manual startup:
    ```bash
-   npm run dev
+   npm run dev -- --port 3000 --host
    ```
-   Frontend should be accessible at `http://localhost:3000/_PL-tests`
+   Frontend will be accessible at `http://localhost:3000/_PL-tests`
 
 3. **Database Seeded**
    ```bash

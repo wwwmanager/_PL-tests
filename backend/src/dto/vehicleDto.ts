@@ -10,8 +10,9 @@ export const vehicleSchema = z.object({
     vehicleType: z.string().optional().nullable(),
 
     // Fuel settings
-    fuelType: z.string().optional().nullable(),
-    fuelTypeId: z.string().uuid().optional().nullable(),
+    fuelType: z.string().optional().nullable(),      // @deprecated REL-202: use fuelStockItemId
+    fuelTypeId: z.string().uuid().optional().nullable(), // @deprecated REL-202: use fuelStockItemId
+    fuelStockItemId: z.string().uuid().optional().nullable(), // REL-202: new FK to StockItem
     fuelTankCapacity: z.number().min(0).optional().nullable(),
     fuelConsumptionRates: z.preprocess(
         (val) => {

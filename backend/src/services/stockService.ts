@@ -4,6 +4,93 @@ import { BadRequestError } from '../utils/errors';
 const prisma = new PrismaClient();
 
 // ============================================================================
+// BE-005: Advisory Lock Helpers for Race Condition Protection
+// ============================================================================
+
+/**
+ * Hash a string to a 32-bit integer for pg_advisory_lock
+ * Uses simple FNV-1a hash algorithm
+ */
+function hashKey(key: string): number {
+    let hash = 2166136261; // FNV offset basis
+    for (let i = 0; i < key.length; i++) {
+        hash ^= key.charCodeAt(i);
+        hash = (hash * 16777619) >>> 0; // FNV prime, keep as unsigned 32-bit
+    }
+    return hash | 0; // Convert to signed 32-bit integer
+}
+
+/**
+ * Acquire an advisory lock for a location+stockItem combination
+ * Must be called inside a $transaction
+ */
+async function acquireLocationLock(
+    tx: Prisma.TransactionClient,
+    stockLocationId: string,
+    stockItemId: string
+): Promise<void> {
+    const lockKey = hashKey(`stock:${stockLocationId}:${stockItemId}`);
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(${lockKey})`;
+}
+
+/**
+ * Acquire locks for multiple locations in deterministic order
+ * Prevents deadlocks by always locking in the same order
+ */
+async function acquireLocationLocks(
+    tx: Prisma.TransactionClient,
+    locationIds: string[],
+    stockItemId: string
+): Promise<void> {
+    // Sort location IDs to ensure consistent lock order (prevents deadlocks)
+    const sortedIds = [...locationIds].sort();
+    for (const locationId of sortedIds) {
+        await acquireLocationLock(tx, locationId, stockItemId);
+    }
+}
+
+/**
+ * Get balance within a transaction context
+ */
+async function getBalanceAtTx(
+    tx: Prisma.TransactionClient,
+    stockLocationId: string,
+    stockItemId: string,
+    asOf: Date
+): Promise<number> {
+    const [incomes, expenses, adjustments, transfersIn, transfersOut] = await Promise.all([
+        tx.stockMovement.aggregate({
+            where: { stockLocationId, stockItemId, movementType: StockMovementType.INCOME, occurredAt: { lte: asOf } },
+            _sum: { quantity: true },
+        }),
+        tx.stockMovement.aggregate({
+            where: { stockLocationId, stockItemId, movementType: StockMovementType.EXPENSE, occurredAt: { lte: asOf } },
+            _sum: { quantity: true },
+        }),
+        tx.stockMovement.aggregate({
+            where: { stockLocationId, stockItemId, movementType: StockMovementType.ADJUSTMENT, occurredAt: { lte: asOf } },
+            _sum: { quantity: true },
+        }),
+        tx.stockMovement.aggregate({
+            where: { toStockLocationId: stockLocationId, stockItemId, movementType: StockMovementType.TRANSFER, occurredAt: { lte: asOf } },
+            _sum: { quantity: true },
+        }),
+        tx.stockMovement.aggregate({
+            where: { fromStockLocationId: stockLocationId, stockItemId, movementType: StockMovementType.TRANSFER, occurredAt: { lte: asOf } },
+            _sum: { quantity: true },
+        }),
+    ]);
+
+    return (
+        Number(incomes._sum.quantity || 0) -
+        Number(expenses._sum.quantity || 0) +
+        Number(adjustments._sum.quantity || 0) +
+        Number(transfersIn._sum.quantity || 0) -
+        Number(transfersOut._sum.quantity || 0)
+    );
+}
+
+// ============================================================================
 // REL-102: Balance Calculation (with temporal support)
 // ============================================================================
 
@@ -142,7 +229,9 @@ export interface CreateTransferParams {
 
 /**
  * Создать TRANSFER — перемещение между локациями
- * Проверяет наличие достаточного количества на источнике
+ * BE-005: Uses advisory locks to prevent race conditions
+ * - Locks both locations in sorted order (prevents deadlocks)
+ * - Balance check + insert in single transaction
  */
 export async function createTransfer(params: CreateTransferParams) {
     const {
@@ -160,24 +249,122 @@ export async function createTransfer(params: CreateTransferParams) {
         userId,
     } = params;
 
-    // Проверяем наличие на источнике
-    const sourceBalance = await getBalanceAt(fromLocationId, stockItemId, occurredAt);
+    return prisma.$transaction(async (tx) => {
+        // BE-005: Acquire locks on both locations in deterministic order
+        await acquireLocationLocks(tx, [fromLocationId, toLocationId], stockItemId);
 
-    if (sourceBalance < quantity) {
-        throw new BadRequestError(
-            `Недостаточно топлива на локации-источнике. Требуется: ${quantity}, доступно: ${sourceBalance}`
-        );
+        // Check balance with lock held
+        const sourceBalance = await getBalanceAtTx(tx, fromLocationId, stockItemId, occurredAt);
+
+        if (sourceBalance < quantity) {
+            throw new BadRequestError(
+                `Недостаточно топлива на локации-источнике. Требуется: ${quantity}, доступно: ${sourceBalance}`
+            );
+        }
+
+        // Create TRANSFER movement
+        return tx.stockMovement.create({
+            data: {
+                organizationId,
+                stockItemId,
+                movementType: StockMovementType.TRANSFER,
+                quantity,
+                fromStockLocationId: fromLocationId,
+                toStockLocationId: toLocationId,
+                occurredAt,
+                occurredSeq,
+                documentType,
+                documentId,
+                externalRef,
+                comment,
+                createdByUserId: userId,
+            },
+        });
+    });
+}
+
+// ============================================================================
+// BE-002: ADJUSTMENT operation
+// ============================================================================
+
+export interface CreateAdjustmentParams {
+    organizationId: string;
+    stockItemId: string;
+    stockLocationId: string;
+    quantity: number;  // Can be negative
+    occurredAt: Date;
+    occurredSeq?: number;
+    documentType?: string;
+    documentId?: string;
+    externalRef?: string;
+    comment: string;  // Required for ADJUSTMENT
+    userId?: string;
+}
+
+/**
+ * Создать ADJUSTMENT — корректировка остатка (может быть + или -)
+ * BE-002: Если quantity < 0, проверяем что баланс не уйдёт в минус
+ * BE-005: Uses advisory lock for negative adjustments
+ */
+export async function createAdjustment(params: CreateAdjustmentParams) {
+    const {
+        organizationId,
+        stockItemId,
+        stockLocationId,
+        quantity,
+        occurredAt,
+        occurredSeq = 0,
+        documentType,
+        documentId,
+        externalRef,
+        comment,
+        userId,
+    } = params;
+
+    // If negative adjustment, use transaction with lock
+    if (quantity < 0) {
+        return prisma.$transaction(async (tx) => {
+            // BE-005: Acquire lock on location
+            await acquireLocationLock(tx, stockLocationId, stockItemId);
+
+            // Check balance with lock held
+            const currentBalance = await getBalanceAtTx(tx, stockLocationId, stockItemId, occurredAt);
+            const resultingBalance = currentBalance + quantity; // quantity is negative
+
+            if (resultingBalance < 0) {
+                throw new BadRequestError(
+                    `Корректировка ${quantity} приведёт к отрицательному остатку. Текущий баланс: ${currentBalance}, результат: ${resultingBalance}`
+                );
+            }
+
+            // Create ADJUSTMENT movement
+            return tx.stockMovement.create({
+                data: {
+                    organizationId,
+                    stockItemId,
+                    stockLocationId,
+                    movementType: StockMovementType.ADJUSTMENT,
+                    quantity,
+                    occurredAt,
+                    occurredSeq,
+                    documentType,
+                    documentId,
+                    externalRef,
+                    comment,
+                    createdByUserId: userId,
+                },
+            });
+        });
     }
 
-    // Создаём движение TRANSFER
+    // Positive adjustment doesn't need locking
     return prisma.stockMovement.create({
         data: {
             organizationId,
             stockItemId,
-            movementType: StockMovementType.TRANSFER,
+            stockLocationId,
+            movementType: StockMovementType.ADJUSTMENT,
             quantity,
-            fromStockLocationId: fromLocationId,
-            toStockLocationId: toLocationId,
             occurredAt,
             occurredSeq,
             documentType,
@@ -269,6 +456,7 @@ export interface CreateMovementParams {
 
 /**
  * Создает движение расхода
+ * BE-005: Uses advisory lock for stockLocationId-based balance check
  */
 export async function createExpenseMovement(
     organizationId: string,
@@ -282,23 +470,47 @@ export async function createExpenseMovement(
     stockLocationId?: string,
     occurredAt?: Date
 ) {
-    // Если указан stockLocationId, проверяем баланс через новую систему
+    const effectiveOccurredAt = occurredAt || new Date();
+
+    // If stockLocationId is provided, use transactional approach with lock
     if (stockLocationId) {
-        const balance = await getBalanceAt(stockLocationId, stockItemId, occurredAt || new Date());
-        if (balance < quantity) {
-            throw new BadRequestError(
-                `Недостаточно топлива на локации. Требуется: ${quantity}, доступно: ${balance}`
-            );
-        }
-    } else {
-        // Fallback на старую проверку
-        const hasEnough = await checkStockAvailability(organizationId, stockItemId, warehouseId, quantity);
-        if (!hasEnough) {
-            const currentBalance = await getStockBalance(organizationId, stockItemId, warehouseId);
-            throw new BadRequestError(
-                `Недостаточно топлива на складе. Требуется: ${quantity}, доступно: ${currentBalance}`
-            );
-        }
+        return prisma.$transaction(async (tx) => {
+            // BE-005: Acquire lock on location
+            await acquireLocationLock(tx, stockLocationId, stockItemId);
+
+            // Check balance with lock held
+            const balance = await getBalanceAtTx(tx, stockLocationId, stockItemId, effectiveOccurredAt);
+            if (balance < quantity) {
+                throw new BadRequestError(
+                    `Недостаточно топлива на локации. Требуется: ${quantity}, доступно: ${balance}`
+                );
+            }
+
+            return tx.stockMovement.create({
+                data: {
+                    organizationId,
+                    stockItemId,
+                    warehouseId,
+                    stockLocationId,
+                    movementType: StockMovementType.EXPENSE,
+                    quantity,
+                    occurredAt: effectiveOccurredAt,
+                    documentType,
+                    documentId,
+                    comment,
+                    createdByUserId: userId,
+                },
+            });
+        });
+    }
+
+    // Fallback: legacy warehouseId path (no locking)
+    const hasEnough = await checkStockAvailability(organizationId, stockItemId, warehouseId, quantity);
+    if (!hasEnough) {
+        const currentBalance = await getStockBalance(organizationId, stockItemId, warehouseId);
+        throw new BadRequestError(
+            `Недостаточно топлива на складе. Требуется: ${quantity}, доступно: ${currentBalance}`
+        );
     }
 
     return prisma.stockMovement.create({
@@ -309,7 +521,7 @@ export async function createExpenseMovement(
             stockLocationId,
             movementType: StockMovementType.EXPENSE,
             quantity,
-            occurredAt: occurredAt || new Date(),
+            occurredAt: effectiveOccurredAt,
             documentType,
             documentId,
             comment,

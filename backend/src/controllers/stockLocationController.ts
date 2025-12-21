@@ -57,7 +57,7 @@ export async function listLocations(
             filters
         );
 
-        res.json(locations);
+        res.json({ data: locations });
     } catch (error) {
         next(error);
     }

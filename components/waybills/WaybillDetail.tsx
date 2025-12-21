@@ -4,7 +4,7 @@ import { Waybill, Route, Vehicle, Employee, WaybillStatus, Organization, SavedRo
 import { getOrganizations } from '../../services/organizationApi';
 import { addWaybill, updateWaybill, changeWaybillStatus, getLastWaybillForVehicle } from '../../services/waybillApi';
 import { getSavedRoutes, addSavedRoutesFromWaybill } from '../../services/routeApi';
-import { getFuelTypes } from '../../services/fuelTypeApi';
+import { getStockItems, StockItem } from '../../services/stockItemApi';
 import { getSeasonSettings, getAppSettings } from '../../services/settingsApi';
 import { FrontWaybillStatus } from '../../services/api/waybillStatusMap';
 import { getNextBlankForDriver, useBlankForWaybill } from '../../services/blankApi';
@@ -87,7 +87,7 @@ export const WaybillDetail: React.FC<WaybillDetailProps> = ({ waybill, isPrefill
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [drivers, setDrivers] = useState<DriverListItem[]>([]); // REL-010: Real Driver list from API
   const [savedRoutes, setSavedRoutes] = useState<SavedRoute[]>([]);
-  const [fuelTypes, setFuelTypes] = useState<FuelType[]>([]);
+  const [fuelItems, setFuelItems] = useState<StockItem[]>([]);
   const [seasonSettings, setSeasonSettings] = useState<SeasonSettings | null>(null);
   const [aiPrompt, setAiPrompt] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
@@ -170,7 +170,7 @@ export const WaybillDetail: React.FC<WaybillDetailProps> = ({ waybill, isPrefill
         getOrganizations(),
         listDrivers(),
         getSavedRoutes(),
-        getFuelTypes(),
+        getStockItems({ categoryEnum: 'FUEL', isActive: true }),
         getSeasonSettings(),
         getAppSettings(),
         getGarageStockItems(true),
@@ -181,7 +181,7 @@ export const WaybillDetail: React.FC<WaybillDetailProps> = ({ waybill, isPrefill
       setOrganizations(organizationsData);
       setDrivers(driversData); // REL-010: Set real drivers
       setSavedRoutes(savedRoutesData);
-      setFuelTypes(fuelTypesData);
+      setFuelItems(fuelTypesData);
       // setIsAIAvailable is already true by default
       setSeasonSettings(settings);
       setAppSettings(appSettingsData);
@@ -274,7 +274,7 @@ export const WaybillDetail: React.FC<WaybillDetailProps> = ({ waybill, isPrefill
   const selectedOrg = useMemo(() => organizations.find(o => o.id === formData.organizationId), [formData.organizationId, organizations]);
   const selectedDispatcher = useMemo(() => employees.find(e => e.id === formData.dispatcherId), [formData.dispatcherId, employees]);
   const selectedController = useMemo(() => employees.find(e => e.id === formData.controllerId), [formData.controllerId, employees]);
-  const selectedFuelType = useMemo(() => fuelTypes.find(f => f.id === selectedVehicle?.fuelTypeId), [selectedVehicle, fuelTypes]);
+  const selectedFuelType = useMemo(() => fuelItems.find(f => f.id === selectedVehicle?.fuelStockItemId), [selectedVehicle, fuelItems]);
 
 
   useEffect(() => {
@@ -901,7 +901,11 @@ export const WaybillDetail: React.FC<WaybillDetailProps> = ({ waybill, isPrefill
   };
 
   const handleSelectExpense = (tx: StockTransaction) => {
-    const fuelItem = tx.items.find(item => stockItems.find(si => si.id === item.stockItemId)?.fuelTypeId);
+    // FIX: Use categoryEnum='FUEL' instead of fuelTypeId check. Also support legacy fuelTypeId if category missing
+    const fuelItem = tx.items.find(item => {
+      const stockItem = stockItems.find(si => si.id === item.stockItemId);
+      return stockItem && (stockItem.categoryEnum === 'FUEL' || stockItem.fuelTypeId);
+    });
     if (fuelItem) {
       setFormData(prev => ({ ...prev, fuelFilled: fuelItem.quantity }));
       setLinkedTxId(tx.id);
@@ -1027,7 +1031,8 @@ export const WaybillDetail: React.FC<WaybillDetailProps> = ({ waybill, isPrefill
           organization={selectedOrg}
           dispatcher={selectedDispatcher}
           controller={selectedController}
-          fuelType={selectedFuelType}
+          // StockItem structure is compatible with FuelType expected by PrintableWaybill (id, name, code, density)
+          fuelType={selectedFuelType as any}
           allOrganizations={organizations}
           onClose={() => setIsPrintModalOpen(false)}
 
@@ -1037,7 +1042,11 @@ export const WaybillDetail: React.FC<WaybillDetailProps> = ({ waybill, isPrefill
       <Modal isOpen={isGarageModalOpen} onClose={() => setIsGarageModalOpen(false)} title="Выбрать расходную накладную">
         <div className="space-y-2">
           {availableExpenses.length > 0 ? availableExpenses.map(tx => {
-            const fuelItem = tx.items.find(item => stockItems.find(si => si.id === item.stockItemId)?.fuelTypeId);
+            const fuelItem = tx.items.find(item => {
+              // Same logic as handleSelectExpense
+              const stockItem = stockItems.find(si => si.id === item.stockItemId);
+              return stockItem && (stockItem.categoryEnum === 'FUEL' || stockItem.fuelTypeId);
+            });
             if (!fuelItem) return null;
             const stockItemDetails = stockItems.find(si => si.id === fuelItem.stockItemId);
             return (

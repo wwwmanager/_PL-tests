@@ -60,8 +60,8 @@ async function main() {
         'admin.panel',
         // Import/Export
         'import.run', 'import.limited', 'export.run',
-        // Stock
-        'stock.view', 'stock.create', 'stock.update', 'stock.delete',
+        // Stock (BE-003: stock.manage needed for create-movement button)
+        'stock.read', 'stock.create', 'stock.update', 'stock.delete', 'stock.manage',
         // Vehicles
         'vehicle.view', 'vehicle.create', 'vehicle.update', 'vehicle.delete',
         // Drivers
@@ -89,11 +89,11 @@ async function main() {
             'waybill.read', 'waybill.create', 'waybill.submit', 'waybill.cancel',
             'vehicle.view', 'vehicle.create', 'vehicle.update',
             'driver.view', 'driver.create', 'driver.update',
-            'stock.view', 'blank.read', 'blank.create', 'blanks.issue', 'blanks.return',
+            'stock.read', 'blank.read', 'blank.create', 'blanks.issue', 'blanks.return',
         ],
         mechanic: [
             'blanks.issue', 'blanks.return', 'blanks.spoil.warehouse',
-            'stock.view', 'stock.create', 'stock.update',
+            'stock.read', 'stock.create', 'stock.update',
         ],
         driver: ['waybill.create', 'waybill.submit', 'blanks.spoil.self'],
         reviewer: ['waybill.submit', 'audit.business.read', 'waybill.view'],
@@ -400,55 +400,102 @@ async function main() {
     });
 
     // ============================================================================
-    // 11. STOCK ITEMS
+    // 10a. STOCK LOCATIONS (BE-003: Required for TRANSFER operations)
+    // ============================================================================
+    console.log('Creating stock locations...');
+
+    // Create StockLocation for warehouse1
+    const warehouseLocation1 = await prisma.stockLocation.create({
+        data: {
+            organizationId: org.id,
+            departmentId: mainDept.id,
+            type: 'WAREHOUSE',
+            name: 'Склад 1 (локация)',
+            warehouseId: warehouse1.id,
+        },
+    });
+
+    // Create StockLocation for warehouse2
+    const warehouseLocation2 = await prisma.stockLocation.create({
+        data: {
+            organizationId: org.id,
+            departmentId: branchDept.id,
+            type: 'WAREHOUSE',
+            name: 'Склад 2 (локация)',
+            warehouseId: warehouse2.id,
+        },
+    });
+
+    // Create StockLocation for vehicle1 tank (for TRANSFER to vehicle)
+    const vehicleTankLocation = await prisma.stockLocation.create({
+        data: {
+            organizationId: org.id,
+            departmentId: mainDept.id,
+            type: 'VEHICLE_TANK',
+            name: `Бак ${vehicle1.registrationNumber}`,
+            vehicleId: vehicle1.id,
+        },
+    });
+
+
+    // ============================================================================
+    // 11. STOCK ITEMS (REL-204: seed with categoryEnum and density for FUEL)
     // ============================================================================
     console.log('Creating stock items...');
 
     const diesel = await prisma.stockItem.create({
         data: {
             organizationId: org.id,
-            code: 'FUEL-001',
+            code: 'ДТ',
             name: 'Дизельное топливо (зимнее)',
             unit: 'л',
             isFuel: true,
+            categoryEnum: 'FUEL',
+            density: 0.84,  // кг/л
         },
     });
 
     const petrol92 = await prisma.stockItem.create({
         data: {
             organizationId: org.id,
-            code: 'FUEL-002',
+            code: 'АИ-92',
             name: 'Бензин АИ-92',
             unit: 'л',
             isFuel: true,
+            categoryEnum: 'FUEL',
+            density: 0.735,
         },
     });
 
     const petrol95 = await prisma.stockItem.create({
         data: {
             organizationId: org.id,
-            code: 'FUEL-003',
+            code: 'АИ-95',
             name: 'Бензин АИ-95',
             unit: 'л',
             isFuel: true,
+            categoryEnum: 'FUEL',
+            density: 0.75,
         },
     });
 
     const oil = await prisma.stockItem.create({
         data: {
             organizationId: org.id,
-            code: 'MAT-001',
+            code: 'M10W40',
             name: 'Масло моторное 10W-40',
             unit: 'л',
             isFuel: false,
+            categoryEnum: 'MATERIAL',
         },
     });
 
-    // Приход топлива на склад
+    // Приход топлива на склад (BE-003: use stockLocationId for balance tracking)
     await prisma.stockMovement.create({
         data: {
             organizationId: org.id,
-            warehouseId: warehouse1.id,
+            warehouseId: warehouse1.id,  // deprecated but kept for compatibility
+            stockLocationId: warehouseLocation1.id,  // BE-003: required for balance queries
             stockItemId: diesel.id,
             movementType: StockMovementType.INCOME,
             quantity: 5000,
@@ -462,6 +509,7 @@ async function main() {
         data: {
             organizationId: org.id,
             warehouseId: warehouse1.id,
+            stockLocationId: warehouseLocation1.id,
             stockItemId: petrol92.id,
             movementType: StockMovementType.INCOME,
             quantity: 3000,
@@ -626,6 +674,7 @@ async function main() {
     console.log('   - 3 vehicles');
     console.log('   - 2 fuel cards');
     console.log('   - 2 warehouses');
+    console.log('   - 3 stock locations (BE-003)');
     console.log('   - 4 stock items');
     console.log('   - 100 blanks (ЧБ 1-100)');
     console.log('   - 2 waybills');

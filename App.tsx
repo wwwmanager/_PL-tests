@@ -17,6 +17,7 @@ const EmployeeList = lazy(() => import('./components/employees/EmployeeList'));
 const Dictionaries = lazy(() => import('./components/dictionaries/Dictionaries'));
 const Reports = lazy(() => import('./components/reports/Reports'));
 const Admin = lazy(() => import('./components/admin/Admin'));
+const Warehouse = lazy(() => import('./components/warehouse/Warehouse'));
 
 type Page =
   | 'dashboard'
@@ -26,6 +27,7 @@ type Page =
   | 'employees'
   | 'dictionaries'
   | 'reports'
+  | 'warehouse'
   | 'admin';
 
 const AppContent: React.FC = () => {
@@ -65,6 +67,8 @@ const AppContent: React.FC = () => {
         return <Dictionaries />;
       case 'reports':
         return <Reports />;
+      case 'warehouse':
+        return <Warehouse />;
       case 'admin':
         return <Admin />;
       default:
@@ -84,8 +88,9 @@ const AppContent: React.FC = () => {
             <li><button onClick={() => setCurrentPage('dashboard')} className={`w-full text-left px-6 py-3 hover:bg-gray-100 dark:hover:bg-gray-700 ${currentPage === 'dashboard' ? 'bg-blue-50 dark:bg-blue-900 border-r-4 border-blue-500' : ''}`}>Панель управления</button></li>
             <li><button onClick={() => setCurrentPage('waybills')} className={`w-full text-left px-6 py-3 hover:bg-gray-100 dark:hover:bg-gray-700 ${currentPage === 'waybills' ? 'bg-blue-50 dark:bg-blue-900 border-r-4 border-blue-500' : ''}`}>Путевые листы</button></li>
             <li><button onClick={() => setCurrentPage('dictionaries')} className={`w-full text-left px-6 py-3 hover:bg-gray-100 dark:hover:bg-gray-700 ${currentPage === 'dictionaries' ? 'bg-blue-50 dark:bg-blue-900 border-r-4 border-blue-500' : ''}`}>Справочники</button></li>
-            <li><button onClick={() => setCurrentPage('reports')} className={`w-full text-left px-6 py-3 hover:bg-gray-100 dark:hover:bg-gray-700 ${currentPage === 'reports' ? 'bg-blue-50 dark:bg-blue-900 border-r-4 border-blue-500' : ''}`}>Отчеты</button></li>
-            <li><button onClick={() => setCurrentPage('admin')} className={`w-full text-left px-6 py-3 hover:bg-gray-100 dark:hover:bg-gray-700 ${currentPage === 'admin' ? 'bg-blue-50 dark:bg-blue-900 border-r-4 border-blue-500' : ''}`}>Настройки</button></li>
+            <li><button data-testid="nav-reports" onClick={() => setCurrentPage('reports')} className={`w-full text-left px-6 py-3 hover:bg-gray-100 dark:hover:bg-gray-700 ${currentPage === 'reports' ? 'bg-blue-50 dark:bg-blue-900 border-r-4 border-blue-500' : ''}`}>Отчеты</button></li>
+            <li><button data-testid="nav-warehouse" onClick={() => setCurrentPage('warehouse')} className={`w-full text-left px-6 py-3 hover:bg-gray-100 dark:hover:bg-gray-700 ${currentPage === 'warehouse' ? 'bg-blue-50 dark:bg-blue-900 border-r-4 border-blue-500' : ''}`}>Склад</button></li>
+            <li><button data-testid="nav-admin" onClick={() => setCurrentPage('admin')} className={`w-full text-left px-6 py-3 hover:bg-gray-100 dark:hover:bg-gray-700 ${currentPage === 'admin' ? 'bg-blue-50 dark:bg-blue-900 border-r-4 border-blue-500' : ''}`}>Настройки</button></li>
           </ul>
         </nav>
         <div className="p-4 border-t dark:border-gray-700 space-y-2">

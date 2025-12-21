@@ -220,6 +220,8 @@ export const CAPABILITY_TRANSLATIONS: Record<Capability, string> = {
   'blanks.spoil.warehouse': 'Списание со склада',
   'blanks.spoil.override': 'Списание любых бланков',
   'rbac.delegate': 'Управление правами',
+  'stock.read': 'Просмотр склада',
+  'stock.manage': 'Управление складом',
 };
 
 export const DEFAULT_ROLE_POLICIES: Record<Role, Capability[]> = {
@@ -228,14 +230,15 @@ export const DEFAULT_ROLE_POLICIES: Record<Role, Capability[]> = {
     'audit.rollback', 'audit.delete', 'audit.business.read', 'waybill.create',
     'waybill.submit', 'waybill.post', 'waybill.cancel', 'waybill.backdate',
     'waybill.correct', 'blanks.issue', 'blanks.return', 'rbac.delegate',
-    'blanks.spoil.self', 'blanks.spoil.warehouse', 'blanks.spoil.override'
+    'blanks.spoil.self', 'blanks.spoil.warehouse', 'blanks.spoil.override',
+    'stock.read', 'stock.manage'
   ],
   auditor: ['audit.read', 'audit.diff', 'audit.business.read'],
   dispatcher: ['import.limited', 'export.run'],
   driver: ['waybill.create', 'waybill.submit', 'waybill.post', 'waybill.cancel', 'export.run', 'blanks.spoil.self'],
   mechanic: ['export.run', 'blanks.spoil.warehouse'], // 'stock.move' - capability to be added if needed
   reviewer: ['audit.business.read', 'waybill.submit'],
-  accountant: ['waybill.post', 'audit.business.read', 'export.run'],
+  accountant: ['waybill.post', 'audit.business.read', 'export.run', 'stock.read', 'stock.manage'],
   viewer: ['audit.read'],
 };
 

@@ -10,7 +10,7 @@ export async function loginAsAdmin(page: Page) {
     await page.waitForSelector('text=Вход в систему', { timeout: 15000 });
 
     // Use data-testid for reliable selection (added to Login.tsx)
-    await page.getByTestId('login-email').fill('admin');
+    await page.getByTestId('login-email').fill('admin@waybills.local');
     await page.getByTestId('login-password').fill('123');
 
     // Submit form

@@ -23,7 +23,11 @@ export async function getBalances(
         const { stockItemId, asOf } = req.query;
 
         if (!stockItemId) {
-            throw new BadRequestError('stockItemId обязателен');
+            return res.json({
+                asOf: new Date().toISOString(),
+                stockItemId: null,
+                locations: [],
+            });
         }
 
         const asOfDate = asOf ? new Date(String(asOf)) : new Date();
@@ -37,7 +41,7 @@ export async function getBalances(
         res.json({
             asOf: asOfDate.toISOString(),
             stockItemId,
-            locations: balances,
+            data: balances,
         });
     } catch (error) {
         next(error);
@@ -115,7 +119,10 @@ export async function createMovement(
         if (!stockItemId) {
             throw new BadRequestError('stockItemId обязателен');
         }
-        if (quantity === undefined || quantity <= 0) {
+
+        // BE-005: Parse quantity to number (DTO validates as string for Decimal compatibility)
+        const parsedQuantity = typeof quantity === 'string' ? parseFloat(quantity) : Number(quantity);
+        if (isNaN(parsedQuantity) || parsedQuantity <= 0) {
             throw new BadRequestError('quantity должен быть положительным числом');
         }
 
@@ -130,7 +137,7 @@ export async function createMovement(
                 result = await stockService.createTransfer({
                     organizationId: user.organizationId,
                     stockItemId,
-                    quantity,
+                    quantity: parsedQuantity,
                     fromLocationId,
                     toLocationId,
                     occurredAt: occurredAtDate,
@@ -147,7 +154,7 @@ export async function createMovement(
                 result = await stockService.createIncomeMovement(
                     user.organizationId,
                     stockItemId,
-                    quantity,
+                    parsedQuantity,
                     documentType,
                     documentId,
                     user.id,
@@ -162,7 +169,7 @@ export async function createMovement(
                 result = await stockService.createExpenseMovement(
                     user.organizationId,
                     stockItemId,
-                    quantity,
+                    parsedQuantity,
                     documentType,
                     documentId,
                     user.id,
@@ -174,8 +181,26 @@ export async function createMovement(
                 break;
 
             case 'ADJUSTMENT':
-                // TODO: implement createAdjustment
-                throw new BadRequestError('ADJUSTMENT пока не реализован');
+                if (!stockLocationId) {
+                    throw new BadRequestError('stockLocationId обязателен для ADJUSTMENT');
+                }
+                if (!comment) {
+                    throw new BadRequestError('Комментарий обязателен для ADJUSTMENT');
+                }
+                result = await stockService.createAdjustment({
+                    organizationId: user.organizationId,
+                    stockItemId,
+                    stockLocationId,
+                    quantity: parsedQuantity, // Can be negative
+                    occurredAt: occurredAtDate,
+                    occurredSeq,
+                    documentType,
+                    documentId,
+                    externalRef,
+                    comment,
+                    userId: user.id,
+                });
+                break;
 
             default:
                 throw new BadRequestError(`Неизвестный movementType: ${movementType}`);

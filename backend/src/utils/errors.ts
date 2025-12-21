@@ -32,3 +32,13 @@ export class ForbiddenError extends AppError {
         super(message, 403, 'FORBIDDEN');
     }
 }
+
+/**
+ * BE-004: 409 Conflict - for unique constraint violations and state conflicts
+ */
+export class ConflictError extends AppError {
+    constructor(message = 'Conflict', code = 'CONFLICT') {
+        super(message, 409, code);
+    }
+}
+

@@ -37,9 +37,9 @@ export function onSessionExpired(reason: SessionExpiredReason = 'token_expired')
     if (sessionExpiredHandler) {
         sessionExpiredHandler(reason);
     } else {
-        // Fallback: redirect to login if no handler registered
-        console.warn('🔐 [Session] No handler registered, redirecting to /login');
-        window.location.href = '/login';
+        // Fallback: redirect to root if no handler registered
+        console.warn('🔐 [Session] No handler registered, redirecting to app root');
+        window.location.href = (import.meta.env.BASE_URL || '/');
     }
 }
 

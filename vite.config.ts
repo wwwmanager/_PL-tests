@@ -7,7 +7,7 @@ import { readFileSync } from 'fs';
 export default defineConfig({
   // Базовый URL для развертывания на GitHub Pages.
   // Закомментировано для локальной разработки. Раскомментируйте для продакшн деплоя на GitHub Pages.
-  // base: '/_PL-tests/',
+  base: '/_PL-tests/',
 
   // --- Плагины ---
   plugins: [
