@@ -2,12 +2,12 @@ import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { Waybill, Route, Vehicle, Employee, WaybillStatus, Organization, SavedRoute, FuelType, SeasonSettings, Attachment, AppSettings, StockTransaction, GarageStockItem } from '../../types';
 // API facades
 import { getOrganizations } from '../../services/organizationApi';
-import { addWaybill, updateWaybill, changeWaybillStatus, getLastWaybillForVehicle } from '../../services/waybillApi';
+import { addWaybill, updateWaybill, changeWaybillStatus, getLastWaybillForVehicle, getWaybillPrefill, getWaybillById } from '../../services/waybillApi';
 import { getSavedRoutes, addSavedRoutesFromWaybill } from '../../services/routeApi';
 import { getStockItems, StockItem } from '../../services/stockItemApi';
 import { getSeasonSettings, getAppSettings } from '../../services/settingsApi';
 import { FrontWaybillStatus } from '../../services/api/waybillStatusMap';
-import { getNextBlankForDriver, useBlankForWaybill } from '../../services/blankApi';
+import { getNextBlankForDriver, useBlankForWaybill, getAvailableBlanksForDriver } from '../../services/blankApi';
 // Utility functions
 import { isWinterDate } from '../../services/dateUtils';
 import { generateId } from '../../services/api/core';
@@ -39,7 +39,7 @@ interface WaybillDetailProps {
   onClose: () => void;
 }
 
-const emptyWaybill: Omit<Waybill, 'id'> = {
+const getEmptyWaybill = (): Omit<Waybill, 'id'> => ({
   number: '', // Will be assigned by backend from blank
   date: new Date().toISOString().split('T')[0],
   vehicleId: '',
@@ -53,15 +53,16 @@ const emptyWaybill: Omit<Waybill, 'id'> = {
   fuelAtEnd: 0,
   routes: [],
   organizationId: '',
-  dispatcherId: '',
-  controllerId: '',
+  dispatcherEmployeeId: '',
+  controllerEmployeeId: '',
   validFrom: new Date().toISOString().slice(0, 16),
   validTo: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 16),
   attachments: [],
   reviewerComment: '',
   deviationReason: '',
   fuelCalculationMethod: 'BOILER',
-};
+  fuel: undefined
+});
 
 const FormField: React.FC<{ label: string; children: React.ReactNode }> = ({ label, children }) => (
   <div>
@@ -80,12 +81,58 @@ const FormSelect = (props: React.SelectHTMLAttributes<HTMLSelectElement>) => (
 
 // FIX: Changed component to be a named export to resolve module resolution errors.
 export const WaybillDetail: React.FC<WaybillDetailProps> = ({ waybill, isPrefill, onClose }) => {
-  const [formData, setFormData] = useState<Omit<Waybill, 'id'> | Waybill>(waybill && !isPrefill ? waybill : emptyWaybill);
+  // WB-FIX-ROUTES-001: Ensure routes is always an array to prevent iteration errors
+  const initialWaybill = waybill && !isPrefill ? { ...waybill, routes: waybill.routes || [] } : getEmptyWaybill();
+  const [formData, setFormData] = useState<Omit<Waybill, 'id'> | Waybill>(initialWaybill);
   const [initialFormData, setInitialFormData] = useState<Omit<Waybill, 'id'> | Waybill | null>(null);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [organizations, setOrganizations] = useState<Organization[]>([]);
-  const [drivers, setDrivers] = useState<DriverListItem[]>([]); // REL-010: Real Driver list from API
+  const [drivers, setDrivers] = useState<DriverListItem[]>([]); // REL-010
+  const [availableBlanks, setAvailableBlanks] = useState<any[]>([]); // WB-PREFILL-040
+
+  useEffect(() => {
+    if (formData.driverId) {
+      getAvailableBlanksForDriver(formData.driverId)
+        .then(blanks => {
+          setAvailableBlanks(blanks);
+          // WB-FIX-PL-001: Auto-select first available blank if not set
+          // Only if status is DRAFT (creating or editing draft) and no blank selected
+          if (formData.status === WaybillStatus.DRAFT && !formData.blankId && blanks.length > 0) {
+            const best = blanks[0]; // First one
+            setFormData(prev => ({
+              ...prev,
+              blankId: best.id,
+              number: best.formattedNumber
+            } as any));
+          }
+        })
+        .catch(err => {
+          console.error("Failed to fetch blanks", err);
+          setAvailableBlanks([]);
+        });
+    } else {
+      setAvailableBlanks([]);
+    }
+  }, [formData.driverId, formData.status]); // Added formData.status to dep? No actually blankId check inside prevents loop
+
+  const handleBlankChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const val = e.target.value;
+    if (val === 'manual') {
+      const waybill = formData as any;
+      setFormData(prev => ({ ...prev, number: '', blankId: undefined }));
+    } else {
+      const blank = availableBlanks.find(b => b.id === val);
+      if (blank) {
+        setFormData(prev => ({
+          ...prev,
+          number: blank.formattedNumber,
+          blankId: blank.id
+        } as any));
+      }
+    }
+  };
+
   const [savedRoutes, setSavedRoutes] = useState<SavedRoute[]>([]);
   const [fuelItems, setFuelItems] = useState<StockItem[]>([]);
   const [seasonSettings, setSeasonSettings] = useState<SeasonSettings | null>(null);
@@ -189,9 +236,21 @@ export const WaybillDetail: React.FC<WaybillDetailProps> = ({ waybill, isPrefill
 
 
       let formDataToSet: Omit<Waybill, 'id'> | Waybill;
+
+      // WB-LOAD-030: Always load full details from backend if ID exists (Edit Mode)
+      let sourceWaybill = waybill;
+      if (waybill && 'id' in waybill && waybill.id && !isPrefill) {
+        try {
+          const loaded = await getWaybillById(waybill.id);
+          if (loaded) sourceWaybill = loaded;
+        } catch (e) {
+          console.error("Failed to load full waybill", e);
+        }
+      }
+
       if (isPrefill && waybill) {
         formDataToSet = {
-          ...emptyWaybill,
+          ...getEmptyWaybill(),
           vehicleId: waybill.vehicleId,
           driverId: waybill.driverId,
           odometerStart: Math.round(waybill.odometerEnd ?? 0),
@@ -201,15 +260,37 @@ export const WaybillDetail: React.FC<WaybillDetailProps> = ({ waybill, isPrefill
           formDataToSet.routes = waybill.routes.map(r => ({ ...r, id: generateId() }));
         }
       } else {
-        formDataToSet = waybill ? {
-          ...waybill,
-          routes: waybill.routes || [],
-          date: waybill.date?.split('T')[0] || new Date().toISOString().split('T')[0],
-        } : emptyWaybill;
+        // C1: Load from sourceWaybill
+        if (sourceWaybill) {
+          // Map flattened fuel from backend (if present) to form fields
+          const f = sourceWaybill.fuel;
+          formDataToSet = {
+            ...sourceWaybill,
+            routes: sourceWaybill.routes || [],
+            date: sourceWaybill.date?.split('T')[0] || new Date().toISOString().split('T')[0],
+            fuelAtStart: f?.fuelStart ? Number(f.fuelStart) : (sourceWaybill.fuelAtStart || 0),
+            fuelFilled: f?.fuelReceived ? Number(f.fuelReceived) : (sourceWaybill.fuelFilled || 0),
+            fuelAtEnd: f?.fuelEnd ? Number(f.fuelEnd) : (sourceWaybill.fuelAtEnd || 0),
+            fuelPlanned: f?.fuelPlanned ? Number(f.fuelPlanned) : (sourceWaybill.fuelPlanned || 0),
+            // Ensure dispatcher/controller/validTo are mapped
+            dispatcherEmployeeId: sourceWaybill.dispatcherEmployeeId || sourceWaybill.dispatcherId || '',
+            controllerEmployeeId: sourceWaybill.controllerEmployeeId || sourceWaybill.controllerId || '',
+            // WB-REG-001 FIX C: Use waybill's date as fallback, not current date
+            // For existing waybills, validFrom should be preserved or derived from date, never today
+            validFrom: sourceWaybill.validFrom
+              ? sourceWaybill.validFrom.slice(0, 16)
+              : (sourceWaybill.date ? `${sourceWaybill.date.split('T')[0]}T08:00` : ''),
+            validTo: sourceWaybill.validTo
+              ? sourceWaybill.validTo.slice(0, 16)
+              : (sourceWaybill.date ? `${sourceWaybill.date.split('T')[0]}T18:00` : ''),
+          };
+        } else {
+          formDataToSet = getEmptyWaybill();
+        }
       }
 
-      if (waybill && 'id' in waybill) {
-        const linkedTx = allTransactions.find(tx => tx.waybillId === waybill.id);
+      if (sourceWaybill && 'id' in sourceWaybill) {
+        const linkedTx = allTransactions.find(tx => tx.waybillId === sourceWaybill.id);
         if (linkedTx) {
           setLinkedTxId(linkedTx.id);
           setInitialLinkedTxId(linkedTx.id);
@@ -225,10 +306,11 @@ export const WaybillDetail: React.FC<WaybillDetailProps> = ({ waybill, isPrefill
           .catch(() => setFuelCardBalance(null));
       }
 
-      if (waybill && !isPrefill) { // For editing existing
-        const fromDate = waybill.validFrom?.split('T')[0] || waybill.date?.split('T')[0] || '';
-        const toDate = waybill.validTo?.split('T')[0] || waybill.date?.split('T')[0] || '';
-        setDayMode(fromDate === toDate ? 'single' : 'multi');
+      // WB-HOTFIX-UI-STATE-001: Use formDataToSet instead of waybill prop for accurate dayMode
+      if (!isPrefill && formDataToSet.validFrom) { // For editing existing
+        const fromDate = (formDataToSet.validFrom || formDataToSet.date || '').split('T')[0];
+        const toDate = (formDataToSet.validTo || formDataToSet.date || '').split('T')[0];
+        setDayMode(fromDate && toDate && fromDate !== toDate ? 'multi' : 'single');
       } else { // For new (blank or prefilled)
         setDayMode('multi');
         // WB-901: Remove auto-reserve on frontend. Number will be assigned by backend.
@@ -272,8 +354,8 @@ export const WaybillDetail: React.FC<WaybillDetailProps> = ({ waybill, isPrefill
   const selectedDriver = useMemo(() => drivers.find(d => d.id === formData.driverId), [formData.driverId, drivers]);
 
   const selectedOrg = useMemo(() => organizations.find(o => o.id === formData.organizationId), [formData.organizationId, organizations]);
-  const selectedDispatcher = useMemo(() => employees.find(e => e.id === formData.dispatcherId), [formData.dispatcherId, employees]);
-  const selectedController = useMemo(() => employees.find(e => e.id === formData.controllerId), [formData.controllerId, employees]);
+  const selectedDispatcher = useMemo(() => employees.find(e => e.id === formData.dispatcherEmployeeId), [formData.dispatcherEmployeeId, employees]);
+  const selectedController = useMemo(() => employees.find(e => e.id === formData.controllerEmployeeId), [formData.controllerEmployeeId, employees]);
   const selectedFuelType = useMemo(() => fuelItems.find(f => f.id === selectedVehicle?.fuelStockItemId), [selectedVehicle, fuelItems]);
 
 
@@ -337,7 +419,7 @@ export const WaybillDetail: React.FC<WaybillDetailProps> = ({ waybill, isPrefill
     let totalConsumption = 0;
     let totalDistance = 0;
 
-    for (const route of formData.routes) {
+    for (const route of (formData.routes || [])) {
       if (!route.distanceKm || route.distanceKm === 0) continue;
 
       const routeDate = dayMode === 'multi' && route.date ? route.date : formData.date;
@@ -377,7 +459,7 @@ export const WaybillDetail: React.FC<WaybillDetailProps> = ({ waybill, isPrefill
       totalPlanned = (distance / 100) * baseRate;
     }
     else if (method === 'SEGMENTS') {
-      for (const route of formData.routes) {
+      for (const route of (formData.routes || [])) {
         const routeDate = dayMode === 'multi' && route.date ? route.date : formData.date;
         const isWinter = isWinterDate(routeDate, seasonSettings);
         const baseRate = isWinter ? (rates.winterRate || rates.summerRate || 0) : (rates.summerRate || rates.winterRate || 0);
@@ -396,7 +478,7 @@ export const WaybillDetail: React.FC<WaybillDetailProps> = ({ waybill, isPrefill
       let totalConsRaw = 0;
       let segmentsKm = 0;
 
-      for (const route of formData.routes) {
+      for (const route of (formData.routes || [])) {
         const routeDate = dayMode === 'multi' && route.date ? route.date : formData.date;
         const isWinter = isWinterDate(routeDate, seasonSettings);
         const baseRate = isWinter ? (rates.winterRate || rates.summerRate || 0) : (rates.summerRate || rates.winterRate || 0);
@@ -508,38 +590,110 @@ export const WaybillDetail: React.FC<WaybillDetailProps> = ({ waybill, isPrefill
     setFormData(prev => ({ ...prev, [name]: numericValue }));
   }, [fuelCardBalance]);
 
+  /* WB-PREFILL-030: Safe Prefill Logic */
+  const [prefillData, setPrefillData] = useState<any>(null); // Staged prefill data
+  const [isPrefillModalOpen, setIsPrefillModalOpen] = useState(false);
+
+  const applyPrefill = (data: any, mode: 'overwrite' | 'fill-empty') => {
+    setFormData(prev => {
+      const newData = { ...prev };
+
+      // Helper: apply if empty or overwrite
+      const applyField = (field: keyof Waybill, value: any) => {
+        const isEmpty = !newData[field] || newData[field] === 0 || newData[field] === '' || newData[field] === '0';
+        if (value !== null && value !== undefined && (mode === 'overwrite' || isEmpty)) {
+          // Special handling for numeric fields to avoid "0" overwrite issues if needed
+          // But generally 0 is a valid value for odometer/fuel, so "isEmpty" check should be careful.
+          // If existing is 0 and new is > 0, we should probably update even in fill-empty mode?
+          // Let's assume 0 is "empty" for fuel/odometer in context of prefill? 
+          // Usually prefill comes from last waybill, so if last waybill had 0, we apply 0.
+          // If user entered 100 manually, we don't overwrite in 'fill-empty'.
+          (newData as any)[field] = value;
+        }
+      };
+
+      applyField('driverId', data.driverId);
+      applyField('dispatcherEmployeeId', data.dispatcherEmployeeId);
+      applyField('controllerEmployeeId', data.controllerEmployeeId);
+      // Dispatcher/Controller are now fully migrated to EmployeeId fields
+      // Legacy fields (dispatcherId/controllerId) are ignored for prefill if present
+
+      // Odometer/Fuel: Usually strict numbers
+      if (data.odometerStart !== null) {
+        const currentOdo = Number(newData.odometerStart || 0);
+        if (mode === 'overwrite' || currentOdo === 0) {
+          newData.odometerStart = data.odometerStart;
+        }
+      }
+
+      if (data.fuelStart !== null) {
+        const currentFuel = Number(newData.fuelAtStart || 0);
+        if (mode === 'overwrite' || currentFuel === 0) {
+          newData.fuelAtStart = data.fuelStart;
+        }
+      }
+
+      return newData;
+    });
+
+    // Message
+    if (data.lastWaybillDate) {
+      setAutoFillMessage(`Данные загружены на основе ПЛ №${data.lastWaybillNumber} от ${new Date(data.lastWaybillDate).toLocaleDateString()}.`);
+      setMinDate(data.lastWaybillDate);
+    } else {
+      setAutoFillMessage(`Данные загружены из карточки ТС (история ПЛ не найдена).`);
+      setMinDate('');
+    }
+
+    setIsPrefillModalOpen(false);
+  };
+
   const handleVehicleChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
     const vehicleId = e.target.value;
     const selectedVehicle = vehicles.find(v => v.id === vehicleId);
     setAutoFillMessage('');
     setMinDate('');
 
+    // Clear prefill state
+    setPrefillData(null);
+
     if (selectedVehicle) {
-      const assignedDriverId = selectedVehicle.assignedDriverId || '';
-      let updates: Partial<Waybill> = {
+      // 1. Basic update of vehicleId
+      setFormData(prev => ({
+        ...prev,
         vehicleId: selectedVehicle.id,
-        driverId: assignedDriverId,
-      };
+        // prefill organization if missing or empty
+        organizationId: (!prev.organizationId || prev.organizationId === 'undefined') ? selectedVehicle.organizationId : prev.organizationId,
+      }));
 
+      // 2. Fetch Prefill Data (WB-PREFILL-020)
       if (!('id' in formData) || !formData.id || isPrefill) {
-        const lastWaybill = await getLastWaybillForVehicle(selectedVehicle.id);
-        updates.odometerStart = Math.round(selectedVehicle.mileage);
-        updates.fuelAtStart = selectedVehicle.currentFuel;
+        try {
+          // Static import used above
+          const data = await getWaybillPrefill(selectedVehicle.id, formData.date); // Pass date to get relevant history
 
-        if (assignedDriverId) {
-          // const driver = employees.find(e => e.id === assignedDriverId);
-          // WB-901: Removed updateWaybillNumberForDriver(driver || null);
+          // 3. Conflict Detection (WB-PREFILL-030)
+          // Check if user has already entered data that might be overwritten
+          const hasUserEnteredData =
+            (formData.driverId && formData.driverId !== selectedVehicle.assignedDriverId) ||
+            (Number(formData.odometerStart) > 0) ||
+            (Number(formData.fuelAtStart) > 0) ||
+            (Number(formData.fuelAtStart) > 0) ||
+            (formData.dispatcherEmployeeId) ||
+            (formData.controllerEmployeeId);
+
+          if (hasUserEnteredData) {
+            // Staging for modal
+            setPrefillData(data);
+            setIsPrefillModalOpen(true);
+          } else {
+            // Auto-apply if form is clean
+            applyPrefill(data, 'fill-empty');
+          }
+        } catch (err) {
+          console.error('Failed to load prefill data', err);
+          showToast('Не удалось загрузить данные автозаполнения', 'error');
         }
-
-        let message = `Стартовые значения одометра и топлива загружены из карточки ТС.`;
-
-        if (lastWaybill) {
-          // Do not set organization from last waybill, it will be set by driver
-          message += ` Данные из последнего ПЛ НЕ загружены.`
-          setMinDate(lastWaybill.date);
-        }
-
-        setAutoFillMessage(message);
       }
 
       const newRoutes = formData.routes.map(r => ({
@@ -548,7 +702,7 @@ export const WaybillDetail: React.FC<WaybillDetailProps> = ({ waybill, isPrefill
         isWarming: selectedVehicle.useWarmingModifier ? r.isWarming : false,
       }));
 
-      setFormData(prev => ({ ...prev, ...updates, routes: newRoutes }));
+      setFormData(prev => ({ ...prev, routes: newRoutes }));
 
     } else {
       setFormData(prev => ({
@@ -697,7 +851,8 @@ export const WaybillDetail: React.FC<WaybillDetailProps> = ({ waybill, isPrefill
   };
 
   const validateForm = async (): Promise<boolean> => {
-    if (!formData.dispatcherId) {
+    // WB-DISP-FIX: Allow DRAFT without dispatcher
+    if (!formData.dispatcherEmployeeId && formData.status !== 'DRAFT') {
       showToast('Диспетчер не назначен. Пожалуйста, укажите его в карточке сотрудника или выберите вручную.', 'error');
       return false;
     }
@@ -776,50 +931,138 @@ export const WaybillDetail: React.FC<WaybillDetailProps> = ({ waybill, isPrefill
     try {
       let savedWaybill: Waybill;
 
+      // WB-FIX-PL-001: Construct payload with fuel object for aggregate upsert
+      const payload: any = { ...formData };
+
+      // Check if we have fuel data to save
+      // We prioritize form data. 
+      if (selectedVehicle?.fuelStockItemId || Number(formData.fuelAtStart) > 0 || Number(formData.fuelFilled) > 0) {
+        payload.fuel = {
+          stockItemId: selectedVehicle?.fuelStockItemId || null,
+          fuelStart: Number(formData.fuelAtStart) || 0,
+          fuelReceived: Number(formData.fuelFilled) || 0,
+          // Calculate consumption or use form if available? Form doesn't have fuelConsumed field usually, it's calc.
+          // Let's pass calculated.
+          fuelConsumed: actualFuelConsumption || 0,
+          fuelEnd: Number(formData.fuelAtEnd) || 0,
+          fuelPlanned: Number(formData.fuelPlanned) || 0,
+          sourceType: linkedTxId ? 'GAS_STATION' : 'MANUAL',
+          // Add timestamp if we had it, or null
+          // comment: ...
+        };
+      }
+
       if ('id' in formData && formData.id) {
-        savedWaybill = await updateWaybill(formData as Waybill);
+        // Ensure required fields for FrontWaybill are present in payload
+        const updatePayload = {
+          ...payload,
+          // WB-FIX-PL-001: Dates are handled by mapper now (WB-DATE-060)
+
+          // Send only new fields, rely on normalization or DTO aliases if needed
+          dispatcherEmployeeId: payload.dispatcherEmployeeId || null,
+          controllerEmployeeId: payload.controllerEmployeeId || null,
+          // Legacy dispatcherId is removed to prevent overwriting with ''
+        };
+        savedWaybill = await updateWaybill(updatePayload as any);
       } else {
-        savedWaybill = await addWaybill(formData as Omit<Waybill, 'id'>);
-        setFormData(savedWaybill);
+        const createPayload = {
+          ...payload,
+          // WB-FIX-PL-001
+          dispatcherEmployeeId: payload.dispatcherEmployeeId || null,
+          controllerEmployeeId: payload.controllerEmployeeId || null,
+        };
+        savedWaybill = await addWaybill(createPayload as any);
       }
 
-      if (savedWaybill && savedWaybill.routes.length > 0) {
-        await addSavedRoutesFromWaybill(savedWaybill.routes);
+      if (savedWaybill) {
+        // WB-HOTFIX-UI-STATE-001: Safe date helpers
+        const toDateInput = (val: any): string => {
+          if (!val) return '';
+          if (typeof val === 'string') return val.slice(0, 10);
+          return new Date(val).toISOString().slice(0, 10);
+        };
 
-        // Обновляем сохраненные маршруты для autocomplete
-        const updatedRoutes = await getSavedRoutes();
-        setSavedRoutes(updatedRoutes);
-      }
+        const toDateTimeInput = (val: any): string => {
+          if (!val) return '';
+          if (typeof val === 'string') {
+            // ISO -> yyyy-MM-ddTHH:mm, datetime-local already fits
+            return val.includes('T') ? val.slice(0, 16) : `${val.slice(0, 10)}T00:00`;
+          }
+          return new Date(val).toISOString().slice(0, 16);
+        };
 
-      // Handle transaction linking
-      const allTransactions = await getStockTransactions();
-      const originalLinkedTx = allTransactions.find(tx => tx.id === initialLinkedTxId);
+        // WB-HOTFIX-UI-STATE-001: Use savedWaybill.fuel (flattened aggregate) instead of fuelLines[0]
+        const f = (savedWaybill as any).fuel;
+        const mappedFormData = {
+          ...savedWaybill,
+          routes: savedWaybill.routes || [],
+          // Map fuel from flattened aggregate
+          fuelAtStart: f?.fuelStart != null ? Number(f.fuelStart) : (savedWaybill.fuelAtStart || 0),
+          fuelFilled: f?.fuelReceived != null ? Number(f.fuelReceived) : (savedWaybill.fuelFilled || 0),
+          fuelAtEnd: f?.fuelEnd != null ? Number(f.fuelEnd) : (savedWaybill.fuelAtEnd || 0),
+          fuelPlanned: f?.fuelPlanned != null ? Number(f.fuelPlanned) : (savedWaybill.fuelPlanned || 0),
+          // Format dates for HTML inputs
+          date: toDateInput(savedWaybill.date),
+          validFrom: toDateTimeInput(savedWaybill.validFrom),
+          validTo: toDateTimeInput(savedWaybill.validTo),
+          // Preserve dispatcher/controller
+          dispatcherEmployeeId: savedWaybill.dispatcherEmployeeId || '',
+          controllerEmployeeId: savedWaybill.controllerEmployeeId || '',
+        };
 
-      // Unlink old if necessary
-      if (originalLinkedTx && originalLinkedTx.id !== linkedTxId) {
-        await updateStockTransaction({ ...originalLinkedTx, waybillId: null });
-      }
+        console.log('[WB-SAVE] Mapped form data:', {
+          date: mappedFormData.date,
+          validFrom: mappedFormData.validFrom,
+          validTo: mappedFormData.validTo,
+          fuelAtStart: mappedFormData.fuelAtStart,
+          fuelFilled: mappedFormData.fuelFilled
+        });
 
-      // Link new if necessary
-      if (linkedTxId && linkedTxId !== originalLinkedTx?.id) {
-        const newLinkedTx = allTransactions.find(tx => tx.id === linkedTxId);
-        if (newLinkedTx) {
-          await updateStockTransaction({ ...newLinkedTx, waybillId: savedWaybill.id });
+        setFormData(mappedFormData as any);
+        setInitialFormData(JSON.parse(JSON.stringify(mappedFormData)));
+
+        // WB-HOTFIX-UI-STATE-001: Recalculate dayMode after save
+        const fromDate = (mappedFormData.validFrom || mappedFormData.date || '').split('T')[0];
+        const toDate = (mappedFormData.validTo || mappedFormData.date || '').split('T')[0];
+        setDayMode(fromDate && toDate && fromDate !== toDate ? 'multi' : 'single');
+
+        // Show toast only once
+        if (!suppressNotifications) {
+          showToast(
+            `Путевой лист ${savedWaybill.number ? `№${savedWaybill.number} ` : ''}успешно сохранен`,
+            'success'
+          );
         }
-      }
 
-      setInitialLinkedTxId(linkedTxId);
+        if (savedWaybill && savedWaybill.routes.length > 0) {
+          await addSavedRoutesFromWaybill(savedWaybill.routes);
+          const updatedRoutes = await getSavedRoutes();
+          setSavedRoutes(updatedRoutes);
+        }
 
-      if (!suppressNotifications) {
-        showToast('Путевой лист успешно сохранен!', 'success');
+        // Handle transaction linking
+        const allTransactions = await getStockTransactions();
+        const originalLinkedTx = allTransactions.find(tx => tx.id === initialLinkedTxId);
+
+        if (originalLinkedTx && originalLinkedTx.id !== linkedTxId) {
+          await updateStockTransaction({ ...originalLinkedTx, waybillId: null });
+        }
+
+        if (linkedTxId && linkedTxId !== originalLinkedTx?.id) {
+          const newLinkedTx = allTransactions.find(tx => tx.id === linkedTxId);
+          if (newLinkedTx) {
+            await updateStockTransaction({ ...newLinkedTx, waybillId: savedWaybill.id });
+          }
+        }
+
+        setInitialLinkedTxId(linkedTxId);
+
+        return savedWaybill;
       }
-      setInitialFormData(JSON.parse(JSON.stringify(savedWaybill)));
-      return savedWaybill;
-    } catch (error) {
-      console.error("Failed to save waybill:", error);
-      if (!suppressNotifications) {
-        showToast(`Не удалось сохранить. Ошибка: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`, 'error');
-      }
+      return null;
+    } catch (err: any) {
+      console.error('Error saving waybill:', err);
+      showToast('Ошибка при сохранении: ' + (err.message || 'Неизвестная ошибка'), 'error');
       return null;
     }
   };
@@ -1017,12 +1260,77 @@ export const WaybillDetail: React.FC<WaybillDetailProps> = ({ waybill, isPrefill
         confirmText="Да, выйти"
         confirmButtonClass="bg-red-600 hover:bg-red-700"
       />
-      <CorrectionModal isOpen={isCorrectionModalOpen} onClose={() => setIsCorrectionModalOpen(false)} onSubmit={handleReturnToDraft} />
-      <CorrectionReasonModal
-        isOpen={isCorrectionReasonModalOpen}
-        onClose={() => setIsCorrectionReasonModalOpen(false)}
-        onSubmit={handleConfirmCorrection}
+      {/* WB-PREFILL-030: Prefill Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={isPrefillModalOpen}
+        title="Обновить данные автозаполнения?"
+        message={`Для выбранного ТС найдены актуальные данные (ПЛ №${prefillData?.lastWaybillNumber || 'нет'}, пробег ${prefillData?.odometerStart || 0}). \n\nВы хотите обновить поля?`}
+        confirmText="Обновить (только пустые)"
+        onConfirm={() => applyPrefill(prefillData, 'fill-empty')}
+        onClose={() => setIsPrefillModalOpen(false)}
       />
+
+      {/* Custom Modal for Prefill Options if ConfirmationModal is too simple */}
+      {isPrefillModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full shadow-xl">
+            <h3 className="text-lg font-bold mb-4 text-gray-900 dark:text-white">Обновить данные автозаполнения?</h3>
+            <p className="mb-4 text-gray-600 dark:text-gray-300">
+              Для выбранного ТС найдены актуальные данные:
+              <ul className="list-disc pl-5 mt-2">
+                <li>Водитель: {prefillData?.driverId ? 'Найден' : 'Нет'}</li>
+                <li>Пробег: {prefillData?.odometerStart}</li>
+                <li>Топливо: {prefillData?.fuelStart}</li>
+                {prefillData?.tankBalance !== null && <li>Бак (датчик): {prefillData.tankBalance}</li>}
+              </ul>
+              <br />
+              Текущие значения в форме будут изменены.
+            </p>
+            <div className="flex flex-col space-y-2">
+              <button
+                onClick={() => applyPrefill(prefillData, 'fill-empty')}
+                className="w-full px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+              >
+                Заполнить только пустые поля
+              </button>
+              <button
+                onClick={() => applyPrefill(prefillData, 'overwrite')}
+                className="w-full px-4 py-2 bg-yellow-600 text-white rounded hover:bg-yellow-700"
+              >
+                Перезаписать все поля
+              </button>
+              <button
+                onClick={() => setIsPrefillModalOpen(false)}
+                className="w-full px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 dark:bg-gray-700 dark:text-white"
+              >
+                Отмена
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isCorrectionModalOpen && formData && 'id' in formData && (
+        <CorrectionModal
+          isOpen={isCorrectionModalOpen}
+          onClose={() => setIsCorrectionModalOpen(false)}
+          onSubmit={async () => {
+            // Refresh logic usually handled by parent list or onClose triggers
+            if (onClose) onClose();
+          }}
+        />
+      )}
+
+      {isCorrectionReasonModalOpen && (
+        <CorrectionReasonModal
+          isOpen={isCorrectionReasonModalOpen}
+          onClose={() => setIsCorrectionReasonModalOpen(false)}
+          onSubmit={(reason) => {
+            setFormData(prev => ({ ...prev, deviationReason: reason }));
+            setIsCorrectionReasonModalOpen(false);
+          }}
+        />
+      )}
       {isPrintModalOpen && (
         <PrintableWaybill
           waybill={formData as Waybill}
@@ -1107,13 +1415,30 @@ export const WaybillDetail: React.FC<WaybillDetailProps> = ({ waybill, isPrefill
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             <FormField label="Организация"><FormSelect name="organizationId" value={formData.organizationId} onChange={handleChange} disabled={!canEdit || isDriver}><option value="">Выберите</option>{organizations.map(o => <option key={o.id} value={o.id}>{o.shortName}</option>)}</FormSelect></FormField>
             <FormField label="Номер ПЛ">
-              <FormInput
-                type="text"
-                name="number"
-                value={formData.number || (('id' in formData && formData.id) ? '' : 'Автоматически')}
-                readOnly
-                className="bg-gray-100 font-semibold"
-              />
+              {availableBlanks.length > 0 && (!('id' in formData) || !formData.id || !formData.number) ? (
+                <FormSelect
+                  name="blankId"
+                  value={(formData as any).blankId || (availableBlanks.find(b => b.formattedNumber === formData.number)?.id) || ''}
+                  onChange={handleBlankChange}
+                  disabled={!canEdit}
+                >
+                  <option value="">-- Выберите бланк --</option>
+                  {availableBlanks.map(b => (
+                    <option key={b.id} value={b.id}>
+                      {b.series} {b.number}
+                    </option>
+                  ))}
+                  <option value="manual">Ввести вручную / Автоматически</option>
+                </FormSelect>
+              ) : (
+                <FormInput
+                  type="text"
+                  name="number"
+                  value={formData.number || (('id' in formData && formData.id) ? '' : 'Автоматически')}
+                  readOnly
+                  className="bg-gray-100 font-semibold"
+                />
+              )}
             </FormField>
             <div />
           </div>
@@ -1187,13 +1512,13 @@ export const WaybillDetail: React.FC<WaybillDetailProps> = ({ waybill, isPrefill
           <CollapsibleSection title="Ответственные лица" isCollapsed={collapsedSections.staff || false} onToggle={() => toggleSection('staff')}>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <FormField label="Выезд разрешил (Диспетчер)">
-                <FormSelect name="dispatcherId" value={formData.dispatcherId} onChange={handleChange} disabled={!canEdit}>
+                <FormSelect name="dispatcherEmployeeId" value={formData.dispatcherEmployeeId || ''} onChange={handleChange} disabled={!canEdit}>
                   <option value="">Выберите</option>
                   {employees.map(e => <option key={e.id} value={e.id}>{e.fullName}</option>)}
                 </FormSelect>
               </FormField>
               <FormField label="Расчет произвел (Контролер/Бухгалтер)">
-                <FormSelect name="controllerId" value={formData.controllerId || ''} onChange={handleChange} disabled={!canEdit}>
+                <FormSelect name="controllerEmployeeId" value={formData.controllerEmployeeId || ''} onChange={handleChange} disabled={!canEdit}>
                   <option value="">Выберите</option>
                   {employees.map(e => <option key={e.id} value={e.id}>{e.fullName}</option>)}
                 </FormSelect>

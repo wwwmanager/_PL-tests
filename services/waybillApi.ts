@@ -17,6 +17,10 @@ export const deleteWaybill = realApi.deleteWaybill;
 export const updateWaybillStatus = realApi.updateWaybillStatus;
 export const changeWaybillStatus = realApi.changeWaybillStatus;
 
+// WB-PREFILL-020: Prefill
+import { getWaybillPrefill as apiGetPrefill } from './api/waybillApi';
+export const getWaybillPrefill = apiGetPrefill;
+
 /**
  * Get all waybills with optional pagination
  */

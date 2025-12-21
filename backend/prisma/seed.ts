@@ -662,6 +662,51 @@ async function main() {
         },
     });
 
+    // ============================================================================
+    // 15. WB-PREFILL-DRIVER-002: DEFAULTS & PERSONAL ASSIGNMENTS
+    // ============================================================================
+    console.log('Creating dedicated officials and assigning to Driver 1...');
+
+    const officialDispatcher = await prisma.employee.create({
+        data: {
+            organizationId: org.id,
+            departmentId: mainDept.id,
+            fullName: 'Диспетчерова Дарья Денисовна',
+            position: 'Старший диспетчер',
+            employeeType: 'dispatcher',
+        }
+    });
+
+    const officialController = await prisma.employee.create({
+        data: {
+            organizationId: org.id,
+            departmentId: mainDept.id,
+            fullName: 'Контролёров Константин Кириллович',
+            position: 'Механик-контролёр',
+            employeeType: 'controller',
+        }
+    });
+
+    // Assign to emp1 (Driver 1) - this ensures Personal Prefill works
+    await prisma.employee.update({
+        where: { id: emp1.id },
+        data: {
+            dispatcherId: officialDispatcher.id,
+            controllerId: officialController.id
+        }
+    });
+
+    // Also set some Department Defaults for testing fallback
+    await prisma.department.update({
+        where: { id: branchDept.id },
+        data: {
+            defaultDispatcherEmployeeId: officialDispatcher.id,
+            defaultControllerEmployeeId: officialController.id
+        }
+    });
+
+    console.log('✅ Seed WB-PREFILL-DRIVER-002 update done');
+
     console.log('✅ Seed completed successfully!');
     console.log('');
     console.log('📊 Created:');

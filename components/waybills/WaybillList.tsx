@@ -52,7 +52,7 @@ const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpene
       return '';
     }
   });
-  const [topLevelFilter, setTopLevelFilter] = useState({ dateFrom: '', dateTo: '', status: '' });
+  const [topLevelFilter, setTopLevelFilter] = useState({ dateFrom: '', dateTo: '', status: WaybillStatus.DRAFT });
   const [selectedWaybillId, setSelectedWaybillId] = useState<string | null>(null);
   const [isDetailViewOpen, setIsDetailViewOpen] = useState(false);
   const [waybillToPrefill, setWaybillToPrefill] = useState<Waybill | null>(null);
@@ -174,6 +174,8 @@ const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpene
     return preFilteredWaybills.map((w, index) => {
       const driver = drivers.find(d => d.id === w.driverId);
       const vehicle = vehicles.find(v => v.id === w.vehicleId);
+      // WB-REG-001 FIX E: Map fuelLines to display columns
+      const firstFuel = (w as any).fuelLines?.[0];
 
       return {
         ...w,
@@ -181,6 +183,9 @@ const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpene
         mileage: (w.odometerEnd ?? w.odometerStart) - w.odometerStart,
         driver: driver?.fullName || w.driverId,
         vehicle: vehicle ? `${vehicle.brand} ${vehicle.registrationNumber}` : w.vehicleId,
+        // WB-REG-001: Use fuelLines data if available
+        fuelAtStart: firstFuel?.fuelStart ?? w.fuelAtStart,
+        fuelAtEnd: firstFuel?.fuelEnd ?? w.fuelAtEnd,
       };
     });
   }, [preFilteredWaybills, drivers, vehicles]);
@@ -250,9 +255,16 @@ const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpene
   };
 
   if (isDetailViewOpen) {
-    const selectedWaybill = selectedWaybillId ? waybills.find(w => w.id === selectedWaybillId) ?? null : waybillToPrefill;
+    // WB-REG-001 FIX B/D: For editing, pass only ID so WaybillDetail loads full data from backend
+    // For prefill, pass the waybill data for copying
+    const selectedWaybill = selectedWaybillId
+      ? { id: selectedWaybillId } as Waybill
+      : waybillToPrefill;
     const isPrefill = !selectedWaybillId && !!waybillToPrefill;
-    return <WaybillDetail waybill={selectedWaybill} isPrefill={isPrefill} onClose={handleCloseDetail} />;
+    // WB-REG-001 FIX B: key prop forces React to re-create component on ID change
+    // BUGFIX: Use stable key for new waybills (not Date.now() which changes on every render!)
+    const stableKey = selectedWaybillId || (waybillToPrefill?.id ? `prefill-${waybillToPrefill.id}` : 'new');
+    return <WaybillDetail key={stableKey} waybill={selectedWaybill} isPrefill={isPrefill} onClose={handleCloseDetail} />;
   }
 
   const renderActionButtons = (waybill: EnrichedWaybill) => {
@@ -297,7 +309,7 @@ const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpene
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg items-center">
           <input type="date" value={topLevelFilter.dateFrom} onChange={e => setTopLevelFilter({ ...topLevelFilter, dateFrom: e.target.value })} className="bg-white dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded-md p-2 focus:ring-blue-500 focus:border-blue-500 text-gray-700 dark:text-gray-200" placeholder="Дата с" />
           <input type="date" value={topLevelFilter.dateTo} onChange={e => setTopLevelFilter({ ...topLevelFilter, dateTo: e.target.value })} className="bg-white dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded-md p-2 focus:ring-blue-500 focus:border-blue-500 text-gray-700 dark:text-gray-200" placeholder="Дата по" />
-          <select value={topLevelFilter.status} onChange={e => setTopLevelFilter({ ...topLevelFilter, status: e.target.value })} className="bg-white dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded-md p-2 focus:ring-blue-500 focus:border-blue-500 text-gray-700 dark:text-gray-200">
+          <select value={topLevelFilter.status} onChange={e => setTopLevelFilter({ ...topLevelFilter, status: e.target.value as WaybillStatus })} className="bg-white dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded-md p-2 focus:ring-blue-500 focus:border-blue-500 text-gray-700 dark:text-gray-200">
             <option value="">Все статусы</option>
           </select>
           <select value={selectedVehicleId} onChange={e => setSelectedVehicleId(e.target.value)} className="bg-white dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded-md p-2 focus:ring-blue-500 focus:border-blue-500 text-gray-700 dark:text-gray-200">

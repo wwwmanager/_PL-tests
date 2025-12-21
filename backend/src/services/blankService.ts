@@ -485,8 +485,31 @@ export async function reserveSpecificBlank(
     driverId: string,
     departmentId?: string
 ): Promise<ReserveBlankResult> {
+    console.log(`[BLS-DEBUG] reserveSpecificBlank called:`, {
+        organizationId,
+        blankId,
+        driverId,
+        departmentId
+    });
+
     return prisma.$transaction(async (tx) => {
-        // Find blank with lock
+        // First, let's see what the blank actually looks like
+        const blankDebug = await tx.blank.findUnique({
+            where: { id: blankId },
+            select: {
+                id: true,
+                status: true,
+                issuedToDriverId: true,
+                organizationId: true,
+                departmentId: true,
+                series: true,
+                number: true
+            }
+        });
+        console.log(`[BLS-DEBUG] Blank found by ID:`, blankDebug);
+
+        // Find blank with lock - NOTE: removed departmentId filter as it's too restrictive
+        // Blanks issued to a driver should be usable regardless of department
         const blank = await tx.blank.findFirst({
             where: {
                 id: blankId,
@@ -495,11 +518,24 @@ export async function reserveSpecificBlank(
                     { status: BlankStatus.AVAILABLE },
                     { status: BlankStatus.ISSUED, issuedToDriverId: driverId }
                 ],
-                ...(departmentId ? { departmentId } : {})
+                // WB-FIX: Removed departmentId filter - blanks issued to driver should work
+                // ...(departmentId ? { departmentId } : {})
             }
         });
 
+        console.log(`[BLS-DEBUG] Blank after filter:`, blank ? 'FOUND' : 'NOT FOUND');
+
         if (!blank) {
+            console.error(`[BLS-DEBUG] ❌ Blank not found! Conditions not met:`, {
+                blankId,
+                organizationId,
+                driverId,
+                blankActualStatus: blankDebug?.status,
+                blankActualIssuedToDriverId: blankDebug?.issuedToDriverId,
+                blankActualOrgId: blankDebug?.organizationId,
+                driverIdMatch: blankDebug?.issuedToDriverId === driverId,
+                orgIdMatch: blankDebug?.organizationId === organizationId
+            });
             throw new Error('Бланк не найден или недоступен');
         }
 
@@ -512,6 +548,8 @@ export async function reserveSpecificBlank(
                 issuedAt: new Date()
             }
         });
+
+        console.log(`[BLS-DEBUG] ✅ Blank reserved:`, blank.id);
 
         return {
             blank: {

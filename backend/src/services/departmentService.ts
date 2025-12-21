@@ -63,6 +63,8 @@ export async function createDepartment(data: {
     code?: string;
     name: string;
     address?: string;
+    defaultDispatcherEmployeeId?: string;
+    defaultControllerEmployeeId?: string;
 }) {
     return prisma.department.create({
         data: {
@@ -70,6 +72,8 @@ export async function createDepartment(data: {
             code: data.code || null,
             name: data.name,
             address: data.address || null,
+            defaultDispatcherEmployeeId: data.defaultDispatcherEmployeeId || null,
+            defaultControllerEmployeeId: data.defaultControllerEmployeeId || null,
         },
     });
 }
@@ -80,6 +84,8 @@ export async function updateDepartment(
         code: string;
         name: string;
         address: string;
+        defaultDispatcherEmployeeId: string | null;
+        defaultControllerEmployeeId: string | null;
     }>
 ) {
     const department = await prisma.department.findUnique({

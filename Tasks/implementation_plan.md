@@ -1,137 +1,66 @@
- Стабилизация контекста, справочников и “золотого пути”
-Цели
-Убрать класс ошибок “пусто потому что не та организация/департамент/роль”.
-Убрать класс ошибок “водитель ≠ сотрудник” (EmployeeId vs DriverId), дубли ФИО больше не вводят в заблуждение.
-Сделать так, чтобы базовый бизнес‑поток никогда незаметно не ломался (E2E golden path + контрактные проверки).
-Снизить зависимость от “памяти агента” за счёт: /me, requestId, понятных ошибок, демо‑seed.
-Нецели (пока)
-Полноценная мульти‑организационная membership‑модель (user может входить в несколько org и переключаться) — можно спроектировать позже.
-Большой рефактор всех UI-экранов — делаем точечно: журналы/справочники/форма ПЛ.
-Фаза 1 — Наблюдаемость и видимый контекст
-1.1 Backend: requestId для каждого запроса
-Результат: любой “пустой экран”/ошибка привязаны к конкретному requestId.
-Изменения:
+# WB-PREFILL-010: Default References for Waybill Prefill
 
-добавить middleware requestId и заголовок X-Request-Id
-errorHandler логирует requestId + userId + orgId + route
-1.2 Backend: эндпоинт GET /me
-Результат: одним запросом видно кто/какая орг/департамент/роль + (опционально) employeeId/driverId.
-Выдаёт:
+## Goal
+Enable setting default personnel for Vehicles (Driver) and Departments (Dispatcher, Controller) to streamline Waybill creation via auto-fill.
 
-user: {id,email,fullName,role}
-organization: {id,name}
-department: {id,name}|null
-tokenClaims: {organizationId, departmentId}
-serverTime, requestId
-1.3 Frontend: ContextBar в шапке + “скопировать диагностику”
-Результат: пользователь всегда видит текущую организацию/департамент/роль.
-Поведение:
+## Proposed Changes
 
-при пустых справочниках пользователь сразу видит “Вы в Оптима‑3, данные в Минсельхоз”.
-кнопка копирует JSON (me + версии + userAgent).
-1.4 Frontend: корректные пустые состояния
-Результат: UI различает:
+### Database Schema (`backend/prisma/schema.prisma`)
+- **Vehicle**: Reuse `assignedDriverId` (FK to `Employee`). (Prefill resolves to Driver).
+- **Department**: Add `defaultDispatcherEmployeeId` and `defaultControllerEmployeeId` (FKs to `Employee`).
 
-403 — нет прав
-401 — не авторизован
-200 [] — нет данных в этой организации
-500 — ошибка сервера (с requestId)
-Acceptance Criteria фазы 1
+### Backend
+- **Services**: Update `vehicleService` and `departmentService` to support CRUD for new fields.
+- **DTOs**: Add fields to DTOs.
 
-Любой баг-репорт включает “Скопировать диагностику”.
-“Пусто” больше не маскирует 403/500.
-Фаза 2 — Инварианты идентичности (Employee vs Driver) и справочники
-2.1 Соглашение: “водитель” в домене = Driver.id
-Результат: бланки/ПЛ/выдача всегда работают с Driver, а не Employee.
-Правило:
+## WB-PREFILL-020: Waybill Prefill Implementation Plan
 
-В API и UI, где речь о водителе — используем driverId (Driver.id).
-employeeId допускается только в справочнике сотрудников, но не как идентификатор водителя.
-2.2 Backend: авто‑создание записи Driver для employeeType=driver
-Результат: не бывает “Иванов (driver), но Driver записи нет”.
-Логика:
+### Backend
+#### [NEW] [waybillPrefillController.ts](file:///c:/_PL-tests/backend/src/controllers/waybillPrefillController.ts)
+- Implement `GET /prefill`.
+- Logic:
+    - Get Vehicle (with defaults).
+    - Get Last Waybill (ODOMETER, TANK).
+    - Get Tank Balance (if available).
+    - Determine `driverId`, `dispatcherId`, `controllerId`:
+        - Priority: Last Waybill -> Default (Vehicle/Dept) -> Current User?
 
-при create/update Employee, если employeeType === 'driver' и нет Driver → создать Driver.
-2.3 Backend: endpoint GET /drivers (join Employee)
-Результат: фронт всегда выбирает корректных водителей.
-Ответ: { driverId, employeeId, fullName, departmentId, isActive }.
+#### [MODIFY] [waybillRoutes.ts](file:///c:/_PL-tests/backend/src/routes/waybillRoutes.ts)
+- Register `/prefill` endpoint.
 
-2.4 Frontend: все “селекторы водителя” перейти на Drivers
-Результат: в форме ПЛ, выдаче бланков и фильтрах журналов выбирается Driver, а отображается ФИО из Employee.
+### Frontend
+#### [MODIFY] [waybillApi.ts](file:///c:/_PL-tests/services/api/waybillApi.ts)
+- Add `getWaybillPrefill(vehicleId, at)`.
 
-2.5 Backward compatibility: временный fallback employeeId→driverId
-Результат: старый фронт не ломается резко, но система сигналит о долге.
-Режим:
+## WB-PREFILL-030: Frontend Safe Prefill
+### Frontend
+#### [MODIFY] [WaybillDetail.tsx](file:///c:/_PL-tests/components/waybills/WaybillDetail.tsx)
+- Trigger `getWaybillPrefill` when `vehicleId` changes.
+- Implement conflict detection:
+    - If fields are empty -> auto-fill.
+    - If fields are filled -> show "Update fields?" modal.
+- Modal options: "Update only empty" (default), "Overwrite all", "Cancel".
 
-если пришёл employeeId вместо driverId:
-найти Driver по employeeId
-если нет → 409 EMPLOYEE_HAS_NO_DRIVER_RECORD
-логировать warning DEPRECATED_EMPLOYEE_ID_AS_DRIVER_ID
-Acceptance Criteria фазы 2
+## WB-POST-010: Conflict Validation
+### Backend
+#### [MODIFY] [waybillService.ts](file:///c:/_PL-tests/backend/src/services/waybillService.ts)
+- In `updateWaybill` (when status -> POSTED):
+    - Fetch last `POSTED` waybill for the vehicle (ordered by date/odometer).
+    - Validation 1: `newWaybill.odometerStart` >= `lastPosted.odometerEnd`.
+    - Validation 2: `newWaybill.startAt` (or date) >= `lastPosted.endAt` (or date).
+    - If conflict: Throw 409 Conflict with details.
 
-Экран “Бланки по водителю” не зависит от выбора “правильного Иванова” в Employees — выбирается Driver.
-Ошибка “водитель не найден” заменяется на понятное: “у сотрудника нет Driver записи” (если так).
-Фаза 3 — Управление организационным контекстом и устранение “пусто из-за org в токене”
-Проблема повторяется: данные переехали в “Минсельхоз”, а пользователь/токен остались в “Оптима‑3”.
+## Verification Plan
+### Automated Tests
+- Integration: Create Vehicle with defaults. Create old waybill. Call prefill. Verify response contains defaults + last waybill data.
+- Integration: Create Posted WB 1. Create Draft WB 2 with older odometer. Try to POST WB 2 -> Expect 409.
+- Frontend: Test prefill conflict modal flow (manual/unit).
 
-3.1 Минимальное решение (без membership): админ‑утилита переназначения пользователя на организацию
-Результат: админ может исправить контекст без ручной ковырялки в БД.
-Реализация:
 
-Endpoint (admin-only): POST /admin/users/:id/set-organization { organizationId, departmentId? }
-После изменения:
-ревокнуть refresh tokens пользователя (или пометить их revokedAt)
-пользователь должен перелогиниться, чтобы получить новый orgId в JWT
-3.2 UI: предупреждение “контекст не совпадает с данными”
-Результат: если списки пустые, а в системе есть данные в другой org — UI это не “угадает”. Но UI может:
+### Frontend
+- **VehicleList**: (Already has Assigned Driver).
+- **OrganizationManagement**: Add "Default Dispatcher/Controller" selects to Department form.
 
-показывать явный org/dept в шапке
-давать кнопку “Выйти и войти в другую организацию” (если у вас есть такие пользователи)
-Acceptance Criteria фазы 3
-
-“Пустые справочники из-за неправильной org” диагностируются за 10 секунд по ContextBar.
-Исправление делается через один админ‑endpoint вместо хаотичных правок сервисов.
-Фаза 4 — Страховочная сетка: E2E “Golden Path” + Demo Seed
-4.1 E2E golden-path тест (server-side)
-Результат: нельзя незаметно сломать систему.
-Сценарий:
-
-org + dept
-employee(driver) → Driver существует
-vehicle с rates
-blankBatch → blanks → issue to driver
-create waybill → blank RESERVED → number assigned
-SUBMITTED → POSTED → stock movement created → blank USED → audit written
-4.2 Demo seed без ловушек
-Результат: любой разработчик поднимает демо‑данные без “три Иванова” и “пользователь в пустой орг”.
-Seed создаёт:
-
-одну org (“Минсельхоз demo”) + dept
-admin/dispatcher/driver users (понятные логины)
-employee+driver, vehicle, stock fuel item, blank batch + issued blanks
-Acceptance Criteria фазы 4
-
-Golden-path тест всегда зелёный в CI.
-Seed воспроизводим и делает приложение “живым” сразу после reset.
-Фаза 5 — Ужесточение контрактов и снятие временных костылей
-5.1 Контрактная дисциплина DTO
-Результат: “Zod требует number, хотя сервер присваивает” больше не повторяется.
-Действия:
-
-DTO схемы — источник истины
-изменили доменную логику → обновили DTO → обновили тесты
-5.2 Удаление fallback employeeId→driverId (после миграции фронта)
-Результат: система становится строгой и предсказуемой.
-
-Порядок внедрения (чтобы сразу прекратить “ветряные мельницы”)
-Фаза 1 (requestId + /me + ContextBar + пустые состояния)
-Фаза 2 (Driver как идентичность + авто-Driver + drivers API + UI селекторы)
-Фаза 3 (admin set-organization + revoke tokens)
-Фаза 4 (golden path + demo seed)
-Фаза 5 (ужесточение, удаление fallback)
-Что будет считаться “готово” по итогу плана
-Пользователь всегда видит текущую org/dept/role и может скопировать диагностику.
-Пустые справочники объяснимы (контекст/права/ошибка), а не “просто пусто”.
-“Водитель” везде один и тот же объект (Driver), бланки/ПЛ не зависят от случайного Employee.
-Любая регрессия в ядре ловится golden-path тестом.
-Демо‑база стабильна и не требует ручных переносов данных между организациями.
+## Verification
+- Manual verification of saving/loading defaults.
+- Database migration (via push/dev).

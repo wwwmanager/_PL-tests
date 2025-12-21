@@ -87,4 +87,25 @@ export async function changeWaybillStatus(id: string, status: string): Promise<W
     return response;
 }
 
+// WB-PREFILL-020: Prefill Data
+export interface WaybillPrefillData {
+    driverId: string | null;
+    dispatcherEmployeeId: string | null;
+    controllerEmployeeId: string | null;
+    odometerStart: number | null;
+    fuelStart: number | null;
+    fuelStockItemId: string | null;
+    tankBalance: number | null;
+    lastWaybillId: string | null;
+    lastWaybillNumber: string | null;
+    lastWaybillDate: string | null;
+}
+
+export async function getWaybillPrefill(vehicleId: string, date?: string): Promise<WaybillPrefillData> {
+    const params = new URLSearchParams();
+    if (date) params.append('date', date);
+
+    return await httpClient.get<WaybillPrefillData>(`/waybills/prefill/${vehicleId}?${params.toString()}`);
+}
+
 export { createWaybill as addWaybill };

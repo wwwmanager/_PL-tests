@@ -74,6 +74,7 @@ function sanitizeVehiclePayload(data: Record<string, unknown>): Record<string, u
         mileage: data.mileage ?? null,
         currentFuel: data.currentFuel ?? null,
         fuelType: toNullIfEmpty(data.fuelType ?? data.fuelTypeId),
+        fuelStockItemId: toNullIfEmpty(data.fuelStockItemId),
 
         fuelConsumptionRates: typeof data.fuelConsumptionRates === 'object'
             ? JSON.stringify(data.fuelConsumptionRates)

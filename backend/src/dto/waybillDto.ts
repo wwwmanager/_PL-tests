@@ -47,6 +47,22 @@ const legacyFuelFieldsSchema = z.object({
 });
 
 /**
+ * Single fuel object schema (for frontend fuel: {...} object)
+ * This is what the frontend sends, different from fuelLines array
+ */
+export const fuelObjectSchema = z.object({
+    stockItemId: z.string().uuid().optional().nullable(),
+    fuelStart: z.number().min(0).optional().nullable(),
+    fuelReceived: z.number().min(0).optional().nullable(),
+    fuelConsumed: z.number().min(0).optional().nullable(),
+    fuelEnd: z.number().min(0).optional().nullable(),
+    fuelPlanned: z.number().min(0).optional().nullable(),
+    sourceType: z.enum(['MANUAL', 'GAS_STATION', 'FUEL_CARD']).optional().nullable(),
+    refueledAt: z.string().datetime().optional().nullable(),
+    comment: z.string().optional().nullable(),
+}).optional().nullable();
+
+/**
  * Create waybill input schema
  */
 export const createWaybillSchema = z.object({
@@ -73,9 +89,20 @@ export const createWaybillSchema = z.object({
     routes: z.array(routeSchema).optional().default([]),
     fuelLines: z.array(fuelLineSchema).optional().default([]),
 
+    // WB-FUEL-FIX: Frontend sends fuel as object, not as flat fields or fuelLines
+    fuel: fuelObjectSchema,
+
     // Notes
     plannedRoute: z.string().optional().nullable(),
     notes: z.string().optional().nullable(),
+
+    // WB-FIX-PL-001: New fields
+    dispatcherEmployeeId: z.string().uuid().optional().nullable(),
+    controllerEmployeeId: z.string().uuid().optional().nullable(),
+    validTo: z.string().datetime().optional().nullable(),
+    // Legacy aliases
+    dispatcherId: z.string().uuid().optional().nullable(),
+    controllerId: z.string().uuid().optional().nullable(),
 
     // Legacy fuel fields (will be mapped to fuelLines if present)
 }).merge(legacyFuelFieldsSchema);
@@ -107,9 +134,20 @@ export const updateWaybillSchema = z.object({
     routes: z.array(routeSchema).optional(),
     fuelLines: z.array(fuelLineSchema).optional(),
 
+    // WB-FUEL-FIX: Frontend sends fuel as object
+    fuel: fuelObjectSchema,
+
     // Notes
     plannedRoute: z.string().optional().nullable(),
     notes: z.string().optional().nullable(),
+
+    // WB-FIX-PL-001: New fields
+    dispatcherEmployeeId: z.string().uuid().optional().nullable(),
+    controllerEmployeeId: z.string().uuid().optional().nullable(),
+    validTo: z.string().datetime().optional().nullable(),
+    // Legacy aliases
+    dispatcherId: z.string().uuid().optional().nullable(),
+    controllerId: z.string().uuid().optional().nullable(),
 
     // Legacy fuel fields
 }).merge(legacyFuelFieldsSchema);

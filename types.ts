@@ -74,12 +74,12 @@ export type DictionaryType =
 
 // Расширяем статусы ПЛ, добавляем обратную совместимость
 export enum WaybillStatus {
-  DRAFT = 'Draft',
-  SUBMITTED = 'Submitted',
-  POSTED = 'Posted', // Проведено
-  CANCELLED = 'Cancelled',
-  // совместимость со старым кодом (строка будет 'Posted'):
-  COMPLETED = 'Posted',
+  DRAFT = 'DRAFT',
+  SUBMITTED = 'SUBMITTED',
+  POSTED = 'POSTED', // Проведено
+  CANCELLED = 'CANCELLED',
+  // совместимость со старым кодом (строка будет 'POSTED'):
+  COMPLETED = 'POSTED',
 }
 
 export type FuelCalculationMethod = 'BOILER' | 'SEGMENTS' | 'MIXED';
@@ -143,10 +143,30 @@ export interface Waybill {
   fuelAtEnd?: number;
   routes: Route[];
   organizationId: string;
-  dispatcherId: string;
+  // WB-FIX-PL-001: Match backend schema
+  dispatcherEmployeeId?: string | null;
+  controllerEmployeeId?: string | null;
+  /** @deprecated use dispatcherEmployeeId */
+  dispatcherId?: string;
+  /** @deprecated use controllerEmployeeId */
   controllerId?: string;
-  validFrom: string;
-  validTo: string;
+
+  validFrom?: string;
+  validTo?: string;
+
+  // WB-FIX-PL-001: Flattened fuel object from backend
+  fuel?: {
+    stockItemId: string | null;
+    fuelStart: string | number | null;
+    fuelReceived: string | number | null;
+    fuelConsumed: string | number | null; // backend decimal or string
+    fuelEnd: string | number | null;
+    fuelPlanned: string | number | null;
+    refueledAt: string | null;
+    sourceType: string | null;
+    comment: string | null;
+  };
+
   attachments?: Attachment[];
   reviewerComment?: string;
   deviationReason?: string;

@@ -24,6 +24,21 @@ export interface BackendWaybillDto {
     fuelCalculationMethod?: string; // BOILER, SEGMENTS, MIXED
     createdAt: string;
     updatedAt: string;
+    // WB-FIX-PL-001
+    dispatcherEmployeeId?: string | null;
+    controllerEmployeeId?: string | null;
+    validTo?: string | null; // from backend validTo
+    fuel?: {
+        stockItemId: string | null;
+        fuelStart: number | null;
+        fuelReceived: number | null;
+        fuelConsumed: number | null;
+        fuelEnd: number | null;
+        fuelPlanned: number | null;
+        refueledAt: string | null; // ISO
+        sourceType: string | null;
+        comment: string | null;
+    };
     routes?: Array<{
         id: string;
         legOrder: number;
@@ -94,10 +109,26 @@ export interface FrontWaybill {
     routes: any[]; // Route[]
 
     // Прочее
-    dispatcherId: string;
+    dispatcherId?: string; // Made optional for deprecated compat
     controllerId?: string;
+    // WB-FIX-PL-001
+    dispatcherEmployeeId?: string | null;
+    controllerEmployeeId?: string | null;
+
     validFrom: string;
     validTo: string;
+
+    fuel?: {
+        stockItemId: string | null;
+        fuelStart: string | number | null;
+        fuelReceived: string | number | null;
+        fuelConsumed: string | number | null;
+        fuelEnd: string | number | null;
+        fuelPlanned: string | number | null;
+        refueledAt: string | null;
+        sourceType: string | null;
+        comment: string | null;
+    };
     reviewerComment?: string;
     deviationReason?: string;
     notes?: string;

@@ -1,4 +1,4 @@
-import { PrismaClient, WaybillStatus, BlankStatus } from '@prisma/client';
+import { PrismaClient, Prisma, WaybillStatus, BlankStatus } from '@prisma/client';
 import { BadRequestError, NotFoundError } from '../utils/errors';
 import { validateOdometer, calculateDistanceKm, calculatePlannedFuelByMethod, FuelConsumptionRates, FuelCalculationMethod, FuelSegment } from '../domain/waybill/fuel';
 import { isWinterDate } from '../utils/dateUtils';
@@ -6,7 +6,7 @@ import { getSeasonSettings } from './settingsService';
 import { reserveNextBlankForDriver, reserveSpecificBlank, releaseBlank } from './blankService';
 // REL-103: Stock location imports
 import { getOrCreateVehicleTankLocation, getOrCreateFuelCardLocation, getOrCreateDefaultWarehouseLocation } from './stockLocationService';
-import { createTransfer, createExpenseMovement } from './stockService';
+import { createTransfer, createExpenseMovement, getBalanceAt } from './stockService';
 
 const prisma = new PrismaClient();
 
@@ -18,7 +18,17 @@ export interface UserInfo {
     employeeId: string | null;
 }
 
-interface CreateWaybillInput {
+interface FuelLineInput {
+    stockItemId: string;
+    fuelStart?: number;
+    fuelReceived?: number;
+    fuelConsumed?: number;
+    fuelEnd?: number;
+    fuelPlanned?: number;
+    isFuel?: boolean; // Added helper for planned assignment
+}
+
+export interface CreateWaybillInput {
     number?: string; // WB-901: Made optional as backend will assign it from blank
     date: string;
     vehicleId: string;
@@ -29,8 +39,11 @@ interface CreateWaybillInput {
     isCityDriving?: boolean;
     isWarming?: boolean;
     plannedRoute?: string;
-    notes?: string;
-    fuelCalculationMethod?: FuelCalculationMethod;
+    // WB-FIX-PL-001
+    dispatcherEmployeeId?: string;
+    controllerEmployeeId?: string;
+    validTo?: string;
+
     routes?: Array<{
         legOrder: number;
         routeId?: string | null;
@@ -41,15 +54,21 @@ interface CreateWaybillInput {
         isWarming?: boolean;
         comment?: string;
     }>;
-    fuelLines?: Array<{
-        stockItemId: string;
-        fuelStart?: number;
-        fuelReceived?: number;
-        fuelConsumed?: number;
-        fuelEnd?: number;
-        fuelPlanned?: number;
-        isFuel?: boolean; // Added helper for planned assignment
-    }>;
+    // Flattened fuel input for WB-FIX-PL-001
+    fuel?: {
+        stockItemId: string | null;
+        fuelStart?: number | null;
+        fuelReceived?: number | null;
+        fuelConsumed?: number | null;
+        fuelEnd?: number | null;
+        fuelPlanned?: number | null;
+        refueledAt?: string | null;
+        sourceType?: string | null;
+        comment?: string | null;
+    };
+    notes?: string;
+    fuelCalculationMethod?: FuelCalculationMethod;
+    fuelLines?: FuelLineInput[];
 }
 
 interface ListWaybillsFilters {
@@ -136,7 +155,8 @@ export async function listWaybills(
                     employee: true
                 }
             },
-            blank: true // WB-901
+            blank: true, // WB-901
+            fuelLines: true // WB-LIST-070
         }
     });
 
@@ -167,7 +187,7 @@ export async function getWaybillById(userInfo: UserInfo, id: string) {
         }
     }
 
-    return prisma.waybill.findFirst({
+    const waybill = await prisma.waybill.findFirst({
         where,
         include: {
             vehicle: true,
@@ -177,9 +197,43 @@ export async function getWaybillById(userInfo: UserInfo, id: string) {
                 }
             },
             blank: true, // WB-901
-            fuelLines: true // WB-901
+            fuelLines: true, // WB-901
+            routes: true, // WB-ROUTES-040
+            dispatcherEmployee: true,
+            controllerEmployee: true
         }
     });
+
+    if (!waybill) return null;
+
+    // B1: Flatten fuel for frontend (WB-FIX-PL-001)
+    // Select aggregate deterministically: refueledAt desc nulls last, then id desc
+    // Since we don't have ORDER BY in include, we sort here.
+    let fuelAgg = null;
+    if (waybill.fuelLines && waybill.fuelLines.length > 0) {
+        const sorted = [...waybill.fuelLines].sort((a, b) => {
+            const timeA = a.refueledAt ? a.refueledAt.getTime() : 0;
+            const timeB = b.refueledAt ? b.refueledAt.getTime() : 0;
+            if (timeA !== timeB) return timeB - timeA; // desc
+            return b.id.localeCompare(a.id); // desc
+        });
+        fuelAgg = sorted[0];
+    }
+
+    return {
+        ...waybill,
+        fuel: {
+            stockItemId: fuelAgg?.stockItemId || null,
+            fuelStart: fuelAgg?.fuelStart || null,
+            fuelReceived: fuelAgg?.fuelReceived || null,
+            fuelConsumed: fuelAgg?.fuelConsumed || null,
+            fuelEnd: fuelAgg?.fuelEnd || null,
+            fuelPlanned: fuelAgg?.fuelPlanned || null,
+            refueledAt: fuelAgg?.refueledAt ? fuelAgg.refueledAt.toISOString() : null,
+            sourceType: fuelAgg?.sourceType || null,
+            comment: fuelAgg?.comment || null,
+        }
+    };
 }
 
 function formatBlankNumber(series: string | null, number: number): string {
@@ -316,8 +370,61 @@ export async function createWaybill(userInfo: UserInfo, input: CreateWaybillInpu
         }
     }
 
+    // Verify fuel input (WB-FIX-PL-001)
+    let fuelLinesCreate = calculatedFuelLines.map(fl => ({
+        stockItemId: fl.stockItemId,
+        fuelStart: fl.fuelStart,
+        fuelReceived: fl.fuelReceived,
+        fuelConsumed: fl.fuelConsumed,
+        fuelEnd: fl.fuelEnd,
+        fuelPlanned: fl.fuelPlanned,
+    }));
+
+    if (input.fuel && (input.fuel.stockItemId || input.fuel.fuelStart || input.fuel.fuelReceived || input.fuel.fuelEnd || input.fuel.sourceType)) {
+        if (!input.fuel.stockItemId) {
+            // If we have some fuel data but no stock item - throw or ignore? 
+            // Plan says "stockItemId required if fuel is not empty".
+            // Let's check if it strictly has meaningful data.
+            if (input.fuel.fuelStart || input.fuel.fuelReceived || input.fuel.fuelEnd) {
+                throw new BadRequestError('Не указан тип топлива (stockItemId)', 'FUEL_TYPE_REQUIRED');
+            }
+        } else {
+            // Add flattened fuel as a line if not already present in calculated (which usually comes from method calc)
+            // But here we are creating fresh. 
+            // If method=BOILER/MIXED, we might have calc lines. 
+            // If method=DIRECT or user manual input, we prioritize input.fuel?
+            // User plan B3: "upsert aggregate... if fuel is not empty -> create".
+            // Since this is CREATE, we just add to create payload.
+
+            // Overwrite or append? Usually flattened fuel is the MAIN fuel.
+            // If calculatedFuelLines exists (from boiler), it might already have entries.
+            // Let's assume input.fuel is the primary source of truth for the first tank.
+
+            const newFuelLine = {
+                stockItemId: input.fuel.stockItemId,
+                fuelStart: input.fuel.fuelStart ?? undefined,
+                fuelReceived: input.fuel.fuelReceived ?? undefined,
+                fuelConsumed: input.fuel.fuelConsumed ?? undefined,
+                fuelEnd: input.fuel.fuelEnd ?? undefined,
+                fuelPlanned: input.fuel.fuelPlanned ?? undefined,
+                // B1/B3: extra fields
+                refueledAt: input.fuel.refueledAt ? new Date(input.fuel.refueledAt) : undefined,
+                sourceType: input.fuel.sourceType,
+                comment: input.fuel.comment
+            };
+
+            // If we have calculated lines, we might need to merge or replace the first one?
+            if (fuelLinesCreate.length > 0) {
+                // Update the first line
+                fuelLinesCreate[0] = { ...fuelLinesCreate[0], ...newFuelLine };
+            } else {
+                fuelLinesCreate.push(newFuelLine);
+            }
+        }
+    }
+
     // Create waybill with fuelLines and routes
-    return prisma.waybill.create({
+    const created = await prisma.waybill.create({
         data: {
             organizationId,
             departmentId: vehicle.departmentId,
@@ -334,7 +441,18 @@ export async function createWaybill(userInfo: UserInfo, input: CreateWaybillInpu
             plannedRoute: input.plannedRoute,
             notes: input.notes,
             status: WaybillStatus.DRAFT,
+
+            // WB-FIX-PL-001 Fields
+            dispatcherEmployeeId: input.dispatcherEmployeeId
+                ?? (input as any).dispatcherId
+                ?? null,
+            controllerEmployeeId: input.controllerEmployeeId
+                ?? (input as any).controllerId
+                ?? null,
+            validTo: input.validTo ? new Date(input.validTo) : null,
+
             routes: input.routes && input.routes.length > 0 ? {
+                // WB-FIX: Removed deleteMany - only valid in UPDATE, not CREATE
                 create: input.routes.map(r => ({
                     legOrder: r.legOrder,
                     routeId: r.routeId || null,
@@ -346,23 +464,46 @@ export async function createWaybill(userInfo: UserInfo, input: CreateWaybillInpu
                     comment: r.comment || null
                 }))
             } : undefined,
-            fuelLines: calculatedFuelLines.length > 0 ? {
-                create: calculatedFuelLines.map(fl => ({
-                    stockItemId: fl.stockItemId,
-                    fuelStart: fl.fuelStart,
-                    fuelReceived: fl.fuelReceived,
-                    fuelConsumed: fl.fuelConsumed,
-                    fuelEnd: fl.fuelEnd,
-                    fuelPlanned: fl.fuelPlanned,
-                }))
+            fuelLines: fuelLinesCreate.length > 0 ? {
+                create: fuelLinesCreate
             } : undefined
         },
         include: {
             fuelLines: true,
             blank: true,
-            routes: true
+            routes: true,
+            dispatcherEmployee: true,
+            controllerEmployee: true
         }
     } as any);
+
+    // WB-HOTFIX-UI-STATE-001: Flatten fuelLines to fuel (same as getWaybillById)
+    const createdWithIncludes = created as any;
+    let fuelAgg = null;
+    if (createdWithIncludes.fuelLines && createdWithIncludes.fuelLines.length > 0) {
+        const sorted = [...createdWithIncludes.fuelLines].sort((a: any, b: any) => {
+            const timeA = a.refueledAt ? new Date(a.refueledAt).getTime() : 0;
+            const timeB = b.refueledAt ? new Date(b.refueledAt).getTime() : 0;
+            if (timeA !== timeB) return timeB - timeA;
+            return b.id.localeCompare(a.id);
+        });
+        fuelAgg = sorted[0];
+    }
+
+    return {
+        ...created,
+        fuel: {
+            stockItemId: fuelAgg?.stockItemId || null,
+            fuelStart: fuelAgg?.fuelStart != null ? Number(fuelAgg.fuelStart) : null,
+            fuelReceived: fuelAgg?.fuelReceived != null ? Number(fuelAgg.fuelReceived) : null,
+            fuelConsumed: fuelAgg?.fuelConsumed != null ? Number(fuelAgg.fuelConsumed) : null,
+            fuelEnd: fuelAgg?.fuelEnd != null ? Number(fuelAgg.fuelEnd) : null,
+            fuelPlanned: fuelAgg?.fuelPlanned != null ? Number(fuelAgg.fuelPlanned) : null,
+            refueledAt: fuelAgg?.refueledAt ? fuelAgg.refueledAt.toISOString?.() ?? fuelAgg.refueledAt : null,
+            sourceType: fuelAgg?.sourceType || null,
+            comment: fuelAgg?.comment || null,
+        }
+    };
 }
 
 export async function updateWaybill(userInfo: UserInfo, id: string, data: Partial<CreateWaybillInput>) {
@@ -416,7 +557,26 @@ export async function updateWaybill(userInfo: UserInfo, id: string, data: Partia
     }
 
     // Recalculate fuelPlanned
-    let calculatedFuelLines = data.fuelLines;
+    let calculatedFuelLines = data.fuelLines || [];
+
+    // WB-FIX-PL-001: Handle flattened fuel input in update (same as create)
+    if (data.fuel && !data.fuelLines) {
+        // If we have fuel lines existing, we might update the first one or replace?
+        // Logic: construct a fuel line from flattened data and use it.
+        const fl: FuelLineInput = {
+            stockItemId: data.fuel.stockItemId!,
+            fuelStart: data.fuel.fuelStart ?? undefined,
+            fuelReceived: data.fuel.fuelReceived ?? undefined,
+            fuelConsumed: data.fuel.fuelConsumed ?? undefined,
+            fuelEnd: data.fuel.fuelEnd ?? undefined,
+            fuelPlanned: data.fuel.fuelPlanned ?? undefined,
+        };
+        // If stockItemId is present, use it.
+        if (fl.stockItemId) {
+            calculatedFuelLines = [fl];
+        }
+    }
+
     const vehicle = data.vehicleId ? await prisma.vehicle.findFirst({ where: { id: data.vehicleId } }) : waybill.vehicle;
     const waybillDate = data.date || waybill.date.toISOString().slice(0, 10);
     const odometerDistanceKm = calculateDistanceKm(newOdometerStart, newOdometerEnd);
@@ -509,7 +669,7 @@ export async function updateWaybill(userInfo: UserInfo, id: string, data: Partia
             }
         }
 
-        return tx.waybill.update({
+        const updated = await tx.waybill.update({
             where: { id },
             data: {
                 number: data.number,
@@ -523,10 +683,49 @@ export async function updateWaybill(userInfo: UserInfo, id: string, data: Partia
                 isWarming: data.isWarming,
                 fuelCalculationMethod: data.fuelCalculationMethod as any,
                 plannedRoute: data.plannedRoute,
-                notes: data.notes
+                notes: data.notes,
+
+                // WB-FIX-PL-001: Persist new fields with normalization
+                dispatcherEmployeeId: (data as any).dispatcherEmployeeId
+                    ?? (data as any).dispatcherId
+                    ?? undefined,
+                controllerEmployeeId: (data as any).controllerEmployeeId
+                    ?? (data as any).controllerId
+                    ?? undefined,
+                validTo: (data as any).validTo
+                    ? new Date((data as any).validTo)
+                    : undefined,
             },
             include: { fuelLines: true, routes: true }
         } as any);
+
+        // WB-HOTFIX-UI-STATE-001: Flatten fuelLines to fuel (same as getWaybillById)
+        const updatedWithIncludes = updated as any;
+        let fuelAgg = null;
+        if (updatedWithIncludes.fuelLines && updatedWithIncludes.fuelLines.length > 0) {
+            const sorted = [...updatedWithIncludes.fuelLines].sort((a: any, b: any) => {
+                const timeA = a.refueledAt ? new Date(a.refueledAt).getTime() : 0;
+                const timeB = b.refueledAt ? new Date(b.refueledAt).getTime() : 0;
+                if (timeA !== timeB) return timeB - timeA;
+                return b.id.localeCompare(a.id);
+            });
+            fuelAgg = sorted[0];
+        }
+
+        return {
+            ...updated,
+            fuel: {
+                stockItemId: fuelAgg?.stockItemId || null,
+                fuelStart: fuelAgg?.fuelStart != null ? Number(fuelAgg.fuelStart) : null,
+                fuelReceived: fuelAgg?.fuelReceived != null ? Number(fuelAgg.fuelReceived) : null,
+                fuelConsumed: fuelAgg?.fuelConsumed != null ? Number(fuelAgg.fuelConsumed) : null,
+                fuelEnd: fuelAgg?.fuelEnd != null ? Number(fuelAgg.fuelEnd) : null,
+                fuelPlanned: fuelAgg?.fuelPlanned != null ? Number(fuelAgg.fuelPlanned) : null,
+                refueledAt: fuelAgg?.refueledAt ? fuelAgg.refueledAt.toISOString?.() ?? fuelAgg.refueledAt : null,
+                sourceType: fuelAgg?.sourceType || null,
+                comment: fuelAgg?.comment || null,
+            }
+        };
     });
 }
 
@@ -551,13 +750,28 @@ export async function deleteWaybill(userInfo: UserInfo, id: string) {
     });
     if (!waybill) throw new NotFoundError('Путевой лист не найден');
 
-    // BLS-202: Release blank if it's in RESERVED status before deleting waybill
-    if (waybill.blankId && waybill.blank?.status === BlankStatus.RESERVED) {
-        try {
-            await releaseBlank(organizationId, waybill.blankId);
-            console.log('[BLS-202] Released blank on waybill delete:', waybill.blankId);
-        } catch (err) {
-            console.warn('[BLS-202] Could not release blank:', err);
+    // WB-DEL-001: Release blank when deleting waybill
+    console.log('[WB-DEL-001] Deleting waybill:', waybill.id, 'blankId:', waybill.blankId, 'blank status:', waybill.blank?.status);
+
+    if (waybill.blankId && waybill.blank) {
+        const blankStatus = waybill.blank.status;
+
+        // Release if RESERVED or reset if it was being used
+        if (blankStatus === BlankStatus.RESERVED) {
+            try {
+                await releaseBlank(organizationId, waybill.blankId);
+                console.log('[WB-DEL-001] ✅ Released blank back to ISSUED:', waybill.blankId);
+            } catch (err) {
+                console.error('[WB-DEL-001] ❌ Failed to release blank:', err);
+                // Force update as fallback
+                await prisma.blank.update({
+                    where: { id: waybill.blankId },
+                    data: { status: BlankStatus.ISSUED }
+                });
+                console.log('[WB-DEL-001] ✅ Force-released blank via fallback:', waybill.blankId);
+            }
+        } else {
+            console.log('[WB-DEL-001] Blank not in RESERVED status, current:', blankStatus);
         }
     }
 
@@ -615,6 +829,73 @@ export async function changeWaybillStatus(
         throw new BadRequestError(
             `Переход из статуса ${currentStatus} в ${status} недопустим`
         );
+    }
+
+    // WB-701: Check for norm excess before POSTED (lines 621-647 omitted for brevity, keeping them)
+    // ... (code above is preserved in context matching, we insert new block below)
+
+    // WB-POST-010: Conflict Validation (Drafts vs Posted)
+    if (status === WaybillStatus.POSTED) {
+        // 1. Get the LAST POSTED Waybill for this vehicle (excluding current one)
+        const lastPosted = await prisma.waybill.findFirst({
+            where: {
+                organizationId,
+                vehicleId: waybill.vehicleId,
+                status: WaybillStatus.POSTED,
+                id: { not: id }, // Exclude current if it was already posted (though transition check prevents re-post usually)
+                // We want strict chronological order: last posted date <= current date
+                // But user might be posting a "forgotten" waybill from the past?
+                // Rule: "The new waybill must effectively be 'after' the previous posted one in sequence"
+                // OR "If we insert a waybill in the past, does it conflict with FUTURE posted waybills?"
+                // The requirement says: "waybill.odometerStart not outdated relative to last POSTED".
+                // This implies we checking against the LATEST known state.
+            },
+            orderBy: [
+                { date: 'desc' },
+                { odometerEnd: 'desc' }
+            ]
+        });
+
+        if (lastPosted) {
+            // Validation 1: Odometer Continuity
+            // new.odometerStart >= last.odometerEnd
+            const newStart = Number(waybill.odometerStart || 0);
+            const lastEnd = Number(lastPosted.odometerEnd || 0);
+
+            if (newStart < lastEnd) {
+                throw new BadRequestError(
+                    `Конфликт показаний одометра: текущее начало (${newStart}) меньше предыдущего конца (${lastEnd}, ПЛ №${lastPosted.number})`,
+                    'ODOMETER_CONFLICT'
+                );
+            }
+
+            // Validation 2: Temporal Sequence (Optional but recommended)
+            // new.date >= last.date (approximately)
+            // If new waybill is strictly BEFORE last posted waybill, it might be an issue depending on policy.
+            // Requirement usually allows posting backdated waybills IF odometer fits?
+            // "fuelAtStart aligned with tankBalanceAsOf(startAt)" -> This is handled by prefill mostly.
+            // But if user forces POST, we check if they break the chain.
+            // Let's enforce Strict Odometer only for now as requested.
+            // "waybill.odometerStart не устарел относительно последнего POSTED" -> Covered.
+
+            // Allow backdating if odometer is correct? (e.g. gaps). 
+            // If odometer is correct, let it pass.
+        }
+
+        // Validation 3: Future Conflicts (if inserting in the middle)
+        // Check if there is a POSTED waybill *after* this one with odometerStart < this.odometerEnd
+        const nextPosted = await prisma.waybill.findFirst({
+            where: {
+                organizationId,
+                vehicleId: waybill.vehicleId,
+                status: WaybillStatus.POSTED,
+                id: { not: id },
+                odometerStart: { lt: Number(waybill.odometerEnd || 0) },
+                date: { gte: waybill.date } // Look for future waybills
+            }
+        });
+
+        // This is complex. Stick to "Last Posted" check as requested.
     }
 
     // WB-701: Check for norm excess before POSTED
@@ -782,5 +1063,177 @@ export async function changeWaybillStatus(
         console.log('[WB-501] Status change completed atomically:', { id, from: currentStatus, to: status });
         return updated;
     });
+}
+
+// WB-PREFILL-020: Prefill Data Logic
+export interface PrefillData {
+    driverId: string | null;
+    dispatcherEmployeeId: string | null;
+    controllerEmployeeId: string | null;
+    odometerStart: number | null;
+    fuelStart: number | null;
+    fuelStockItemId: string | null;
+    tankBalance: number | null;
+    lastWaybillId: string | null;
+    lastWaybillNumber: string | null;
+    lastWaybillDate: Date | null;
+}
+
+export async function getWaybillPrefillData(
+    userInfo: UserInfo,
+    vehicleId: string,
+    date?: Date
+): Promise<PrefillData> {
+    const organizationId = userInfo.organizationId;
+
+    // 1. Get Vehicle with Department Defaults
+    const vehicle = await prisma.vehicle.findFirst({
+        where: { id: vehicleId, organizationId },
+        include: {
+            department: {
+                include: {
+                    defaultDispatcher: true,
+                    defaultController: true
+                }
+            },
+            fuelStockItem: true,
+            assignedDriver: { // Assigned Driver (Employee)
+                select: {
+                    id: true,
+                    dispatcherId: true,
+                    controllerId: true,
+                    driver: {
+                        select: { id: true }
+                    },
+                    department: {
+                        select: {
+                            id: true,
+                            defaultDispatcherEmployeeId: true,
+                            defaultControllerEmployeeId: true
+                        }
+                    }
+                }
+            }
+        }
+    });
+
+    if (!vehicle) {
+        throw new NotFoundError('Транспортное средство не найдено');
+    }
+
+    // 2. Get Last POSTED Waybill
+    // Ordered by date desc, then created desc
+    const lastWaybill = await prisma.waybill.findFirst({
+        where: {
+            organizationId,
+            vehicleId,
+            status: WaybillStatus.POSTED,
+            date: date ? { lt: date } : undefined // Only waybills BEFORE the requested date
+        },
+        orderBy: [
+            { date: 'desc' },
+            { createdAt: 'desc' }
+        ],
+        include: {
+            fuelLines: true // Needed to get fuelEnd
+        }
+    });
+
+    // 3. Get Tank Balance (if fuelStockItem is set)
+    let tankBalance: number | null = null;
+    if (vehicle.fuelStockItemId) {
+        try {
+            const tankLocation = await getOrCreateVehicleTankLocation(vehicle.id);
+            const balanceRaw = await getBalanceAt(
+                tankLocation.id,
+                vehicle.fuelStockItemId,
+                date || new Date()
+            );
+            // handle balance return type (assuming { quantity: number } or number)
+            tankBalance = typeof balanceRaw === 'number' ? balanceRaw : (balanceRaw as any)?.quantity || 0;
+        } catch (e) {
+            console.warn('[Prefill] Failed to get tank balance', e);
+        }
+    }
+
+    // 4. Resolve IDs
+    // Driver: Last Waybill Driver -> Vehicle Assigned Driver (resolved to Driver ID)
+    let driverId = lastWaybill?.driverId || null;
+    if (!driverId && vehicle.assignedDriver?.driver) {
+        driverId = vehicle.assignedDriver.driver.id;
+    }
+
+    // Dispatcher/Controller: 
+    // Priority:
+    // 1. Personal Assigned (Employee.dispatcherId)
+    // 2. Driver's Department Defaults
+    // 3. Vehicle's Department Defaults
+
+    // Check personal settings first
+    let dispatcherId = vehicle.assignedDriver?.dispatcherId || null;
+    let controllerId = vehicle.assignedDriver?.controllerId || null;
+
+    // Fallback to Driver's Department
+    if (!dispatcherId && vehicle.assignedDriver?.department) {
+        dispatcherId = vehicle.assignedDriver.department.defaultDispatcherEmployeeId || null;
+    }
+    if (!controllerId && vehicle.assignedDriver?.department) {
+        controllerId = vehicle.assignedDriver.department.defaultControllerEmployeeId || null;
+    }
+
+    // Fallback to Vehicle's Department
+    if (!dispatcherId && vehicle.department) {
+        dispatcherId = vehicle.department.defaultDispatcherEmployeeId || null;
+    }
+    if (!controllerId && vehicle.department) {
+        controllerId = vehicle.department.defaultControllerEmployeeId || null;
+    }
+
+    // Lastly, default to null. Frontend can fill if user manually selects.
+
+    // Odometer: Last Waybill End -> Vehicle Mileage -> 0
+    let odometerStart = lastWaybill?.odometerEnd ? Number(lastWaybill.odometerEnd) : Number(vehicle.mileage);
+
+    // Fuel: Tank Balance -> Last Waybill Fuel End -> Vehicle Current Fuel -> 0
+    let fuelStart = tankBalance;
+
+    // Fallback logic:
+    // 1. If we have a tank balance from Stock (and it's not null), we usually trust it.
+    // 2. BUT if this is the FIRST waybill (no lastWaybill) and Stock is 0 (no history), 
+    //    we should trust the manual 'currentFuel' from the Vehicle card (Initial Balance).
+    if (fuelStart === null || (fuelStart === 0 && !lastWaybill)) {
+        // Try to get confirmation from last waybill if available
+        if (lastWaybill) {
+            const lastFuelLine = vehicle.fuelStockItemId
+                ? lastWaybill.fuelLines.find(fl => fl.stockItemId === vehicle.fuelStockItemId)
+                : lastWaybill.fuelLines[0];
+            const lastFuelEnd = lastFuelLine?.fuelEnd;
+
+            // If we have history, trusting Stock=0 is safer, unless that history is broken.
+            // But if we are here, 'fuelStart' (Stock) is null or 0.
+            // If last waybill exists, usually we should trust Stock or Last Waybill.
+            if (fuelStart === null) {
+                fuelStart = lastFuelEnd ? Number(lastFuelEnd) : Number(vehicle.currentFuel);
+            }
+        } else {
+            // No history. Stock says 0 (or null). Trust Vehicle Card.
+            fuelStart = Number(vehicle.currentFuel);
+        }
+    }
+
+    return {
+        driverId,
+        // dispatcherEmployeeId and controllerEmployeeId moved to end for normalization
+        odometerStart,
+        fuelStart,
+        fuelStockItemId: vehicle.fuelStockItemId,
+        tankBalance,
+        lastWaybillId: lastWaybill?.id || null,
+        lastWaybillNumber: lastWaybill?.number || null,
+        lastWaybillDate: lastWaybill?.date || null,
+        // Normalized naming for frontend compatibility
+        dispatcherEmployeeId: dispatcherId,
+        controllerEmployeeId: controllerId,
+    };
 }
 

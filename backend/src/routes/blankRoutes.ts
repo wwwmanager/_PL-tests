@@ -33,3 +33,6 @@ router.get('/summary/driver/:driverId', checkPermission('blank.read'), blankCont
 
 // REL-501: Get available blanks for driver (blanks in ISSUED status for waybill selection)
 router.get('/available/:driverId', checkPermission('blank.read'), blankController.getAvailableBlanks);
+
+// BLS-REL-001: Release reserved blank back to ISSUED status
+router.post('/:id/release', checkPermission('blank.update'), blankController.releaseBlank);

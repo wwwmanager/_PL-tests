@@ -35,7 +35,8 @@ const storageSchema = z.object({
     type: z.enum(['centralWarehouse', 'remoteWarehouse', 'vehicleTank', 'contractorWarehouse']),
     organizationId: z.string().min(1, "Организация обязательна"),
     address: z.string().optional().nullable(),
-    responsiblePerson: z.string().optional().nullable(),
+    // FIX: Changed from responsiblePerson (string) to responsibleEmployeeId (UUID)
+    responsibleEmployeeId: z.string().optional().nullable(),
     description: z.string().optional().nullable(),
     status: z.enum(['active', 'archived']),
 });
@@ -114,7 +115,7 @@ const StorageManagement = () => {
             type: 'centralWarehouse',
             organizationId: organizations[0]?.id || '',
             address: '',
-            responsiblePerson: '',
+            responsibleEmployeeId: '',
             description: '',
             status: 'active',
         });
@@ -215,10 +216,10 @@ const StorageManagement = () => {
                                 {organizations.map(o => <option key={o.id} value={o.id}>{o.shortName}</option>)}
                             </FormSelect>
                         </FormField>
-                        <FormField label="Ответственное лицо" error={errors.responsiblePerson?.message}>
-                            <FormSelect {...register("responsiblePerson")}>
+                        <FormField label="Ответственное лицо" error={errors.responsibleEmployeeId?.message}>
+                            <FormSelect {...register("responsibleEmployeeId")}>
                                 <option value="">Выберите</option>
-                                {employees.map(e => <option key={e.id} value={e.fullName}>{e.fullName}</option>)}
+                                {employees.map(e => <option key={e.id} value={e.id}>{e.fullName}</option>)}
                             </FormSelect>
                         </FormField>
                         <div className="md:col-span-2"><FormField label="Адрес" error={errors.address?.message}><FormInput {...register("address")} /></FormField></div>

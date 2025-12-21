@@ -131,3 +131,22 @@ export async function getAvailableBlanks(req: Request, res: Response, next: Next
         next(err);
     }
 }
+
+/**
+ * BLS-REL-001: Release a reserved blank back to ISSUED status
+ * POST /blanks/:id/release
+ * Used when a waybill creation is cancelled and the blank should be returned to the driver
+ */
+export async function releaseBlank(req: Request, res: Response, next: NextFunction) {
+    try {
+        const { id } = req.params;
+        const orgId = req.user!.organizationId;
+        console.log(`🎫 [blankController] POST /blanks/${id}/release request received`);
+
+        const result = await blankService.releaseBlank(orgId, id);
+        res.json({ success: true, blank: result });
+    } catch (err) {
+        console.error(`❌ [blankController] releaseBlank error for blankId ${req.params.id}:`, err);
+        next(err);
+    }
+}

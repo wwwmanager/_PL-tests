@@ -36,11 +36,12 @@ export async function getWarehouseById(req: Request, res: Response, next: NextFu
 
 /**
  * Create new warehouse
+ * WH-FIX-RESP-LOC-001: Added support for responsibleEmployeeId and other fields
  */
 export async function createWarehouse(req: Request, res: Response, next: NextFunction) {
     try {
         const organizationId = req.user!.organizationId;
-        const { name, address, departmentId } = req.body;
+        const { name, address, departmentId, responsibleEmployeeId, description, type, status } = req.body;
 
         // Validation
         if (!name || typeof name !== 'string' || name.trim().length === 0) {
@@ -51,7 +52,11 @@ export async function createWarehouse(req: Request, res: Response, next: NextFun
             organizationId,
             name: name.trim(),
             address: address || null,
-            departmentId: departmentId || null
+            departmentId: departmentId || null,
+            responsibleEmployeeId: responsibleEmployeeId || null,
+            description: description || null,
+            type: type || null,
+            status: status || 'active',
         });
 
         res.status(201).json({ data: warehouse });
@@ -62,17 +67,22 @@ export async function createWarehouse(req: Request, res: Response, next: NextFun
 
 /**
  * Update warehouse
+ * WH-FIX-RESP-LOC-001: Added support for responsibleEmployeeId and other fields
  */
 export async function updateWarehouse(req: Request, res: Response, next: NextFunction) {
     try {
         const organizationId = req.user!.organizationId;
         const { id } = req.params;
-        const { name, address, departmentId } = req.body;
+        const { name, address, departmentId, responsibleEmployeeId, description, type, status } = req.body;
 
         const warehouse = await warehouseService.updateWarehouse(organizationId, id, {
             name,
             address,
-            departmentId
+            departmentId,
+            responsibleEmployeeId,
+            description,
+            type,
+            status,
         });
 
         res.json({ data: warehouse });

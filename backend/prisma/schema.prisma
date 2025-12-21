@@ -183,6 +183,12 @@ model Department {
   stockItems       StockItem[]  // REL-201
   resetRulesForDept FuelCardResetRule[] @relation("ResetRuleDepartment")  // REL-105
 
+  // WB-PREFILL-010: Default personnel
+  defaultDispatcherEmployeeId String? @db.Uuid
+  defaultControllerEmployeeId String? @db.Uuid
+  defaultDispatcher           Employee? @relation("DeptDefaultDispatcher", fields: [defaultDispatcherEmployeeId], references: [id], onDelete: SetNull)
+  defaultController           Employee? @relation("DeptDefaultController", fields: [defaultControllerEmployeeId], references: [id], onDelete: SetNull)
+
   @@map("departments")
 }
 
@@ -326,6 +332,16 @@ model Employee {
   controlledEmployees  Employee[]    @relation("EmployeeController")
   driver               Driver?
   user                 User?
+
+  // WB-PREFILL-010: Back-relations
+  waybillsAsDispatcher Waybill[] @relation("WaybillDispatcher")
+  waybillsAsController Waybill[] @relation("WaybillController")
+  
+  defaultForDispatcherDepartments Department[] @relation("DeptDefaultDispatcher")
+  defaultForControllerDepartments Department[] @relation("DeptDefaultController")
+  
+  // WH-FIX-RESP-LOC-001: Back-relation for warehouse responsible
+  responsibleForWarehouses Warehouse[] @relation("WarehouseResponsible")
 
   @@map("employees")
 }
@@ -514,21 +530,28 @@ model StockItem {
 }
 
 model Warehouse {
-  id             String   @id @default(uuid()) @db.Uuid
-  organizationId String   @db.Uuid
-  departmentId   String?  @db.Uuid
-  name           String   @db.Text
-  address        String?  @db.Text
-  createdAt      DateTime @default(now()) @db.Timestamp(6)
-  updatedAt      DateTime @default(now()) @updatedAt @db.Timestamp(6)
+  id                    String   @id @default(uuid()) @db.Uuid
+  organizationId        String   @db.Uuid
+  departmentId          String?  @db.Uuid
+  name                  String   @db.Text
+  address               String?  @db.Text
+  // WH-FIX-RESP-LOC-001: New fields
+  responsibleEmployeeId String?  @db.Uuid
+  description           String?  @db.Text
+  type                  String?  @db.Text  // centralWarehouse, remoteWarehouse, vehicleTank, contractorWarehouse
+  status                String   @default("active") @db.Text  // active, archived
+  createdAt             DateTime @default(now()) @db.Timestamp(6)
+  updatedAt             DateTime @default(now()) @updatedAt @db.Timestamp(6)
 
   organization          Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   department            Department?     @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  responsibleEmployee   Employee?       @relation("WarehouseResponsible", fields: [responsibleEmployeeId], references: [id], onDelete: SetNull)
   defaultForDepartments Department[]    @relation("DefaultWarehouse") // WH-DEC-001
   stockMovements        StockMovement[]
   vehicles              Vehicle[]
   stockLocation         StockLocation? @relation("WarehouseLocation")
 
+  @@index([organizationId, responsibleEmployeeId])
   @@map("warehouses")
 }
 
@@ -717,6 +740,11 @@ model Waybill {
   startAt           DateTime?     @db.Timestamp(6)  // время выезда
   endAt             DateTime?     @db.Timestamp(6)  // время возврата
   
+  // WB-FIX-PL-001: Ответственные и срок действия
+  dispatcherEmployeeId String?    @db.Uuid
+  controllerEmployeeId String?    @db.Uuid
+  validTo              DateTime?  @db.Timestamp(6)
+  
   createdByUserId   String?       @db.Uuid
   approvedByUserId  String?       @db.Uuid
   completedByUserId String?       @db.Uuid
@@ -733,7 +761,10 @@ model Waybill {
   createdByUser   User?        @relation("WaybillCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
   approvedByUser  User?        @relation("WaybillApprovedBy", fields: [approvedByUserId], references: [id], onDelete: SetNull)
   completedByUser User?        @relation("WaybillCompletedBy", fields: [completedByUserId], references: [id], onDelete: SetNull)
-
+  
+  dispatcherEmployee Employee? @relation("WaybillDispatcher", fields: [dispatcherEmployeeId], references: [id], onDelete: SetNull)
+  controllerEmployee Employee? @relation("WaybillController", fields: [controllerEmployeeId], references: [id], onDelete: SetNull)
+  
   routes    WaybillRoute[]
   fuelLines WaybillFuel[]
 

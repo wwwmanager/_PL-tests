@@ -11,7 +11,7 @@ import {
     getBlankBatches, createBlankBatch, materializeBatch,
     issueBlanksToDriver,
     searchBlanks, spoilBlank, bulkSpoilBlanks, countBlanksByFilter,
-    getBlanks
+    getBlanks, releaseBlank
 } from '../../services/blankApi';
 import { useToast } from '../../hooks/useToast';
 import useTable from '../../hooks/useTable';
@@ -348,6 +348,7 @@ const BlankList: React.FC<{ key: number }> = () => {
     };
 
     const canBeSpoiled = (status: BlankStatus) => status === 'available' || status === 'issued';
+    const canBeReleased = (status: BlankStatus) => status === 'reserved';  // BLS-REL-001
     const isSpoilAllowed = can('blanks.spoil.self') || can('blanks.spoil.warehouse') || can('blanks.spoil.override');
 
     const onSelectPage = (checked: boolean) => {
@@ -403,6 +404,17 @@ const BlankList: React.FC<{ key: number }> = () => {
         fetchData(filters, pagination.page, pagination.pageSize);
         setSelection({ mode: 'none', selectedIds: new Set(), excludedIds: new Set() });
     }
+
+    // BLS-REL-001: Handle release of reserved blank
+    const handleReleaseBlank = async (blankId: string) => {
+        try {
+            await releaseBlank(blankId);
+            showToast('Резерв бланка снят, возвращён водителю', 'success');
+            fetchData(filters, pagination.page, pagination.pageSize);
+        } catch (e) {
+            showToast('Ошибка снятия резерва: ' + (e as Error).message, 'error');
+        }
+    };
 
     return (
         <div>
@@ -467,6 +479,12 @@ const BlankList: React.FC<{ key: number }> = () => {
                                         {isSpoilAllowed && canBeSpoiled(b.status) && (
                                             <button onClick={() => setSpoilModalData({ blank: { id: b.id, series: b.series, number: parseInt(b.number, 10), organizationId: b.organizationId }, reason: '' })} className="p-1" title="Испортить/списать бланк">
                                                 <TrashIcon className="h-5 w-5 text-yellow-600" />
+                                            </button>
+                                        )}
+                                        {/* BLS-REL-001: Release reserved blank */}
+                                        {canBeReleased(b.status) && (
+                                            <button onClick={() => handleReleaseBlank(b.id)} className="p-1 ml-1 text-blue-600 hover:text-blue-800" title="Снять резерв (вернуть водителю)">
+                                                ↩️
                                             </button>
                                         )}
                                     </td>

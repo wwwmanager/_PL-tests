@@ -107,5 +107,18 @@ export async function useBlankForWaybill(
     return response.data;
 }
 
+/**
+ * BLS-REL-001: Release a reserved blank back to ISSUED status
+ * Used when a waybill creation is cancelled and the blank should be returned to the driver
+ * 
+ * @param blankId - Blank ID to release
+ * @returns Success status and updated blank
+ */
+export async function releaseBlank(blankId: string): Promise<{ success: boolean; blank: WaybillBlank }> {
+    const response = await httpClient.post<{ success: boolean; blank: WaybillBlank }>(`/blanks/${blankId}/release`, {});
+    return response;
+}
+
 // Re-export types
 export type { DriverBlankRange, DriverBlankSummary } from './api/realBlankApi';
+
