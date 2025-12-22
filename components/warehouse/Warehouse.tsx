@@ -3,9 +3,10 @@ import { CubeIcon } from '../Icons';
 import FuelBalances from './FuelBalances';
 import FuelMovements from './FuelMovements';
 import StockItemList from './StockItemList';
+import FuelManagement from '../admin/FuelManagement';
 import { RequireCapability } from '../../services/auth';
 
-type Tab = 'nomenclature' | 'balances' | 'movements';
+type Tab = 'nomenclature' | 'balances' | 'movements' | 'fuel-cards';
 
 const Warehouse: React.FC = () => {
     const [activeTab, setActiveTab] = useState<Tab>('nomenclature');
@@ -54,6 +55,16 @@ const Warehouse: React.FC = () => {
                         >
                             Журнал движений
                         </button>
+                        <button
+                            data-testid="tab-fuel-cards"
+                            onClick={() => setActiveTab('fuel-cards')}
+                            className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === 'fuel-cards'
+                                ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+                                : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
+                                }`}
+                        >
+                            💳 Топливные карты
+                        </button>
                     </nav>
                 </div>
 
@@ -83,6 +94,15 @@ const Warehouse: React.FC = () => {
                             </div>
                         }>
                             <FuelMovements />
+                        </RequireCapability>
+                    )}
+                    {activeTab === 'fuel-cards' && (
+                        <RequireCapability cap="stock.read" fallback={
+                            <div className="p-8 text-center text-gray-500">
+                                У вас нет прав для управления топливными картами.
+                            </div>
+                        }>
+                            <FuelManagement />
                         </RequireCapability>
                     )}
                 </div>
