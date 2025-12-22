@@ -385,8 +385,8 @@ export interface FuelCardAssignment {
  * Get all fuel cards
  */
 export async function getFuelCards(): Promise<FuelCard[]> {
-    const response = await httpClient.get<ApiResponse<FuelCard[]>>('/fuel-cards');
-    return response.data || [];
+    const response = await httpClient.get<FuelCard[]>('/fuel-cards');
+    return response || [];
 }
 
 /**
@@ -500,8 +500,8 @@ export async function previewResetRules(ruleId?: string): Promise<{ processed: n
  */
 export async function getOrCreateFuelCardLocation(fuelCardId: string): Promise<StockLocation> {
     console.log('📡 [stockApi] Getting/creating fuel card location for:', fuelCardId);
-    const response = await httpClient.post<ApiResponse<StockLocation>>('/stock/locations/fuel-card', { fuelCardId });
-    return response.data;
+    const response = await httpClient.post<StockLocation>('/stock/locations/fuel-card', { fuelCardId });
+    return response;
 }
 
 /**
@@ -513,7 +513,7 @@ export async function getStockItems(isFuel?: boolean): Promise<BackendStockItem[
     if (isFuel !== undefined) {
         url += `?isFuel=${isFuel}`;
     }
-    const response = await httpClient.get<ApiResponse<BackendStockItem[]>>(url);
+    const response = await httpClient.get<{ data: BackendStockItem[] }>(url);
     return response.data || [];
 }
 
@@ -552,7 +552,7 @@ export interface CreateTransferParams {
 
 export async function createTransferMovement(params: CreateTransferParams): Promise<StockMovementV2> {
     console.log('📡 [stockApi] Creating TRANSFER movement:', params);
-    const response = await httpClient.post<ApiResponse<StockMovementV2>>('/stock/movements/v2', {
+    const response = await httpClient.post<StockMovementV2>('/stock/movements/v2', {
         movementType: 'TRANSFER',
         stockItemId: params.stockItemId,
         quantity: String(params.quantity), // Backend expects string decimal
@@ -562,7 +562,7 @@ export async function createTransferMovement(params: CreateTransferParams): Prom
         externalRef: params.externalRef,
         comment: params.comment,
     });
-    return response.data;
+    return response;
 }
 
 /**
