@@ -477,3 +477,84 @@ export async function previewResetRules(ruleId?: string): Promise<{ processed: n
     return response.data || { processed: 0, reset: 0, skipped: 0 };
 }
 
+// ==================== FUEL-TOPUP-001: MANUAL TOP-UP ====================
+
+/**
+ * Get or create a stock location for a fuel card
+ * Used as the destination for manual top-up transfers
+ */
+export async function getOrCreateFuelCardLocation(fuelCardId: string): Promise<StockLocation> {
+    console.log('📡 [stockApi] Getting/creating fuel card location for:', fuelCardId);
+    const response = await httpClient.post<ApiResponse<StockLocation>>('/stock/locations/fuel-card', { fuelCardId });
+    return response.data;
+}
+
+/**
+ * Get stock items (fuel types) for top-up dropdown
+ */
+export async function getStockItems(isFuel?: boolean): Promise<BackendStockItem[]> {
+    console.log('📡 [stockApi] Fetching stock items...');
+    let url = '/stock/items';
+    if (isFuel !== undefined) {
+        url += `?isFuel=${isFuel}`;
+    }
+    const response = await httpClient.get<ApiResponse<BackendStockItem[]>>(url);
+    return response.data || [];
+}
+
+export interface StockItemOption {
+    id: string;
+    name: string;
+    code: string | null;
+    unit: string;
+}
+
+/**
+ * Get fuel types for top-up selector
+ */
+export async function getFuelTypes(): Promise<StockItemOption[]> {
+    const items = await getStockItems(true);
+    return items.map(item => ({
+        id: item.id,
+        name: item.name,
+        code: item.code,
+        unit: item.unit,
+    }));
+}
+
+/**
+ * Create a TRANSFER movement (used for manual top-up)
+ */
+export interface CreateTransferParams {
+    stockItemId: string;
+    quantity: number;
+    fromLocationId: string;
+    toLocationId: string;
+    occurredAt: string; // ISO date string
+    externalRef: string;
+    comment?: string;
+}
+
+export async function createTransferMovement(params: CreateTransferParams): Promise<StockMovementV2> {
+    console.log('📡 [stockApi] Creating TRANSFER movement:', params);
+    const response = await httpClient.post<ApiResponse<StockMovementV2>>('/stock/movements/v2', {
+        movementType: 'TRANSFER',
+        stockItemId: params.stockItemId,
+        quantity: String(params.quantity), // Backend expects string decimal
+        fromLocationId: params.fromLocationId,
+        toLocationId: params.toLocationId,
+        occurredAt: params.occurredAt,
+        externalRef: params.externalRef,
+        comment: params.comment,
+    });
+    return response.data;
+}
+
+/**
+ * Get warehouses for source location dropdown
+ */
+export async function getWarehouses(): Promise<StockLocation[]> {
+    const locations = await getStockLocations();
+    return locations.filter(loc => loc.type === 'WAREHOUSE');
+}
+

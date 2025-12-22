@@ -18,12 +18,17 @@ import {
     runTopUpJob,
     runResetRules,
     previewResetRules,
+    getOrCreateFuelCardLocation,
+    getFuelTypes,
+    getWarehouses,
+    createTransferMovement,
     type LocationBalance,
     type StockMovementV2,
     type FuelCard,
     type StockLocation,
     type TopUpRule,
     type ResetRule,
+    type StockItemOption,
 } from '../../services/stockApi';
 import DataTable from '../shared/DataTable';
 import CollapsibleSection from '../shared/CollapsibleSection';
@@ -281,11 +286,201 @@ function MovementsTab() {
     );
 }
 
+// ==================== MANUAL TOP-UP MODAL ====================
+
+interface ManualTopUpModalProps {
+    card: FuelCard;
+    isOpen: boolean;
+    onClose: () => void;
+    onSuccess: () => void;
+}
+
+function ManualTopUpModal({ card, isOpen, onClose, onSuccess }: ManualTopUpModalProps) {
+    const [fuelTypes, setFuelTypes] = useState<StockItemOption[]>([]);
+    const [warehouses, setWarehouses] = useState<StockLocation[]>([]);
+    const [loading, setLoading] = useState(false);
+    const [submitting, setSubmitting] = useState(false);
+    const { showToast } = useToast();
+
+    const [formData, setFormData] = useState({
+        stockItemId: '',
+        fromLocationId: '',
+        quantity: '',
+        occurredAt: new Date().toISOString().slice(0, 16),
+        comment: '',
+    });
+
+    useEffect(() => {
+        if (isOpen) {
+            setLoading(true);
+            Promise.all([getFuelTypes(), getWarehouses()])
+                .then(([fuels, whs]) => {
+                    setFuelTypes(fuels);
+                    setWarehouses(whs);
+                    if (fuels.length > 0) setFormData(f => ({ ...f, stockItemId: fuels[0].id }));
+                    if (whs.length > 0) setFormData(f => ({ ...f, fromLocationId: whs[0].id }));
+                })
+                .catch(err => showToast('Ошибка загрузки данных: ' + err.message, 'error'))
+                .finally(() => setLoading(false));
+        }
+    }, [isOpen]);
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+
+        if (!formData.stockItemId || !formData.fromLocationId || !formData.quantity) {
+            showToast('Заполните все обязательные поля', 'error');
+            return;
+        }
+
+        const qty = parseFloat(formData.quantity);
+        if (isNaN(qty) || qty <= 0) {
+            showToast('Количество должно быть положительным числом', 'error');
+            return;
+        }
+
+        setSubmitting(true);
+        try {
+            // 1. Get or create fuel card location
+            const cardLocation = await getOrCreateFuelCardLocation(card.id);
+            console.log('📡 [ManualTopUp] Card location:', cardLocation);
+
+            // 2. Create TRANSFER movement
+            const externalRef = `MANUAL_TOPUP:${crypto.randomUUID()}`;
+            const occurredAt = new Date(formData.occurredAt).toISOString();
+
+            await createTransferMovement({
+                stockItemId: formData.stockItemId,
+                quantity: qty,
+                fromLocationId: formData.fromLocationId,
+                toLocationId: cardLocation.id,
+                occurredAt,
+                externalRef,
+                comment: formData.comment || `Ручное пополнение карты ${card.cardNumber}`,
+            });
+
+            showToast(`Карта ${card.cardNumber} пополнена на ${qty} л`, 'success');
+            onSuccess();
+            onClose();
+        } catch (err: any) {
+            console.error('[ManualTopUp] Error:', err);
+            showToast('Ошибка пополнения: ' + (err.message || 'Неизвестная ошибка'), 'error');
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    return (
+        <Modal isOpen={isOpen} onClose={onClose} title={`Пополнить карту ${card.cardNumber}`}>
+            {loading ? (
+                <div className="text-center py-8">Загрузка...</div>
+            ) : (
+                <form onSubmit={handleSubmit} className="space-y-4">
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Тип топлива *
+                        </label>
+                        <select
+                            value={formData.stockItemId}
+                            onChange={(e) => setFormData(f => ({ ...f, stockItemId: e.target.value }))}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                            required
+                        >
+                            <option value="">Выберите...</option>
+                            {fuelTypes.map(ft => (
+                                <option key={ft.id} value={ft.id}>{ft.name}</option>
+                            ))}
+                        </select>
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Склад-источник *
+                        </label>
+                        <select
+                            value={formData.fromLocationId}
+                            onChange={(e) => setFormData(f => ({ ...f, fromLocationId: e.target.value }))}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                            required
+                        >
+                            <option value="">Выберите...</option>
+                            {warehouses.map(wh => (
+                                <option key={wh.id} value={wh.id}>{wh.name}</option>
+                            ))}
+                        </select>
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Количество (л) *
+                        </label>
+                        <input
+                            type="number"
+                            step="0.01"
+                            min="0.01"
+                            value={formData.quantity}
+                            onChange={(e) => setFormData(f => ({ ...f, quantity: e.target.value }))}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                            placeholder="например: 50.00"
+                            required
+                        />
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Дата/время операции
+                        </label>
+                        <input
+                            type="datetime-local"
+                            value={formData.occurredAt}
+                            onChange={(e) => setFormData(f => ({ ...f, occurredAt: e.target.value }))}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                        />
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Комментарий
+                        </label>
+                        <input
+                            type="text"
+                            value={formData.comment}
+                            onChange={(e) => setFormData(f => ({ ...f, comment: e.target.value }))}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                            placeholder="Необязательно"
+                        />
+                    </div>
+
+                    <div className="flex justify-end gap-2 pt-4 border-t">
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            className="px-4 py-2 text-gray-600 hover:text-gray-800"
+                            disabled={submitting}
+                        >
+                            Отмена
+                        </button>
+                        <button
+                            type="submit"
+                            disabled={submitting}
+                            className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50"
+                        >
+                            {submitting ? 'Пополнение...' : '💳 Пополнить'}
+                        </button>
+                    </div>
+                </form>
+            )}
+        </Modal>
+    );
+}
+
 // ==================== FUEL CARDS TAB ====================
 
 function FuelCardsTab() {
     const [cards, setCards] = useState<FuelCard[]>([]);
     const [loading, setLoading] = useState(false);
+    const [selectedCard, setSelectedCard] = useState<FuelCard | null>(null);
+    const [topUpModalOpen, setTopUpModalOpen] = useState(false);
     const { showToast } = useToast();
 
     const loadCards = async () => {
@@ -304,6 +499,16 @@ function FuelCardsTab() {
         loadCards();
     }, []);
 
+    const handleTopUp = (card: FuelCard) => {
+        setSelectedCard(card);
+        setTopUpModalOpen(true);
+    };
+
+    const handleTopUpSuccess = () => {
+        loadCards();
+        // Note: Balance will be visible in Balances tab (ledger source of truth)
+    };
+
     const columns = [
         { key: 'cardNumber', label: 'Номер карты', sortable: true },
         { key: 'provider', label: 'Поставщик', sortable: true },
@@ -317,18 +522,31 @@ function FuelCardsTab() {
                 </span>
             )
         },
+        // FUEL-TOPUP-006: Removed balanceLiters column - use Balances tab for accurate ledger data
         {
-            key: 'balanceLiters',
-            label: 'Баланс (л)',
-            sortable: true,
-            render: (row: FuelCard) => row.balanceLiters.toFixed(2)
+            key: 'actions',
+            label: 'Действия',
+            render: (row: FuelCard) => (
+                <button
+                    onClick={() => handleTopUp(row)}
+                    className="px-3 py-1 bg-green-500 text-white rounded text-sm hover:bg-green-600"
+                    title="Пополнить карту"
+                >
+                    💳 Пополнить
+                </button>
+            )
         },
     ];
 
     return (
         <div className="space-y-4">
             <div className="flex justify-between items-center">
-                <h3 className="text-lg font-medium">Топливные карты</h3>
+                <div>
+                    <h3 className="text-lg font-medium">Топливные карты</h3>
+                    <p className="text-sm text-gray-500">
+                        💡 Баланс карт смотрите во вкладке <strong>"Балансы"</strong> (данные из ledger)
+                    </p>
+                </div>
                 <button
                     onClick={loadCards}
                     disabled={loading}
@@ -344,6 +562,18 @@ function FuelCardsTab() {
                 keyField="id"
                 emptyMessage="Нет топливных карт"
             />
+
+            {selectedCard && (
+                <ManualTopUpModal
+                    card={selectedCard}
+                    isOpen={topUpModalOpen}
+                    onClose={() => {
+                        setTopUpModalOpen(false);
+                        setSelectedCard(null);
+                    }}
+                    onSuccess={handleTopUpSuccess}
+                />
+            )}
         </div>
     );
 }
@@ -497,8 +727,8 @@ export default function FuelManagement() {
         <button
             onClick={() => setActiveTab(tab)}
             className={`px-4 py-2 rounded-t-lg font-medium transition-colors flex items-center gap-2 ${activeTab === tab
-                    ? 'bg-white text-blue-600 border-b-2 border-blue-600'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                ? 'bg-white text-blue-600 border-b-2 border-blue-600'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                 }`}
         >
             <span>{icon}</span>
