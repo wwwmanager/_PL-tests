@@ -22,6 +22,7 @@ import {
     getFuelTypes,
     getWarehouses,
     createTransferMovement,
+    createFuelCard,
     type LocationBalance,
     type StockMovementV2,
     type FuelCard,
@@ -474,6 +475,117 @@ function ManualTopUpModal({ card, isOpen, onClose, onSuccess }: ManualTopUpModal
     );
 }
 
+// ==================== CREATE FUEL CARD MODAL ====================
+
+interface CreateFuelCardModalProps {
+    isOpen: boolean;
+    onClose: () => void;
+    onSuccess: () => void;
+}
+
+function CreateFuelCardModal({ isOpen, onClose, onSuccess }: CreateFuelCardModalProps) {
+    const [submitting, setSubmitting] = useState(false);
+    const { showToast } = useToast();
+
+    const [formData, setFormData] = useState({
+        cardNumber: '',
+        provider: '',
+        isActive: true,
+    });
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+
+        if (!formData.cardNumber.trim()) {
+            showToast('Введите номер карты', 'error');
+            return;
+        }
+
+        setSubmitting(true);
+        try {
+            await createFuelCard({
+                cardNumber: formData.cardNumber.trim(),
+                provider: formData.provider.trim() || undefined,
+                isActive: formData.isActive,
+            });
+
+            showToast(`Карта ${formData.cardNumber} создана`, 'success');
+            setFormData({ cardNumber: '', provider: '', isActive: true });
+            onSuccess();
+            onClose();
+        } catch (err: any) {
+            console.error('[CreateFuelCard] Error:', err);
+            showToast('Ошибка создания карты: ' + (err.message || 'Неизвестная ошибка'), 'error');
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    return (
+        <Modal isOpen={isOpen} onClose={onClose} title="Создать топливную карту">
+            <form onSubmit={handleSubmit} className="space-y-4">
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Номер карты *
+                    </label>
+                    <input
+                        type="text"
+                        value={formData.cardNumber}
+                        onChange={(e) => setFormData(f => ({ ...f, cardNumber: e.target.value }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                        placeholder="например: 1234-5678-9012"
+                        required
+                    />
+                </div>
+
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Поставщик
+                    </label>
+                    <input
+                        type="text"
+                        value={formData.provider}
+                        onChange={(e) => setFormData(f => ({ ...f, provider: e.target.value }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                        placeholder="например: Роснефть, Газпромнефть"
+                    />
+                </div>
+
+                <div className="flex items-center gap-2">
+                    <input
+                        type="checkbox"
+                        id="isActive"
+                        checked={formData.isActive}
+                        onChange={(e) => setFormData(f => ({ ...f, isActive: e.target.checked }))}
+                        className="w-4 h-4"
+                    />
+                    <label htmlFor="isActive" className="text-sm text-gray-700">
+                        Активна
+                    </label>
+                </div>
+
+                <div className="flex justify-end gap-2 pt-4 border-t">
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        className="px-4 py-2 text-gray-600 hover:text-gray-800"
+                        disabled={submitting}
+                    >
+                        Отмена
+                    </button>
+                    <button
+                        type="submit"
+                        disabled={submitting}
+                        className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+                    >
+                        {submitting ? 'Создание...' : '➕ Создать'}
+                    </button>
+                </div>
+            </form>
+        </Modal>
+    );
+}
+
 // ==================== FUEL CARDS TAB ====================
 
 function FuelCardsTab() {
@@ -481,6 +593,7 @@ function FuelCardsTab() {
     const [loading, setLoading] = useState(false);
     const [selectedCard, setSelectedCard] = useState<FuelCard | null>(null);
     const [topUpModalOpen, setTopUpModalOpen] = useState(false);
+    const [createModalOpen, setCreateModalOpen] = useState(false);
     const { showToast } = useToast();
 
     const loadCards = async () => {
@@ -547,20 +660,28 @@ function FuelCardsTab() {
                         💡 Баланс карт смотрите во вкладке <strong>"Балансы"</strong> (данные из ledger)
                     </p>
                 </div>
-                <button
-                    onClick={loadCards}
-                    disabled={loading}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
-                >
-                    {loading ? 'Загрузка...' : 'Обновить'}
-                </button>
+                <div className="flex gap-2">
+                    <button
+                        onClick={() => setCreateModalOpen(true)}
+                        className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
+                    >
+                        ➕ Создать карту
+                    </button>
+                    <button
+                        onClick={loadCards}
+                        disabled={loading}
+                        className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+                    >
+                        {loading ? 'Загрузка...' : 'Обновить'}
+                    </button>
+                </div>
             </div>
 
             <DataTable
                 columns={columns}
                 data={cards}
                 keyField="id"
-                emptyMessage="Нет топливных карт"
+                emptyMessage="Нет топливных карт. Нажмите «Создать карту» чтобы добавить."
             />
 
             {selectedCard && (
@@ -574,9 +695,16 @@ function FuelCardsTab() {
                     onSuccess={handleTopUpSuccess}
                 />
             )}
+
+            <CreateFuelCardModal
+                isOpen={createModalOpen}
+                onClose={() => setCreateModalOpen(false)}
+                onSuccess={loadCards}
+            />
         </div>
     );
 }
+
 
 // ==================== RULES TAB ====================
 

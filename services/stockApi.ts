@@ -390,6 +390,21 @@ export async function getFuelCards(): Promise<FuelCard[]> {
 }
 
 /**
+ * Create a new fuel card
+ */
+export interface CreateFuelCardParams {
+    cardNumber: string;
+    provider?: string;
+    isActive?: boolean;
+}
+
+export async function createFuelCard(params: CreateFuelCardParams): Promise<FuelCard> {
+    console.log('📡 [stockApi] Creating fuel card:', params);
+    const response = await httpClient.post<ApiResponse<FuelCard>>('/fuel-cards', params);
+    return response.data;
+}
+
+/**
  * Get assignment history for a fuel card
  */
 export async function getCardAssignments(fuelCardId: string): Promise<FuelCardAssignment[]> {
