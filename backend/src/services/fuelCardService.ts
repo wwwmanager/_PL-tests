@@ -1,5 +1,6 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, TopUpScheduleType } from '@prisma/client';
 import { BadRequestError, NotFoundError } from '../utils/errors';
+import { computeNextRunAt } from '../utils/topUpUtils';
 
 const prisma = new PrismaClient();
 
@@ -296,10 +297,7 @@ export async function upsertTopUpRule(
         where: { organizationId, fuelCardId }
     });
 
-    const nextRunAt = new Date();
-    if (data.scheduleType === 'DAILY') nextRunAt.setUTCDate(nextRunAt.getUTCDate() + 1);
-    if (data.scheduleType === 'WEEKLY') nextRunAt.setUTCDate(nextRunAt.getUTCDate() + 7);
-    if (data.scheduleType === 'MONTHLY') nextRunAt.setUTCMonth(nextRunAt.getUTCMonth() + 1);
+    const nextRunAt = computeNextRunAt(new Date(), data.scheduleType as TopUpScheduleType);
 
     if (existing) {
         return prisma.fuelCardTopUpRule.update({
