@@ -465,7 +465,7 @@ export interface CreateTopUpRuleParams {
 }
 
 export async function createTopUpRule(fuelCardId: string, data: CreateTopUpRuleParams): Promise<TopUpRule> {
-    const response = await httpClient.post<ApiResponse<TopUpRule>>(`/fuel-cards/${fuelCardId}/topup-rule`, data);
+    const response = await httpClient.put<ApiResponse<TopUpRule>>(`/fuel-cards/${fuelCardId}/topup-rule`, data);
     return response.data;
 }
 
