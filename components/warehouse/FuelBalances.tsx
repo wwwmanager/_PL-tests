@@ -19,21 +19,31 @@ const FuelBalances: React.FC = () => {
     const loadData = useCallback(async () => {
         setLoading(true);
         try {
-            const [balancesData, itemsData] = await Promise.all([
-                getStockBalances(filters.stockItemId, new Date(asOf)),
-                getStockItems(true),
-            ]);
-            setItems(itemsData);
-            if (!filters.stockItemId && itemsData.length > 0) {
-                setFilters(prev => ({ ...prev, stockItemId: itemsData[0].id }));
+            // First load items if not loaded yet
+            let currentItems = items;
+            if (items.length === 0) {
+                currentItems = await getStockItems(true);
+                setItems(currentItems);
             }
-            setBalances(balancesData);
+
+            // Set default stockItemId if not set
+            let effectiveStockItemId = filters.stockItemId;
+            if (!effectiveStockItemId && currentItems.length > 0) {
+                effectiveStockItemId = currentItems[0].id;
+                setFilters(prev => ({ ...prev, stockItemId: effectiveStockItemId }));
+            }
+
+            // Only fetch balances if we have a stockItemId
+            if (effectiveStockItemId) {
+                const balancesData = await getStockBalances(effectiveStockItemId, new Date(asOf));
+                setBalances(balancesData);
+            }
         } catch (err: any) {
             showToast('Ошибка загрузки данных: ' + err.message, 'error');
         } finally {
             setLoading(false);
         }
-    }, [asOf, showToast]);
+    }, [asOf, filters.stockItemId, showToast, items.length]);
 
     useEffect(() => {
         loadData();

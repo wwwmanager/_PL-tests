@@ -94,3 +94,10 @@ export async function createStockMovement(data: Partial<StockMovementV2> & { occ
     return response.data;
 }
 
+/**
+ * Delete a stock movement
+ * REL-203: Added for movement management
+ */
+export async function deleteStockMovement(id: string): Promise<void> {
+    await httpClient.delete(`/stock/movements/${id}`);
+}

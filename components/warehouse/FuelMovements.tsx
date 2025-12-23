@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { getStockMovements, getStockItems, getStockLocations } from '../../services/api/stockApi';
+import { getStockMovements, getStockItems, getStockLocations, deleteStockMovement } from '../../services/api/stockApi';
 import { StockMovementV2, GarageStockItem, StockLocation } from '../../types';
 import { useToast } from '../../hooks/useToast';
-import { PlusIcon } from '../Icons';
+import { PlusIcon, TrashIcon } from '../Icons';
 import { RequireCapability } from '../../services/auth';
 import MovementCreateModal from './MovementCreateModal';
+import ConfirmationModal from '../shared/ConfirmationModal';
 
 const FuelMovements: React.FC = () => {
     const [movements, setMovements] = useState<StockMovementV2[]>([]);
@@ -14,6 +15,7 @@ const FuelMovements: React.FC = () => {
     const [total, setTotal] = useState(0);
     const [page, setPage] = useState(1);
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+    const [movementToDelete, setMovementToDelete] = useState<StockMovementV2 | null>(null);
     const limit = 20;
 
     const [filters, setFilters] = useState({
@@ -60,6 +62,19 @@ const FuelMovements: React.FC = () => {
         setIsCreateModalOpen(false);
         if (refresh === true) {
             loadData();
+        }
+    };
+
+    const handleDeleteConfirm = async () => {
+        if (!movementToDelete) return;
+        try {
+            await deleteStockMovement(movementToDelete.id);
+            showToast('Операция удалена', 'success');
+            loadData();
+        } catch (err: any) {
+            showToast('Ошибка удаления: ' + err.message, 'error');
+        } finally {
+            setMovementToDelete(null);
         }
     };
 
@@ -182,6 +197,7 @@ const FuelMovements: React.FC = () => {
                             <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Кол-во</th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Локация</th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Основание / Коммент.</th>
+                            <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Действия</th>
                         </tr>
                     </thead>
                     <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-800">
@@ -233,6 +249,17 @@ const FuelMovements: React.FC = () => {
                                                 {m.externalRef && <span className="text-[10px] text-gray-400">ID: {m.externalRef}</span>}
                                             </div>
                                         </td>
+                                        <td className="px-6 py-4 text-center">
+                                            <RequireCapability cap="stock.manage">
+                                                <button
+                                                    onClick={() => setMovementToDelete(m)}
+                                                    className="p-1 text-red-500 hover:text-red-700 transition-colors"
+                                                    title="Удалить операцию"
+                                                >
+                                                    <TrashIcon className="w-4 h-4" />
+                                                </button>
+                                            </RequireCapability>
+                                        </td>
                                     </tr>
                                 );
                             })
@@ -267,6 +294,16 @@ const FuelMovements: React.FC = () => {
             <MovementCreateModal
                 isOpen={isCreateModalOpen}
                 onClose={handleCloseCreateModal}
+            />
+
+            <ConfirmationModal
+                isOpen={!!movementToDelete}
+                onClose={() => setMovementToDelete(null)}
+                onConfirm={handleDeleteConfirm}
+                title="Удалить операцию?"
+                message={`Вы уверены, что хотите удалить операцию от ${movementToDelete ? new Date(movementToDelete.occurredAt).toLocaleString('ru-RU') : ''}? Это повлияет на балансы.`}
+                confirmText="Удалить"
+                confirmButtonClass="bg-red-600 hover:bg-red-700"
             />
         </div>
     );

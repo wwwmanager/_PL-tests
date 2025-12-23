@@ -44,6 +44,7 @@ export interface StockItemFilter {
 
 /**
  * Get all stock items with optional filters
+ * REL-203: Now includes balance calculated from StockMovement
  */
 export async function getAll(filter: StockItemFilter) {
     const { organizationId, categoryEnum, category, isFuel, isActive, search } = filter;
@@ -75,7 +76,7 @@ export async function getAll(filter: StockItemFilter) {
         ];
     }
 
-    return prisma.stockItem.findMany({
+    const items = await prisma.stockItem.findMany({
         where,
         orderBy: [
             { categoryEnum: 'asc' },
@@ -86,6 +87,32 @@ export async function getAll(filter: StockItemFilter) {
             department: { select: { id: true, name: true } },  // REL-201
         },
     });
+
+    // REL-203: Calculate balance for each item from StockMovement
+    // INCOME adds, EXPENSE subtracts, ADJUSTMENT can be +/-, TRANSFER is neutral on this item
+    const balanceResults = await prisma.$queryRaw<{ stockItemId: string; balance: number }[]>`
+        SELECT 
+            "stockItemId",
+            SUM(
+                CASE 
+                    WHEN "movementType" = 'INCOME' THEN quantity
+                    WHEN "movementType" = 'EXPENSE' THEN -quantity
+                    WHEN "movementType" = 'ADJUSTMENT' THEN quantity
+                    ELSE 0
+                END
+            )::numeric AS balance
+        FROM stock_movements
+        WHERE "organizationId" = ${organizationId}::uuid
+          AND "stockItemId" = ANY(${items.map(i => i.id)}::uuid[])
+        GROUP BY "stockItemId"
+    `;
+
+    const balanceMap = new Map(balanceResults.map(b => [b.stockItemId, Number(b.balance) || 0]));
+
+    return items.map(item => ({
+        ...item,
+        balance: balanceMap.get(item.id) || 0,
+    }));
 }
 
 /**
