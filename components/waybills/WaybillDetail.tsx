@@ -932,7 +932,12 @@ export const WaybillDetail: React.FC<WaybillDetailProps> = ({ waybill, isPrefill
       let savedWaybill: Waybill;
 
       // WB-FIX-PL-001: Construct payload with fuel object for aggregate upsert
-      const payload: any = { ...formData };
+      // WB-FIX-ODOMETER-001: Explicit Number conversion to avoid "expected number, received string" error
+      const payload: any = {
+        ...formData,
+        odometerStart: formData.odometerStart != null ? Number(formData.odometerStart) : null,
+        odometerEnd: formData.odometerEnd != null ? Number(formData.odometerEnd) : null,
+      };
 
       // Check if we have fuel data to save
       // We prioritize form data. 
