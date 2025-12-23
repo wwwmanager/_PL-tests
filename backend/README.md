@@ -2,45 +2,6 @@
 
 Backend API для системы управления путевыми листами, построенный на Express.js + Prisma + PostgreSQL.
 
-## 🏗️ Структура проекта
-
-```
-backend/
-├── src/
-│   ├── app.ts               # Express приложение
-│   ├── server.ts            # Точка входа (запуск сервера)
-│   ├── config/
-│   │   └── env.ts           # Конфигурация переменных окружения
-│   ├── db/
-│   │   └── prisma.ts        # Prisma Client
-│   ├── middleware/
-│   │   ├── authMiddleware.ts    # JWT аутентификация
-│   │   └── errorMiddleware.ts   # Обработка ошибок
-│   ├── routes/
-│   │   ├── index.ts
-│   │   ├── authRoutes.ts
-│   │   ├── vehicleRoutes.ts
-│   │   ├── driverRoutes.ts
-│   │   └── waybillRoutes.ts
-│   ├── controllers/
-│   │   ├── authController.ts
-│   │   ├── vehicleController.ts
-│   │   ├── driverController.ts
-│   │   └── waybillController.ts
-│   ├── services/
-│   │   ├── authService.ts
-│   │   ├── vehicleService.ts
-│   │   ├── driverService.ts
-│   │   └── waybillService.ts
-│   └── utils/
-│       ├── jwt.ts
-│       ├── password.ts
-│       └── errors.ts
-├── prisma/
-│   └── schema.prisma
-└── package.json
-```
-
 ## 🚀 Быстрый старт
 
 ### 1. Установка зависимостей
@@ -52,19 +13,20 @@ npm install
 
 ### 2. Настройка окружения
 
-Создайте файл `.env` на основе `.env.template`:
+Создайте файл `.env` на основе `.env.example`:
 
 ```bash
 DATABASE_URL="postgresql://user:password@localhost:5432/waybills?schema=public"
-PORT=3000
+PORT=3001
 JWT_SECRET="your_strong_secret_here_change_in_production"
 JWT_EXPIRES_IN="15m"
+JWT_REFRESH_EXPIRES_IN="7d"
 NODE_ENV="development"
 ```
 
-### 3. Настройка базы данных
+> **Примечание:** Frontend обычно запускается на порту 3000 с прокси на backend (3001).
 
-Убедитесь, что PostgreSQL запущен, затем выполните миграции:
+### 3. Настройка базы данных
 
 ```bash
 npm run prisma:generate
@@ -84,19 +46,90 @@ npm run build
 npm start
 ```
 
-## 📚 API Endpoints
+## 🏗️ Структура проекта
+
+```
+backend/
+├── src/
+│   ├── app.ts               # Express приложение
+│   ├── server.ts            # Точка входа
+│   ├── config/
+│   │   └── env.ts           # Переменные окружения
+│   ├── db/
+│   │   └── prisma.ts        # Prisma Client
+│   ├── dto/                 # Zod-схемы валидации
+│   │   ├── waybillDto.ts
+│   │   ├── vehicleDto.ts
+│   │   ├── employeeDto.ts
+│   │   ├── driverDto.ts
+│   │   └── stockMovementDto.ts
+│   ├── jobs/                # Фоновые задачи
+│   │   ├── fuelCardTopUpJob.ts  # Автопополнение карт
+│   │   ├── scheduler.ts
+│   │   └── locks.ts
+│   ├── middleware/
+│   │   ├── authMiddleware.ts
+│   │   ├── validateDto.ts   # Zod-валидация
+│   │   ├── checkPermission.ts
+│   │   └── errorMiddleware.ts
+│   ├── routes/              # 24 файла роутов
+│   │   ├── index.ts
+│   │   ├── waybillRoutes.ts
+│   │   ├── stockRoutes.ts
+│   │   ├── stockLocationRoutes.ts
+│   │   ├── fuelCardRoutes.ts
+│   │   ├── adminRoutes.ts
+│   │   └── ...
+│   ├── controllers/         # 26+ контроллеров
+│   │   ├── waybillController.ts
+│   │   ├── stockController.ts
+│   │   ├── stockBalanceController.ts
+│   │   └── ...
+│   ├── services/
+│   └── utils/
+│       ├── jwt.ts
+│       ├── password.ts
+│       ├── topUpUtils.ts
+│       └── errors.ts
+├── prisma/
+│   └── schema.prisma
+└── package.json
+```
+
+## � API Endpoints
 
 ### Аутентификация
 
 - `POST /api/auth/login` - Вход в систему
   - Body: `{ email: string, password: string }`
-  - Response: `{ accessToken: string, user: {...} }`
+  - Response: `{ accessToken, refreshToken, user }`
+- `POST /api/auth/refresh` - Обновить токен
+- `POST /api/auth/logout` - Выход
+
+### Путевые листы (Waybills)
+
+- `GET /api/waybills` - Список путевых листов
+  - Query: `?startDate=...&endDate=...&vehicleId=...&driverId=...&status=...`
+- `GET /api/waybills/prefill/:vehicleId` - Предзаполнение данных для нового ПЛ
+- `POST /api/waybills` - Создать путевой лист
+- `GET /api/waybills/:id` - Получить путевой лист
+- `PUT /api/waybills/:id` - Обновить путевой лист
+- `DELETE /api/waybills/:id` - Удалить путевой лист
+- `PATCH /api/waybills/:id/status` - Изменить статус
+  - Body: `{ status: "DRAFT" | "SUBMITTED" | "POSTED" | "CANCELLED" }`
+
+**Жизненный цикл статусов:**
+```
+DRAFT → SUBMITTED → POSTED
+          ↓
+      CANCELLED
+```
 
 ### Транспортные средства
 
 - `GET /api/vehicles` - Список ТС
 - `POST /api/vehicles` - Создать ТС
-- `GET /api/vehicles/:id` - Получить ТС по ID
+- `GET /api/vehicles/:id` - Получить ТС
 - `PUT /api/vehicles/:id` - Обновить ТС
 - `DELETE /api/vehicles/:id` - Удалить ТС
 
@@ -104,52 +137,116 @@ npm start
 
 - `GET /api/drivers` - Список водителей
 - `POST /api/drivers` - Создать водителя
-- `GET /api/drivers/:id` - Получить водителя по ID
+- `GET /api/drivers/:id` - Получить водителя
 - `PUT /api/drivers/:id` - Обновить водителя
 - `DELETE /api/drivers/:id` - Удалить водителя
 
-### Путевые листы
-
-- `GET /api/waybills` - Список путевых листов
-  - Query params: `?startDate=...&endDate=...&vehicleId=...&driverId=...&status=...`
-- `POST /api/waybills` - Создать путевой лист
-- `GET /api/waybills/:id` - Получить путевой лист по ID
-- `PUT /api/waybills/:id` - Обновить путевой лист
-- `DELETE /api/waybills/:id` - Удалить путевой лист
-- `PATCH /api/waybills/:id/status` - Изменить статус
-  - Body: `{ status: "DRAFT" | "APPROVED" | "ISSUED" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED" }`
-
 ### Складской учёт (Stock)
 
+#### Балансы
+
 - `GET /api/stock/balances` - Балансы всех локаций
-  - Query params: `?stockItemId=...&asOf=...`
+  - Query: `?stockItemId=...&asOf=...`
 - `GET /api/stock/balance` - Баланс одной локации
-  - Query params: `?locationId=...&stockItemId=...&asOf=...`
+  - Query: `?locationId=...&stockItemId=...&asOf=...`
 
-#### Движения v2 (STOCK-MOVEMENTS-V2-GET)
+#### Локации хранения
 
-- `GET /api/stock/movements/v2` - Список движений с фильтрацией и пагинацией
+- `GET /api/stock/locations` - Список локаций
+- `GET /api/stock/locations/:id` - Локация по ID
+- `POST /api/stock/locations/warehouse` - Получить/создать локацию склада
+- `POST /api/stock/locations/vehicle-tank` - Получить/создать локацию бака ТС
+- `POST /api/stock/locations/fuel-card` - Получить/создать локацию топливной карты
+
+#### Движения v2 (Stock Movements)
+
+- `GET /api/stock/movements/v2` - Список движений
   - Query params:
-    - `from` / `occurredFrom` — ISO дата начала периода (>=)
-    - `to` / `occurredTo` — ISO дата конца периода (<=)
+    - `from` / `occurredFrom` — ISO дата начала (>=)
+    - `to` / `occurredTo` — ISO дата конца (<=)
     - `movementType` — `INCOME` | `EXPENSE` | `ADJUSTMENT` | `TRANSFER`
     - `stockItemId` — UUID товара
-    - `locationId` — UUID локации (ищет по любому полю: stockLocationId, fromStockLocationId, toStockLocationId)
+    - `locationId` — UUID локации (ищет по stockLocationId, fromStockLocationId, toStockLocationId)
     - `page` — номер страницы (default: 1)
     - `pageSize` — размер страницы (default: 50, max: 200)
-  - Response: `{ success: true, data: [...], total: number, page: number, pageSize: number }`
+  - Response: `{ success: true, data: [...], total, page, pageSize }`
   - Errors: 400 на невалидные даты или movementType
 
 - `POST /api/stock/movements/v2` - Создать движение
-  - Body: `{ movementType, stockItemId, quantity, stockLocationId?, fromLocationId?, toLocationId?, occurredAt?, comment? }`
+  - Body для **INCOME/EXPENSE/ADJUSTMENT**:
+    ```json
+    {
+      "movementType": "INCOME",
+      "stockItemId": "uuid",
+      "quantity": "100.5",
+      "stockLocationId": "uuid",
+      "occurredAt": "2024-12-23T10:00:00Z",
+      "comment": "string"
+    }
+    ```
+  - Body для **TRANSFER**:
+    ```json
+    {
+      "movementType": "TRANSFER",
+      "stockItemId": "uuid",
+      "quantity": "50",
+      "fromLocationId": "uuid",
+      "toLocationId": "uuid",
+      "occurredAt": "2024-12-23T10:00:00Z",
+      "externalRef": "MANUAL_TOPUP:uuid",
+      "comment": "string"
+    }
+    ```
+  - `externalRef` — для идемпотентности (уникален в пределах организации)
+  - `occurredAt` — когда произошло движение (default: now)
+  - `occurredSeq` — порядок в пределах одного occurredAt
+
+### Топливные карты (Fuel Cards)
+
+#### CRUD
+
+- `GET /api/fuel-cards` - Список карт
+- `POST /api/fuel-cards` - Создать карту
+- `PUT /api/fuel-cards/:id` - Обновить карту
+- `DELETE /api/fuel-cards/:id` - Удалить карту
+
+#### Назначения (Assignments)
+
+- `GET /api/fuel-cards/:cardId/assignments` - История назначений карты
+- `POST /api/fuel-cards/:cardId/assignments` - Назначить карту водителю/ТС
+
+#### Пополнение топливных карт
+
+**Ручное пополнение (Manual TopUp):**
+1. Получить/создать локацию карты: `POST /api/stock/locations/fuel-card` с `{ fuelCardId }`
+2. Создать TRANSFER: `POST /api/stock/movements/v2` с `fromLocationId` (склад) → `toLocationId` (карта)
+
+**Автоматическое пополнение (Auto TopUp):**
+- Endpoint: `POST /api/admin/jobs/run-fuelcard-topups` (требует роль admin)
+- Модель правил: `FuelCardTopUpRule`
+- Job: `jobs/fuelCardTopUpJob.ts`
+- Использует `externalRef` для идемпотентности: `TOPUP:ruleId:date`
+
+> **Важно:** Баланс карты рассчитывается из ledger (сумма движений). Поле `balanceLiters` в FuelCard может быть кешем или устарело.
+
+### Административные функции
+
+- `GET /api/admin/data-preview` - Превью данных по категориям
+- `POST /api/admin/selective-delete` - Выборочное удаление
+- `POST /api/admin/import` - Импорт JSON
+- `DELETE /api/admin/reset-database` - Сброс базы (⚠️)
+- `POST /api/admin/transfer-user` - Перенос пользователя между организациями
+- `POST /api/admin/recalculate` - Пересчёт балансов
+- `POST /api/admin/jobs/run-fuelcard-topups` - Ручной запуск job автопополнения
 
 ### Служебные
 
 - `GET /api/health` - Health check
+- `GET /api/me` - Текущий пользователь
 
 ## 🔐 Аутентификация
 
-Все эндпоинты кроме `/api/auth/login` и `/api/health` требуют JWT токен в заголовке:
+Все эндпоинты кроме `/api/auth/login`, `/api/auth/refresh` и `/api/health` требуют JWT токен:
 
 ```
 Authorization: Bearer <token>
@@ -157,71 +254,49 @@ Authorization: Bearer <token>
 
 ## 🗄️ База данных
 
-### Модели
+### Основные модели
 
 - **Organization** - Организации
 - **User** - Пользователи системы
 - **Employee** - Сотрудники
-- **Driver** - Водители (связаны с Employee)
+- **Driver** - Водители
 - **Vehicle** - Транспортные средства
 - **Waybill** - Путевые листы
+- **StockItem** - Номенклатура (топливо, ТМЦ)
+- **StockLocation** - Локации хранения (склад, бак ТС, топливная карта)
+- **StockMovement** - Движения товаров
+- **FuelCard** - Топливные карты
+- **FuelCardTopUpRule** - Правила автопополнения
 
 ### Миграции
 
-Создать новую миграцию:
 ```bash
+# Создать новую миграцию
 npx prisma migrate dev --name migration_name
-```
 
-Применить миграции:
-```bash
+# Применить миграции
 npx prisma migrate deploy
-```
 
-Сбросить базу (⚠️ удалит все данные):
-```bash
+# Сбросить базу (⚠️ удалит все данные)
 npx prisma migrate reset
+
+# Открыть Prisma Studio
+npx prisma studio
 ```
 
-## 🛠️ Полезные команды
+## �️ Тестирование
 
 ```bash
-# Открыть Prisma Studio (GUI для базы данных)
-npx prisma studio
+# Unit/integration тесты (Vitest)
+npm test
 
-# Форматировать schema.prisma
-npx prisma format
-
-# Проверить статус миграций
-npx prisma migrate status
+# E2E тесты
+npm run test:e2e
 ```
-
-## 📝 Следующие шаги
-
-Это минимальная версия backend. Планируется добавить:
-
-- [ ] Регистрацию пользователей
-- [ ] Role-based access control (RBAC)
-- [ ] Refresh tokens
-- [ ] Валидация входных данных (express-validator / zod)
-- [ ] Rate limiting
-- [ ] Логирование (winston)
-- [ ] State machine для путевых листов
-- [ ] Работу со складом, бланками, топливными картами
-- [ ] Audit log
-- [ ] Тесты (jest)
-- [ ] Docker setup
-- [ ] CI/CD
 
 ## 🤝 Интеграция с фронтендом
 
-Чтобы фронтенд мог подключиться к backend:
-
-1. Укажите в `.env` фронтенда:
-   ```
-   VITE_API_BASE_URL=http://localhost:3000/api
-   ```
-
-2. Убедитесь, что CORS настроен корректно (по умолчанию разрешены все источники)
-
-3. JWT токен сохраняется в localStorage фронтенда и отправляется с каждым запросом
+1. Frontend запускается на `http://localhost:3000`
+2. Backend запускается на `http://localhost:3001`
+3. Frontend использует прокси `/api → http://localhost:3001/api`
+4. JWT токен хранится в localStorage и отправляется с каждым запросом
