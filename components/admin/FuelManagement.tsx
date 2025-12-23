@@ -25,6 +25,9 @@ import {
     createFuelCard,
     assignFuelCard,
     searchDrivers,
+    deleteFuelCard,
+    createTopUpRule,
+    deleteTopUpRule,
     type LocationBalance,
     type StockMovementV2,
     type FuelCard,
@@ -33,6 +36,7 @@ import {
     type ResetRule,
     type StockItemOption,
     type DriverSearchResult,
+    type CreateTopUpRuleParams,
 } from '../../services/stockApi';
 import DataTable from '../shared/DataTable';
 import CollapsibleSection from '../shared/CollapsibleSection';
@@ -771,6 +775,7 @@ function FuelCardsTab() {
     const [topUpModalOpen, setTopUpModalOpen] = useState(false);
     const [assignModalOpen, setAssignModalOpen] = useState(false);
     const [createModalOpen, setCreateModalOpen] = useState(false);
+    const [deleteConfirmCard, setDeleteConfirmCard] = useState<FuelCard | null>(null);
     const { showToast } = useToast();
 
     const loadCards = async () => {
@@ -805,6 +810,19 @@ function FuelCardsTab() {
 
     const handleAssignSuccess = () => {
         loadCards();
+    };
+
+    const handleDeleteConfirm = async () => {
+        if (!deleteConfirmCard) return;
+        try {
+            await deleteFuelCard(deleteConfirmCard.id);
+            showToast(`Карта ${deleteConfirmCard.cardNumber} удалена`, 'success');
+            loadCards();
+        } catch (err: any) {
+            showToast('Ошибка удаления: ' + (err.message || 'Неизвестная ошибка'), 'error');
+        } finally {
+            setDeleteConfirmCard(null);
+        }
     };
 
     const columns = [
@@ -848,6 +866,13 @@ function FuelCardsTab() {
                         title="Привязать к водителю"
                     >
                         👤 Привязать
+                    </button>
+                    <button
+                        onClick={() => setDeleteConfirmCard(row)}
+                        className="px-3 py-1 bg-red-500 text-white rounded text-sm hover:bg-red-600"
+                        title="Удалить карту"
+                    >
+                        🗑️
                     </button>
                 </div>
             )
@@ -916,10 +941,195 @@ function FuelCardsTab() {
                 onClose={() => setCreateModalOpen(false)}
                 onSuccess={loadCards}
             />
+
+            {/* Delete Confirmation Modal */}
+            {deleteConfirmCard && (
+                <Modal isOpen={true} onClose={() => setDeleteConfirmCard(null)} title="Подтверждение удаления">
+                    <div className="space-y-4">
+                        <p>Вы уверены, что хотите удалить карту <strong>{deleteConfirmCard.cardNumber}</strong>?</p>
+                        <p className="text-sm text-gray-500">Это действие нельзя отменить.</p>
+                        <div className="flex justify-end gap-2">
+                            <button
+                                onClick={() => setDeleteConfirmCard(null)}
+                                className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50"
+                            >
+                                Отмена
+                            </button>
+                            <button
+                                onClick={handleDeleteConfirm}
+                                className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
+                            >
+                                Удалить
+                            </button>
+                        </div>
+                    </div>
+                </Modal>
+            )}
         </div>
     );
 }
 
+
+// ==================== CREATE TOPUP RULE MODAL ====================
+
+interface CreateTopUpRuleModalProps {
+    isOpen: boolean;
+    onClose: () => void;
+    onSuccess: () => void;
+}
+
+function CreateTopUpRuleModal({ isOpen, onClose, onSuccess }: CreateTopUpRuleModalProps) {
+    const [cards, setCards] = useState<FuelCard[]>([]);
+    const [selectedCardId, setSelectedCardId] = useState('');
+    const [scheduleType, setScheduleType] = useState<'DAILY' | 'WEEKLY' | 'MONTHLY'>('DAILY');
+    const [amountLiters, setAmountLiters] = useState('');
+    const [minBalanceLiters, setMinBalanceLiters] = useState('');
+    const [loading, setLoading] = useState(false);
+    const [submitting, setSubmitting] = useState(false);
+    const { showToast } = useToast();
+
+    useEffect(() => {
+        if (isOpen) {
+            setLoading(true);
+            getFuelCards()
+                .then(setCards)
+                .finally(() => setLoading(false));
+            setSelectedCardId('');
+            setScheduleType('DAILY');
+            setAmountLiters('');
+            setMinBalanceLiters('');
+        }
+    }, [isOpen]);
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!selectedCardId) {
+            showToast('Выберите топливную карту', 'error');
+            return;
+        }
+        const amount = parseFloat(amountLiters);
+        if (isNaN(amount) || amount <= 0) {
+            showToast('Введите корректное количество литров', 'error');
+            return;
+        }
+
+        setSubmitting(true);
+        try {
+            await createTopUpRule(selectedCardId, {
+                scheduleType,
+                amountLiters: amount,
+                minBalanceLiters: minBalanceLiters ? parseFloat(minBalanceLiters) : undefined,
+                isActive: true,
+            });
+            showToast('Правило автопополнения создано', 'success');
+            onSuccess();
+            onClose();
+        } catch (err: any) {
+            showToast('Ошибка создания правила: ' + (err.message || 'Неизвестная ошибка'), 'error');
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    const selectedCard = cards.find(c => c.id === selectedCardId);
+
+    return (
+        <Modal isOpen={isOpen} onClose={onClose} title="Создание правила автопополнения">
+            <form onSubmit={handleSubmit} className="space-y-4">
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Топливная карта *
+                    </label>
+                    <select
+                        value={selectedCardId}
+                        onChange={(e) => setSelectedCardId(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                        required
+                    >
+                        <option value="">Выберите карту...</option>
+                        {cards.map((card) => (
+                            <option key={card.id} value={card.id}>
+                                {card.cardNumber} {card.provider ? `(${card.provider})` : ''}
+                            </option>
+                        ))}
+                    </select>
+                    {selectedCard?.assignedToDriver && (
+                        <p className="text-sm text-gray-500 mt-1">
+                            Водитель: {selectedCard.assignedToDriver.fullName}
+                        </p>
+                    )}
+                </div>
+
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Расписание *
+                    </label>
+                    <select
+                        value={scheduleType}
+                        onChange={(e) => setScheduleType(e.target.value as any)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                    >
+                        <option value="DAILY">Ежедневно</option>
+                        <option value="WEEKLY">Еженедельно</option>
+                        <option value="MONTHLY">Ежемесячно</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Количество литров *
+                    </label>
+                    <input
+                        type="number"
+                        value={amountLiters}
+                        onChange={(e) => setAmountLiters(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                        placeholder="100"
+                        min="0"
+                        step="0.1"
+                        required
+                    />
+                </div>
+
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Мин. баланс для пополнения (опционально)
+                    </label>
+                    <input
+                        type="number"
+                        value={minBalanceLiters}
+                        onChange={(e) => setMinBalanceLiters(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                        placeholder="Пополнять при балансе ниже..."
+                        min="0"
+                        step="0.1"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                        Если указано, пополнение произойдёт только если баланс карты ниже этого значения
+                    </p>
+                </div>
+
+                <div className="flex justify-end gap-2 pt-4">
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        disabled={submitting}
+                        className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50"
+                    >
+                        Отмена
+                    </button>
+                    <button
+                        type="submit"
+                        disabled={submitting || loading}
+                        className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50"
+                    >
+                        {submitting ? 'Создание...' : 'Создать правило'}
+                    </button>
+                </div>
+            </form>
+        </Modal>
+    );
+}
 
 // ==================== RULES TAB ====================
 
@@ -928,6 +1138,7 @@ function RulesTab() {
     const [resetRules, setResetRules] = useState<ResetRule[]>([]);
     const [loading, setLoading] = useState(false);
     const [runningJob, setRunningJob] = useState(false);
+    const [createRuleModalOpen, setCreateRuleModalOpen] = useState(false);
     const { showToast } = useToast();
 
     const loadRules = async () => {
@@ -1020,13 +1231,21 @@ function RulesTab() {
             <div className="bg-white rounded-lg shadow p-4">
                 <div className="flex justify-between items-center mb-4">
                     <h3 className="text-lg font-medium">Правила автопополнения</h3>
-                    <button
-                        onClick={handleRunTopUp}
-                        disabled={runningJob}
-                        className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50"
-                    >
-                        {runningJob ? 'Выполняется...' : '▶ Запустить сейчас'}
-                    </button>
+                    <div className="flex gap-2">
+                        <button
+                            onClick={() => setCreateRuleModalOpen(true)}
+                            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                        >
+                            ➕ Создать правило
+                        </button>
+                        <button
+                            onClick={handleRunTopUp}
+                            disabled={runningJob}
+                            className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50"
+                        >
+                            {runningJob ? 'Выполняется...' : '▶ Запустить сейчас'}
+                        </button>
+                    </div>
                 </div>
                 <DataTable
                     columns={topUpColumns}
@@ -1055,6 +1274,12 @@ function RulesTab() {
                     emptyMessage="Нет правил обнуления"
                 />
             </div>
+
+            <CreateTopUpRuleModal
+                isOpen={createRuleModalOpen}
+                onClose={() => setCreateRuleModalOpen(false)}
+                onSuccess={loadRules}
+            />
         </div>
     );
 }

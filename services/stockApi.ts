@@ -444,6 +444,38 @@ export async function searchDrivers(query: string): Promise<DriverSearchResult[]
     return response.data || [];
 }
 
+/**
+ * FUEL-CARDS-003: Delete a fuel card
+ */
+export async function deleteFuelCard(fuelCardId: string): Promise<void> {
+    await httpClient.delete(`/fuel-cards/${fuelCardId}`);
+}
+
+/**
+ * FUEL-CARDS-003: Create or update a top-up rule for a fuel card
+ */
+export interface CreateTopUpRuleParams {
+    scheduleType: 'DAILY' | 'WEEKLY' | 'MONTHLY';
+    amountLiters: number;
+    minBalanceLiters?: number;
+    stockItemId?: string;
+    sourceLocationId?: string;
+    timezone?: string;
+    isActive?: boolean;
+}
+
+export async function createTopUpRule(fuelCardId: string, data: CreateTopUpRuleParams): Promise<TopUpRule> {
+    const response = await httpClient.post<ApiResponse<TopUpRule>>(`/fuel-cards/${fuelCardId}/topup-rule`, data);
+    return response.data;
+}
+
+/**
+ * FUEL-CARDS-003: Delete a top-up rule
+ */
+export async function deleteTopUpRule(fuelCardId: string): Promise<void> {
+    await httpClient.delete(`/fuel-cards/${fuelCardId}/topup-rule`);
+}
+
 // ==================== TOP-UP & RESET RULES ====================
 
 export interface TopUpRule {
