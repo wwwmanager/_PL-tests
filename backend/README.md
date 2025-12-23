@@ -119,6 +119,30 @@ npm start
 - `PATCH /api/waybills/:id/status` - Изменить статус
   - Body: `{ status: "DRAFT" | "APPROVED" | "ISSUED" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED" }`
 
+### Складской учёт (Stock)
+
+- `GET /api/stock/balances` - Балансы всех локаций
+  - Query params: `?stockItemId=...&asOf=...`
+- `GET /api/stock/balance` - Баланс одной локации
+  - Query params: `?locationId=...&stockItemId=...&asOf=...`
+
+#### Движения v2 (STOCK-MOVEMENTS-V2-GET)
+
+- `GET /api/stock/movements/v2` - Список движений с фильтрацией и пагинацией
+  - Query params:
+    - `from` / `occurredFrom` — ISO дата начала периода (>=)
+    - `to` / `occurredTo` — ISO дата конца периода (<=)
+    - `movementType` — `INCOME` | `EXPENSE` | `ADJUSTMENT` | `TRANSFER`
+    - `stockItemId` — UUID товара
+    - `locationId` — UUID локации (ищет по любому полю: stockLocationId, fromStockLocationId, toStockLocationId)
+    - `page` — номер страницы (default: 1)
+    - `pageSize` — размер страницы (default: 50, max: 200)
+  - Response: `{ success: true, data: [...], total: number, page: number, pageSize: number }`
+  - Errors: 400 на невалидные даты или movementType
+
+- `POST /api/stock/movements/v2` - Создать движение
+  - Body: `{ movementType, stockItemId, quantity, stockLocationId?, fromLocationId?, toLocationId?, occurredAt?, comment? }`
+
 ### Служебные
 
 - `GET /api/health` - Health check
