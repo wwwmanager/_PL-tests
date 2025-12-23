@@ -86,3 +86,58 @@ export async function getDriverById(req: Request, res: Response, next: NextFunct
         next(err);
     }
 }
+
+/**
+ * FUEL-CARD-LINK-UI: Search drivers by name for autocomplete
+ * GET /api/drivers/search?q=...
+ */
+export async function searchDrivers(req: Request, res: Response, next: NextFunction) {
+    try {
+        if (!req.user) {
+            return res.status(401).json({ code: 'UNAUTHORIZED', message: 'Требуется авторизация' });
+        }
+
+        const organizationId = req.user.organizationId;
+        const query = (req.query.q as string || '').trim();
+        const limit = Math.min(parseInt(req.query.limit as string, 10) || 20, 50);
+
+        const where: any = {
+            employee: {
+                organizationId,
+                isActive: true,
+            },
+        };
+
+        if (query) {
+            where.employee.fullName = { contains: query, mode: 'insensitive' };
+        }
+
+        const drivers = await prisma.driver.findMany({
+            where,
+            include: {
+                employee: {
+                    select: {
+                        id: true,
+                        fullName: true,
+                    },
+                },
+            },
+            take: limit,
+            orderBy: {
+                employee: {
+                    fullName: 'asc',
+                },
+            },
+        });
+
+        const result = drivers.map(d => ({
+            id: d.id,
+            employeeId: d.employeeId,
+            fullName: d.employee?.fullName ?? 'Без имени',
+        }));
+
+        res.json({ success: true, data: result });
+    } catch (err) {
+        next(err);
+    }
+}

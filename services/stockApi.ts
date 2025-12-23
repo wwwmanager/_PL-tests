@@ -367,6 +367,7 @@ export interface FuelCard {
     balanceLiters: number;
     assignedToDriverId?: string;
     assignedToVehicleId?: string;
+    assignedToDriver?: { id: string; fullName: string } | null;
 }
 
 export interface FuelCardAssignment {
@@ -419,6 +420,28 @@ export async function isCardValidAt(fuelCardId: string, asOf?: Date): Promise<{ 
     const params = asOf ? `?asOf=${asOf.toISOString()}` : '';
     const response = await httpClient.get<ApiResponse<{ valid: boolean; reason?: string }>>(`/fuel-cards/${fuelCardId}/valid${params}`);
     return response.data || { valid: false };
+}
+
+/**
+ * FUEL-CARD-LINK-UI: Assign fuel card to a driver
+ */
+export async function assignFuelCard(fuelCardId: string, driverId: string | null): Promise<FuelCard> {
+    const response = await httpClient.patch<FuelCard>(`/fuel-cards/${fuelCardId}/assign`, { driverId });
+    return response;
+}
+
+/**
+ * FUEL-CARD-LINK-UI: Search drivers by name for autocomplete
+ */
+export interface DriverSearchResult {
+    id: string;
+    fullName: string;
+    employeeId: string;
+}
+
+export async function searchDrivers(query: string): Promise<DriverSearchResult[]> {
+    const response = await httpClient.get<ApiResponse<DriverSearchResult[]>>(`/drivers/search?q=${encodeURIComponent(query)}`);
+    return response.data || [];
 }
 
 // ==================== TOP-UP & RESET RULES ====================

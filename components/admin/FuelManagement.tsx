@@ -23,6 +23,8 @@ import {
     getWarehouses,
     createTransferMovement,
     createFuelCard,
+    assignFuelCard,
+    searchDrivers,
     type LocationBalance,
     type StockMovementV2,
     type FuelCard,
@@ -30,6 +32,7 @@ import {
     type TopUpRule,
     type ResetRule,
     type StockItemOption,
+    type DriverSearchResult,
 } from '../../services/stockApi';
 import DataTable from '../shared/DataTable';
 import CollapsibleSection from '../shared/CollapsibleSection';
@@ -586,6 +589,179 @@ function CreateFuelCardModal({ isOpen, onClose, onSuccess }: CreateFuelCardModal
     );
 }
 
+// ==================== ASSIGN DRIVER MODAL ====================
+
+interface AssignDriverModalProps {
+    card: FuelCard;
+    isOpen: boolean;
+    onClose: () => void;
+    onSuccess: () => void;
+}
+
+function AssignDriverModal({ card, isOpen, onClose, onSuccess }: AssignDriverModalProps) {
+    const [searchQuery, setSearchQuery] = useState('');
+    const [drivers, setDrivers] = useState<DriverSearchResult[]>([]);
+    const [selectedDriver, setSelectedDriver] = useState<DriverSearchResult | null>(null);
+    const [loading, setLoading] = useState(false);
+    const [submitting, setSubmitting] = useState(false);
+    const { showToast } = useToast();
+
+    // Debounced search
+    useEffect(() => {
+        if (!isOpen) return;
+
+        const timer = setTimeout(async () => {
+            if (searchQuery.length >= 2) {
+                setLoading(true);
+                try {
+                    const results = await searchDrivers(searchQuery);
+                    setDrivers(results);
+                } catch (err) {
+                    console.error('Driver search error:', err);
+                } finally {
+                    setLoading(false);
+                }
+            } else if (searchQuery.length === 0) {
+                // Load all drivers when empty
+                setLoading(true);
+                try {
+                    const results = await searchDrivers('');
+                    setDrivers(results);
+                } catch (err) {
+                    console.error('Driver search error:', err);
+                } finally {
+                    setLoading(false);
+                }
+            }
+        }, 300);
+
+        return () => clearTimeout(timer);
+    }, [searchQuery, isOpen]);
+
+    useEffect(() => {
+        if (isOpen) {
+            setSearchQuery('');
+            setSelectedDriver(null);
+            setDrivers([]);
+        }
+    }, [isOpen]);
+
+    const handleAssign = async () => {
+        if (!selectedDriver) {
+            showToast('Выберите водителя', 'error');
+            return;
+        }
+
+        setSubmitting(true);
+        try {
+            await assignFuelCard(card.id, selectedDriver.id);
+            showToast(`Карта ${card.cardNumber} привязана к ${selectedDriver.fullName}`, 'success');
+            onSuccess();
+            onClose();
+        } catch (err: any) {
+            console.error('Assign error:', err);
+            showToast('Ошибка привязки: ' + (err.message || 'Неизвестная ошибка'), 'error');
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    const handleUnassign = async () => {
+        setSubmitting(true);
+        try {
+            await assignFuelCard(card.id, null);
+            showToast(`Карта ${card.cardNumber} отвязана от водителя`, 'success');
+            onSuccess();
+            onClose();
+        } catch (err: any) {
+            console.error('Unassign error:', err);
+            showToast('Ошибка отвязки: ' + (err.message || 'Неизвестная ошибка'), 'error');
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    return (
+        <Modal isOpen={isOpen} onClose={onClose} title={`Привязка карты ${card.cardNumber}`}>
+            <div className="space-y-4">
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Поиск водителя по ФИО
+                    </label>
+                    <input
+                        type="text"
+                        value={searchQuery}
+                        onChange={(e) => {
+                            setSearchQuery(e.target.value);
+                            setSelectedDriver(null);
+                        }}
+                        placeholder="Введите часть ФИО..."
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                </div>
+
+                {loading && (
+                    <div className="text-center text-gray-500 py-2">Поиск...</div>
+                )}
+
+                {!loading && drivers.length > 0 && (
+                    <div className="max-h-48 overflow-y-auto border border-gray-200 rounded-md">
+                        {drivers.map((driver) => (
+                            <div
+                                key={driver.id}
+                                onClick={() => setSelectedDriver(driver)}
+                                className={`px-3 py-2 cursor-pointer hover:bg-blue-50 ${selectedDriver?.id === driver.id ? 'bg-blue-100 font-medium' : ''
+                                    }`}
+                            >
+                                {driver.fullName}
+                            </div>
+                        ))}
+                    </div>
+                )}
+
+                {!loading && searchQuery.length >= 2 && drivers.length === 0 && (
+                    <div className="text-center text-gray-500 py-2">Водители не найдены</div>
+                )}
+
+                {selectedDriver && (
+                    <div className="p-3 bg-green-50 border border-green-200 rounded-md">
+                        <strong>Выбран:</strong> {selectedDriver.fullName}
+                    </div>
+                )}
+
+                <div className="flex justify-between gap-2 pt-4">
+                    <button
+                        type="button"
+                        onClick={handleUnassign}
+                        disabled={submitting}
+                        className="px-4 py-2 bg-red-100 text-red-700 rounded-md hover:bg-red-200 disabled:opacity-50"
+                    >
+                        Отвязать от водителя
+                    </button>
+                    <div className="flex gap-2">
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            disabled={submitting}
+                            className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50"
+                        >
+                            Отмена
+                        </button>
+                        <button
+                            type="button"
+                            onClick={handleAssign}
+                            disabled={!selectedDriver || submitting}
+                            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+                        >
+                            {submitting ? 'Сохранение...' : 'Привязать'}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </Modal>
+    );
+}
+
 // ==================== FUEL CARDS TAB ====================
 
 function FuelCardsTab() {
@@ -593,6 +769,7 @@ function FuelCardsTab() {
     const [loading, setLoading] = useState(false);
     const [selectedCard, setSelectedCard] = useState<FuelCard | null>(null);
     const [topUpModalOpen, setTopUpModalOpen] = useState(false);
+    const [assignModalOpen, setAssignModalOpen] = useState(false);
     const [createModalOpen, setCreateModalOpen] = useState(false);
     const { showToast } = useToast();
 
@@ -617,14 +794,32 @@ function FuelCardsTab() {
         setTopUpModalOpen(true);
     };
 
+    const handleAssign = (card: FuelCard) => {
+        setSelectedCard(card);
+        setAssignModalOpen(true);
+    };
+
     const handleTopUpSuccess = () => {
         loadCards();
-        // Note: Balance will be visible in Balances tab (ledger source of truth)
+    };
+
+    const handleAssignSuccess = () => {
+        loadCards();
     };
 
     const columns = [
         { key: 'cardNumber', label: 'Номер карты', sortable: true },
         { key: 'provider', label: 'Поставщик', sortable: true },
+        {
+            key: 'assignedDriver',
+            label: 'Водитель',
+            sortable: true,
+            render: (row: FuelCard) => (
+                <span className={row.assignedToDriver ? 'text-gray-900' : 'text-gray-400 italic'}>
+                    {row.assignedToDriver?.fullName || 'Не назначен'}
+                </span>
+            )
+        },
         {
             key: 'isActive',
             label: 'Статус',
@@ -635,18 +830,26 @@ function FuelCardsTab() {
                 </span>
             )
         },
-        // FUEL-TOPUP-006: Removed balanceLiters column - use Balances tab for accurate ledger data
         {
             key: 'actions',
             label: 'Действия',
             render: (row: FuelCard) => (
-                <button
-                    onClick={() => handleTopUp(row)}
-                    className="px-3 py-1 bg-green-500 text-white rounded text-sm hover:bg-green-600"
-                    title="Пополнить карту"
-                >
-                    💳 Пополнить
-                </button>
+                <div className="flex gap-2">
+                    <button
+                        onClick={() => handleTopUp(row)}
+                        className="px-3 py-1 bg-green-500 text-white rounded text-sm hover:bg-green-600"
+                        title="Пополнить карту"
+                    >
+                        💳 Пополнить
+                    </button>
+                    <button
+                        onClick={() => handleAssign(row)}
+                        className="px-3 py-1 bg-blue-500 text-white rounded text-sm hover:bg-blue-600"
+                        title="Привязать к водителю"
+                    >
+                        👤 Привязать
+                    </button>
+                </div>
             )
         },
     ];
@@ -693,6 +896,18 @@ function FuelCardsTab() {
                         setSelectedCard(null);
                     }}
                     onSuccess={handleTopUpSuccess}
+                />
+            )}
+
+            {selectedCard && (
+                <AssignDriverModal
+                    card={selectedCard}
+                    isOpen={assignModalOpen}
+                    onClose={() => {
+                        setAssignModalOpen(false);
+                        setSelectedCard(null);
+                    }}
+                    onSuccess={handleAssignSuccess}
                 />
             )}
 

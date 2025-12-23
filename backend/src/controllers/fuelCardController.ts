@@ -5,7 +5,17 @@ export async function listFuelCards(req: Request, res: Response, next: NextFunct
     try {
         const user = req.user!;
         const fuelCards = await fuelCardService.listFuelCards(user);
-        res.json(fuelCards);
+
+        // Transform to include assignedToDriver.fullName for frontend
+        const result = fuelCards.map((card: any) => ({
+            ...card,
+            assignedToDriver: card.assignedToDriver ? {
+                id: card.assignedToDriver.id,
+                fullName: card.assignedToDriver.employee?.fullName || 'Без имени',
+            } : null,
+        }));
+
+        res.json(result);
     } catch (err) {
         next(err);
     }
