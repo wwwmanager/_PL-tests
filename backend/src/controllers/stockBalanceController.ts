@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import * as stockService from '../services/stockService';
 import * as stockLocationService from '../services/stockLocationService';
 import { BadRequestError } from '../utils/errors';
+import { prisma } from '../db/prisma';
 
 /**
  * REL-102: Stock Balance Controller
@@ -80,6 +81,131 @@ export async function getBalance(
             stockItemId,
             asOf: asOfDate.toISOString(),
             balance,
+        });
+    } catch (error) {
+        next(error);
+    }
+}
+
+/**
+ * GET /stock/movements/v2
+ * STOCK-MOVEMENTS-V2-GET-001/002: List movements with filters and pagination
+ * Query params:
+ *   - locationId: filter by any location (stockLocationId, fromStockLocationId, toStockLocationId)
+ *   - stockItemId: filter by stock item
+ *   - movementType: INCOME | EXPENSE | ADJUSTMENT | TRANSFER
+ *   - from/occurredFrom: ISO date (occurredAt >= from)
+ *   - to/occurredTo: ISO date (occurredAt <= to)
+ *   - page: page number (default 1)
+ *   - pageSize: items per page (default 50, max 200)
+ */
+export async function listMovementsV2(
+    req: Request,
+    res: Response,
+    next: NextFunction
+) {
+    try {
+        const user = req.user as { organizationId: string };
+
+        const {
+            locationId,
+            stockItemId,
+            movementType,
+            from,
+            to,
+            occurredFrom: occurredFromAlt,
+            occurredTo: occurredToAlt,
+            page: pageStr,
+            pageSize: pageSizeStr,
+        } = req.query;
+
+        // Support both from/to and occurredFrom/occurredTo (prefer from/to)
+        const occurredFromStr = (from ?? occurredFromAlt) as string | undefined;
+        const occurredToStr = (to ?? occurredToAlt) as string | undefined;
+
+        // Validate dates
+        let occurredFrom: Date | undefined;
+        let occurredTo: Date | undefined;
+
+        if (occurredFromStr) {
+            occurredFrom = new Date(occurredFromStr);
+            if (isNaN(occurredFrom.getTime())) {
+                throw new BadRequestError('Invalid from/occurredFrom date format');
+            }
+        }
+        if (occurredToStr) {
+            occurredTo = new Date(occurredToStr);
+            if (isNaN(occurredTo.getTime())) {
+                throw new BadRequestError('Invalid to/occurredTo date format');
+            }
+        }
+
+        // Validate movementType enum
+        const validMovementTypes = ['INCOME', 'EXPENSE', 'ADJUSTMENT', 'TRANSFER'];
+        if (movementType && !validMovementTypes.includes(String(movementType))) {
+            throw new BadRequestError(`Invalid movementType. Must be one of: ${validMovementTypes.join(', ')}`);
+        }
+
+        const page = Math.max(1, parseInt(String(pageStr || '1'), 10));
+        const pageSize = Math.min(200, Math.max(1, parseInt(String(pageSizeStr || '50'), 10)));
+
+        // Build where clause
+        const where: any = { organizationId: user.organizationId };
+
+        if (movementType) {
+            where.movementType = String(movementType);
+        }
+        if (stockItemId) {
+            where.stockItemId = String(stockItemId);
+        }
+
+        // Date range filter
+        if (occurredFrom || occurredTo) {
+            where.occurredAt = {};
+            if (occurredFrom) {
+                where.occurredAt.gte = occurredFrom;
+            }
+            if (occurredTo) {
+                where.occurredAt.lte = occurredTo;
+            }
+        }
+
+        // Location filter: match any of stockLocationId, fromStockLocationId, toStockLocationId
+        if (locationId) {
+            where.OR = [
+                { stockLocationId: String(locationId) },
+                { fromStockLocationId: String(locationId) },
+                { toStockLocationId: String(locationId) },
+            ];
+        }
+
+        const [total, items] = await Promise.all([
+            prisma.stockMovement.count({ where }),
+            prisma.stockMovement.findMany({
+                where,
+                orderBy: [
+                    { occurredAt: 'desc' },
+                    { occurredSeq: 'desc' },
+                    { createdAt: 'desc' },
+                ],
+                skip: (page - 1) * pageSize,
+                take: pageSize,
+                include: {
+                    stockItem: { select: { id: true, name: true } },
+                    stockLocation: { select: { id: true, name: true, type: true } },
+                    fromStockLocation: { select: { id: true, name: true, type: true } },
+                    toStockLocation: { select: { id: true, name: true, type: true } },
+                    createdByUser: { select: { id: true, email: true } },
+                },
+            }),
+        ]);
+
+        res.json({
+            success: true,
+            data: items,
+            total,
+            page,
+            pageSize,
         });
     } catch (error) {
         next(error);

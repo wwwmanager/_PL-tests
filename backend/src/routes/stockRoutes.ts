@@ -9,7 +9,7 @@ import {
     getFuelCardBalance, getAvailableFuelExpenses
 } from '../controllers/stockController';
 import {
-    getBalances, getBalance, createMovement
+    getBalances, getBalance, createMovement, listMovementsV2
 } from '../controllers/stockBalanceController';
 
 export const router = Router();
@@ -30,6 +30,7 @@ router.delete('/items/:id', deleteStockItem);     // DELETE /api/stock/items/:id
 router.get('/movements', listStockMovements);     // GET /api/stock/movements
 router.post('/movements', createStockMovement);   // POST /api/stock/movements (legacy)
 // BE-002: v2 endpoint with Zod DTO validation
+router.get('/movements/v2', listMovementsV2);     // GET /api/stock/movements/v2 (STOCK-MOVEMENTS-V2-GET-001)
 router.post('/movements/v2', validateDto(createMovementSchema), createMovement);
 router.put('/movements/:id', updateStockMovement);// PUT /api/stock/movements/:id
 router.delete('/movements/:id', deleteStockMovement); // DELETE /api/stock/movements/:id

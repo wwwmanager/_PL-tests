@@ -92,7 +92,7 @@ function BalancesTab() {
             sortable: true,
             render: (row: LocationBalance) => (
                 <span className={row.balance < 0 ? 'text-red-600 font-bold' : row.balance > 0 ? 'text-green-600' : ''}>
-                    {row.balance.toFixed(2)} {row.unit}
+                    {Number(row.balance).toFixed(2)} {row.unit}
                 </span>
             )
         },
@@ -206,7 +206,7 @@ function MovementsTab() {
             key: 'quantity',
             label: 'Кол-во',
             sortable: true,
-            render: (row: StockMovementV2) => row.quantity.toFixed(2)
+            render: (row: StockMovementV2) => Number(row.quantity).toFixed(2)
         },
         {
             key: 'stockLocationName',
