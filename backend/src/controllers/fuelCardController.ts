@@ -80,6 +80,31 @@ export async function getFuelCardsForDriver(req: Request, res: Response, next: N
     }
 }
 
+/**
+ * FUEL-CARD-SEARCH-BE-010: Search fuel cards by card number
+ * GET /fuel-cards/search?q=1234&onlyUnassigned=true&limit=20
+ */
+export async function searchFuelCards(req: Request, res: Response, next: NextFunction) {
+    try {
+        const user = req.user!;
+        const { q, onlyUnassigned, limit } = req.query as {
+            q?: string;
+            onlyUnassigned?: string;
+            limit?: string;
+        };
+
+        const fuelCards = await fuelCardService.searchFuelCards(
+            user.organizationId,
+            q || '',
+            onlyUnassigned === 'true',
+            parseInt(limit || '20', 10)
+        );
+        res.json({ data: fuelCards });
+    } catch (err) {
+        next(err);
+    }
+}
+
 // ============================================================================
 // FUEL-001: Top-Up Rules and Transactions
 // ============================================================================

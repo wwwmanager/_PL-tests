@@ -276,11 +276,14 @@ export async function deleteStockMovement(req: Request, res: Response, next: Nex
     }
 }
 
-// ==================== HELPER ENDPOINTS ====================
-
 /**
- * Get fuel card balance for a driver
+ * FUEL-CARD-LINK-BE-010: Get fuel card balance for a driver using ledger
  * GET /api/stock/fuel-card-balance/:driverId
+ * 
+ * Now properly uses:
+ * 1. FuelCard.assignedToDriverId = Driver.id
+ * 2. StockLocation linked to FuelCard
+ * 3. Ledger balance from StockMovement
  */
 export async function getFuelCardBalance(req: Request, res: Response, next: NextFunction) {
     try {
@@ -289,18 +292,96 @@ export async function getFuelCardBalance(req: Request, res: Response, next: Next
         }
 
         const { driverId } = req.params;
+        const organizationId = req.user.organizationId;
 
-        // Get employee with fuel card balance
-        const employee = await prisma.employee.findUnique({
-            where: { id: driverId },
-            select: { fuelCardBalance: true },
+        // Find all fuel cards assigned to this driver
+        const fuelCards = await prisma.fuelCard.findMany({
+            where: {
+                organizationId,
+                assignedToDriverId: driverId,
+                isActive: true,
+            },
+            include: {
+                stockLocation: true,
+            },
         });
 
-        if (!employee) {
-            return res.status(404).json({ error: 'Driver not found' });
+        if (fuelCards.length === 0) {
+            // No cards assigned - return zero balance
+            return res.json({
+                data: {
+                    balance: 0,
+                    cards: [],
+                    message: 'No fuel cards assigned to this driver'
+                }
+            });
         }
 
-        res.json({ data: { balance: employee.fuelCardBalance || 0 } });
+        // Get all fuel stock items for balance calculation
+        const fuelItems = await prisma.stockItem.findMany({
+            where: {
+                organizationId,
+                isFuel: true,
+                isActive: true,
+            },
+        });
+
+        // Calculate balance for each card from ledger
+        const cardBalances = await Promise.all(
+            fuelCards.map(async (card) => {
+                if (!card.stockLocation) {
+                    return {
+                        cardId: card.id,
+                        cardNumber: card.cardNumber,
+                        provider: card.provider,
+                        balance: 0,
+                        balanceByItem: [],
+                        hasLocation: false,
+                    };
+                }
+
+                // Calculate balance for each fuel type
+                const balanceByItem = await Promise.all(
+                    fuelItems.map(async (item) => {
+                        // Import getBalanceAt from stockService
+                        const { getBalanceAt } = await import('../services/stockService');
+                        const balance = await getBalanceAt(
+                            card.stockLocation!.id,
+                            item.id,
+                            new Date()
+                        );
+                        return {
+                            stockItemId: item.id,
+                            stockItemName: item.name,
+                            unit: item.unit,
+                            balance,
+                        };
+                    })
+                );
+
+                // Sum all fuel balances for total
+                const totalBalance = balanceByItem.reduce((sum, b) => sum + b.balance, 0);
+
+                return {
+                    cardId: card.id,
+                    cardNumber: card.cardNumber,
+                    provider: card.provider,
+                    balance: totalBalance,
+                    balanceByItem: balanceByItem.filter(b => b.balance !== 0),
+                    hasLocation: true,
+                };
+            })
+        );
+
+        // Calculate total balance across all cards
+        const totalBalance = cardBalances.reduce((sum, c) => sum + c.balance, 0);
+
+        res.json({
+            data: {
+                balance: totalBalance,
+                cards: cardBalances,
+            }
+        });
     } catch (err) {
         console.error('[getFuelCardBalance] Error:', err);
         next(err);

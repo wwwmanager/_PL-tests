@@ -257,6 +257,63 @@ export async function getFuelCardsForDriver(organizationId: string, driverId: st
 }
 
 /**
+ * FUEL-CARD-SEARCH-BE-010: Search fuel cards by card number
+ * @param organizationId - Organization ID
+ * @param query - Search query (partial card number)
+ * @param onlyUnassigned - If true, return only unassigned cards
+ * @param limit - Max results (default 20)
+ */
+export async function searchFuelCards(
+    organizationId: string,
+    query: string,
+    onlyUnassigned: boolean = false,
+    limit: number = 20
+) {
+    // Normalize query: remove hyphens, spaces for flexible matching
+    const normalizedQuery = query.replace(/[-\s]/g, '');
+
+    const where: any = {
+        organizationId,
+        isActive: true,
+    };
+
+    // ILIKE search on card number
+    if (normalizedQuery) {
+        where.cardNumber = {
+            contains: normalizedQuery,
+            mode: 'insensitive',
+        };
+    }
+
+    if (onlyUnassigned) {
+        where.assignedToDriverId = null;
+    }
+
+    return prisma.fuelCard.findMany({
+        where,
+        select: {
+            id: true,
+            cardNumber: true,
+            provider: true,
+            isActive: true,
+            assignedToDriverId: true,
+            assignedToDriver: {
+                select: {
+                    id: true,
+                    employee: {
+                        select: {
+                            fullName: true,
+                        },
+                    },
+                },
+            },
+        },
+        orderBy: { cardNumber: 'asc' },
+        take: Math.min(limit, 50),
+    });
+}
+
+/**
  * Проверяет, что карта принадлежит организации пользователя
  */
 async function ensureSameOrg(user: AuthUser, id: string) {
