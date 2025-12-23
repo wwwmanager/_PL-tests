@@ -328,6 +328,76 @@ async function ensureSameOrg(user: AuthUser, id: string) {
 // ============================================================================
 
 /**
+ * FUEL-CARDS-RULES-BE-010: List all top-up rules for organization
+ */
+export async function listTopUpRules(organizationId: string) {
+    const rules = await prisma.fuelCardTopUpRule.findMany({
+        where: { organizationId },
+        include: {
+            fuelCard: {
+                select: {
+                    id: true,
+                    cardNumber: true,
+                    provider: true,
+                },
+            },
+            stockItem: {
+                select: {
+                    id: true,
+                    name: true,
+                },
+            },
+            sourceLocation: {
+                select: {
+                    id: true,
+                    name: true,
+                },
+            },
+        },
+        orderBy: { createdAt: 'desc' },
+    });
+
+    // Serialize Decimal fields to numbers for JSON
+    return rules.map(rule => ({
+        ...rule,
+        amountLiters: Number(rule.amountLiters),
+        minBalanceLiters: rule.minBalanceLiters ? Number(rule.minBalanceLiters) : null,
+    }));
+}
+
+/**
+ * FUEL-CARDS-RULES-BE-010: List all reset rules for organization
+ */
+export async function listResetRules(organizationId: string) {
+    const rules = await prisma.fuelCardResetRule.findMany({
+        where: { organizationId },
+        include: {
+            department: {
+                select: {
+                    id: true,
+                    name: true,
+                },
+            },
+            targetLocation: {
+                select: {
+                    id: true,
+                    name: true,
+                },
+            },
+            stockItem: {
+                select: {
+                    id: true,
+                    name: true,
+                },
+            },
+        },
+        orderBy: { createdAt: 'desc' },
+    });
+
+    return rules;
+}
+
+/**
  * Get top-up rule for a fuel card
  */
 export async function getTopUpRule(organizationId: string, fuelCardId: string) {

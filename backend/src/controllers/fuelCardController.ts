@@ -110,6 +110,34 @@ export async function searchFuelCards(req: Request, res: Response, next: NextFun
 // ============================================================================
 
 /**
+ * FUEL-CARDS-RULES-BE-010: List all top-up rules for organization
+ * GET /fuel-cards/topup-rules
+ */
+export async function listTopUpRules(req: Request, res: Response, next: NextFunction) {
+    try {
+        const user = req.user!;
+        const rules = await fuelCardService.listTopUpRules(user.organizationId);
+        res.json({ success: true, data: rules });
+    } catch (err) {
+        next(err);
+    }
+}
+
+/**
+ * FUEL-CARDS-RULES-BE-010: List all reset rules for organization
+ * GET /fuel-cards/reset-rules
+ */
+export async function listResetRules(req: Request, res: Response, next: NextFunction) {
+    try {
+        const user = req.user!;
+        const rules = await fuelCardService.listResetRules(user.organizationId);
+        res.json({ success: true, data: rules });
+    } catch (err) {
+        next(err);
+    }
+}
+
+/**
  * GET /fuel-cards/:id/topup-rule
  */
 export async function getTopUpRule(req: Request, res: Response, next: NextFunction) {

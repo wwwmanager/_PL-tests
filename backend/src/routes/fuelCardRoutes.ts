@@ -12,6 +12,10 @@ router.post('/', fuelCardController.createFuelCard);
 // FUEL-CARD-SEARCH-BE-010: Search by card number (must be before /:id)
 router.get('/search', fuelCardController.searchFuelCards);
 
+// FUEL-CARDS-RULES-BE-010: List all rules (must be before /:id)
+router.get('/topup-rules', fuelCardController.listTopUpRules);
+router.get('/reset-rules', fuelCardController.listResetRules);
+
 // REL-601: Get fuel cards for specific driver (must be before /:id to avoid conflict)
 router.get('/driver/:driverId', fuelCardController.getFuelCardsForDriver);
 
