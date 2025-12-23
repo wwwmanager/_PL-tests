@@ -170,6 +170,9 @@ export interface LocationBalance {
     locationId: string;
     locationName: string;
     locationType: string;
+    stockItemId: string;
+    stockItemName: string;
+    unit: string;
     balance: number;
 }
 
@@ -181,6 +184,16 @@ export async function getBalancesAt(
     stockItemId: string,
     asOf: Date = new Date()
 ): Promise<LocationBalance[]> {
+    // Получаем информацию о товаре
+    const stockItem = await prisma.stockItem.findUnique({
+        where: { id: stockItemId },
+        select: { name: true, unit: true }
+    });
+
+    if (!stockItem) {
+        return [];
+    }
+
     // Получаем все активные локации организации
     const locations = await prisma.stockLocation.findMany({
         where: {
@@ -194,18 +207,23 @@ export async function getBalancesAt(
         },
     });
 
+    console.log(`[getBalancesAt] Found ${locations.length} active locations for org ${organizationId}`);
+
     // Параллельно считаем баланс каждой локации
     const balances = await Promise.all(
         locations.map(async (loc) => ({
             locationId: loc.id,
             locationName: loc.name,
             locationType: loc.type,
+            stockItemId, // Add stockItemId for frontend filtering
+            stockItemName: stockItem.name,
+            unit: stockItem.unit,
             balance: await getBalanceAt(loc.id, stockItemId, asOf),
         }))
     );
 
-    // Фильтруем локации с нулевым балансом (опционально)
-    return balances;
+    // Filter out locations with 0 balance to reduce noise
+    return balances.filter(b => Math.abs(b.balance) > 0.001);
 }
 
 // ============================================================================
