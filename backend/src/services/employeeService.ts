@@ -126,8 +126,9 @@ export async function createEmployee(data: any) {
 
         // REL-302: Auto-create Driver record if employeeType is 'driver'
         const employeeType = data.employeeType || 'driver';
+        let driverId: string | null = null;
         if (employeeType === 'driver') {
-            await tx.driver.create({
+            const driver = await tx.driver.create({
                 data: {
                     employeeId: employee.id,
                     licenseNumber: data.documentNumber || `AUTO-${employee.id.slice(0, 8)}`,
@@ -136,7 +137,32 @@ export async function createEmployee(data: any) {
                     licenseValidTo: data.documentExpiry ? new Date(data.documentExpiry) : null,
                 },
             });
+            driverId = driver.id;
             console.log(`[REL-302] Auto-created Driver for new employee ${employee.id} (${employee.fullName})`);
+        }
+
+        // FUEL-CARD-LINK-AUTO: Auto-link FuelCard when fuelCardNumber is provided
+        if (data.fuelCardNumber && driverId) {
+            const cardNumber = data.fuelCardNumber.trim();
+            const normalizedCardNumber = cardNumber.replace(/[-\s]/g, '');
+
+            const fuelCard = await tx.fuelCard.findFirst({
+                where: {
+                    OR: [
+                        { cardNumber: cardNumber },
+                        { cardNumber: { contains: normalizedCardNumber } },
+                    ],
+                    organizationId: data.organizationId,
+                },
+            });
+
+            if (fuelCard) {
+                await tx.fuelCard.update({
+                    where: { id: fuelCard.id },
+                    data: { assignedToDriverId: driverId },
+                });
+                console.log(`[FUEL-CARD-LINK] Linked card "${fuelCard.cardNumber}" to new driver ${driverId}`);
+            }
         }
 
         return employee;
@@ -201,13 +227,14 @@ export async function updateEmployee(id: string, data: any) {
         });
 
         // REL-302: Ensure Driver exists for ANY driver-type employee (fixes historical data)
+        let driverId: string | null = null;
         if (isDriverType) {
-            const existingDriver = await tx.driver.findUnique({
+            let existingDriver = await tx.driver.findUnique({
                 where: { employeeId: id }
             });
 
             if (!existingDriver) {
-                await tx.driver.create({
+                existingDriver = await tx.driver.create({
                     data: {
                         employeeId: id,
                         licenseNumber: data.documentNumber || employee.documentNumber || `AUTO-${id.slice(0, 8)}`,
@@ -219,6 +246,55 @@ export async function updateEmployee(id: string, data: any) {
                 });
 
                 console.log(`[REL-302] Auto-created missing Driver for employee ${id} (${updatedEmployee.fullName})`);
+            }
+            driverId = existingDriver.id;
+        }
+
+        // FUEL-CARD-LINK-AUTO: Auto-link FuelCard when fuelCardNumber is updated
+        if (data.fuelCardNumber !== undefined && isDriverType && driverId) {
+            const newCardNumber = data.fuelCardNumber?.trim();
+            const oldCardNumber = employee.fuelCardNumber?.trim();
+
+            // If card number changed
+            if (newCardNumber !== oldCardNumber) {
+                // Unlink old card if there was one
+                if (oldCardNumber) {
+                    await tx.fuelCard.updateMany({
+                        where: {
+                            cardNumber: oldCardNumber,
+                            assignedToDriverId: driverId,
+                        },
+                        data: {
+                            assignedToDriverId: null,
+                        },
+                    });
+                    console.log(`[FUEL-CARD-LINK] Unlinked old card "${oldCardNumber}" from driver ${driverId}`);
+                }
+
+                // Link new card if provided
+                if (newCardNumber) {
+                    // Find the FuelCard by cardNumber (try normalized matching)
+                    const normalizedCardNumber = newCardNumber.replace(/[-\s]/g, '');
+                    const fuelCard = await tx.fuelCard.findFirst({
+                        where: {
+                            OR: [
+                                { cardNumber: newCardNumber },
+                                { cardNumber: { contains: normalizedCardNumber } },
+                            ],
+                            organizationId: employee.organizationId,
+                        },
+                    });
+
+                    if (fuelCard) {
+                        await tx.fuelCard.update({
+                            where: { id: fuelCard.id },
+                            data: { assignedToDriverId: driverId },
+                        });
+                        console.log(`[FUEL-CARD-LINK] Linked card "${fuelCard.cardNumber}" (${fuelCard.id}) to driver ${driverId}`);
+                    } else {
+                        console.log(`[FUEL-CARD-LINK] FuelCard with number "${newCardNumber}" not found in organization ${employee.organizationId}`);
+                    }
+                }
             }
         }
 
