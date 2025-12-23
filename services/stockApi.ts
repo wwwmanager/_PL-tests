@@ -193,9 +193,19 @@ export async function deleteStockTransaction(id: string): Promise<void> {
  */
 export async function getFuelCardBalance(driverId: string): Promise<number> {
     try {
-        const response = await httpClient.get<ApiResponse<{ balance: number }>>(`/stock/fuel-card-balance/${driverId}`);
-        return response.data?.balance || 0;
-    } catch {
+        // WB-FIX-001: Use dedicated endpoint to get all cards for driver and sum positive balances
+        const response = await httpClient.get<{ data: FuelCard[] }>(`/fuel-cards/driver/${driverId}`);
+        const cards = response.data || [];
+
+        if (cards.length === 0) return 0;
+
+        // For now, return the balance of the first active card
+        // Ideally, we should let the user select the card if there are multiple
+        // But the current UI design implies a single balance context
+        const activeCard = cards.find(c => c.isActive) || cards[0];
+        return Number(activeCard.balanceLiters) || 0;
+    } catch (e) {
+        console.warn('[stockApi] Failed to fetch fuel card balance', e);
         return 0;
     }
 }
@@ -207,6 +217,7 @@ export interface FuelCardInfo {
     id: string;
     cardNumber: string;
     provider: string | null;
+    balanceLiters?: number;
 }
 
 export async function getFuelCardsForDriver(driverId: string): Promise<FuelCardInfo[]> {
@@ -621,10 +632,28 @@ export async function createTransferMovement(params: CreateTransferParams): Prom
 }
 
 /**
+ * Update a stock movement (V2)
+ */
+export async function updateStockMovementV2(id: string, params: Partial<CreateTransferParams> & {
+    movementType?: 'INCOME' | 'EXPENSE' | 'ADJUSTMENT' | 'TRANSFER';
+    stockLocationId?: string;
+}): Promise<StockMovementV2> {
+    console.log('📡 [stockApi] Updating movement:', id, params);
+
+    // Map params to backend expectation
+    const payload: any = {
+        ...params,
+        quantity: params.quantity ? String(params.quantity) : undefined,
+    };
+
+    const response = await httpClient.put<ApiResponse<StockMovementV2>>(`/stock/movements/${id}`, payload);
+    return response.data;
+}
+
+/**
  * Get warehouses for source location dropdown
  */
 export async function getWarehouses(): Promise<StockLocation[]> {
     const locations = await getStockLocations();
     return locations.filter(loc => loc.type === 'WAREHOUSE');
 }
-

@@ -11,11 +11,21 @@ export interface Column<T = any> {
     render?: (row: T) => React.ReactNode;
 }
 
+import useTable from '../../hooks/useTable';
+
+export interface Column<T = any> {
+    key: string;
+    label: string;
+    sortable?: boolean;
+    render?: (row: T) => React.ReactNode;
+}
+
 export interface DataTableProps<T = any> {
     columns: Column<T>[];
     data: T[];
     keyField: string;
     emptyMessage?: string;
+    searchable?: boolean;
 }
 
 function DataTable<T extends Record<string, any>>({
@@ -23,35 +33,16 @@ function DataTable<T extends Record<string, any>>({
     data,
     keyField,
     emptyMessage = 'Нет данных',
+    searchable = false,
 }: DataTableProps<T>) {
-    const [sortKey, setSortKey] = useState<string | null>(null);
-    const [sortAsc, setSortAsc] = useState(true);
-
-    const handleSort = (key: string, sortable?: boolean) => {
-        if (!sortable) return;
-        if (sortKey === key) {
-            setSortAsc(!sortAsc);
-        } else {
-            setSortKey(key);
-            setSortAsc(true);
-        }
-    };
-
-    const sortedData = useMemo(() => {
-        if (!sortKey) return data;
-        return [...data].sort((a, b) => {
-            const aVal = a[sortKey];
-            const bVal = b[sortKey];
-            if (aVal == null) return sortAsc ? 1 : -1;
-            if (bVal == null) return sortAsc ? -1 : 1;
-            if (typeof aVal === 'number' && typeof bVal === 'number') {
-                return sortAsc ? aVal - bVal : bVal - aVal;
-            }
-            return sortAsc
-                ? String(aVal).localeCompare(String(bVal))
-                : String(bVal).localeCompare(String(aVal));
-        });
-    }, [data, sortKey, sortAsc]);
+    const {
+        rows,
+        sortColumn,
+        sortDirection,
+        handleSort,
+        filters,
+        handleFilterChange,
+    } = useTable(data, columns);
 
     if (data.length === 0) {
         return (
@@ -70,28 +61,51 @@ function DataTable<T extends Record<string, any>>({
                             <th
                                 key={col.key}
                                 className={`px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider ${col.sortable ? 'cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700' : ''}`}
-                                onClick={() => handleSort(col.key, col.sortable)}
+                                onClick={() => handleSort(col.key)}
                             >
                                 <span className="flex items-center gap-1">
                                     {col.label}
-                                    {col.sortable && sortKey === col.key && (
-                                        <span>{sortAsc ? '▲' : '▼'}</span>
+                                    {col.sortable && sortColumn === col.key && (
+                                        <span>{sortDirection === 'asc' ? '▲' : '▼'}</span>
                                     )}
                                 </span>
                             </th>
                         ))}
                     </tr>
-                </thead>
-                <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
-                    {sortedData.map((row) => (
-                        <tr key={row[keyField]} className="hover:bg-gray-50 dark:hover:bg-gray-800">
+                    {searchable && (
+                        <tr>
                             {columns.map((col) => (
-                                <td key={col.key} className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
-                                    {col.render ? col.render(row) : row[col.key]}
-                                </td>
+                                <th key={`${col.key}-filter`} className="px-4 py-2 bg-gray-50 dark:bg-gray-800">
+                                    <input
+                                        type="text"
+                                        placeholder={`Поиск...`}
+                                        value={filters[col.key] || ''}
+                                        onChange={(e) => handleFilterChange(col.key, e.target.value)}
+                                        className="w-full text-xs px-2 py-1 border rounded border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                    />
+                                </th>
                             ))}
                         </tr>
-                    ))}
+                    )}
+                </thead>
+                <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
+                    {rows.length === 0 ? (
+                        <tr>
+                            <td colSpan={columns.length} className="px-4 py-8 text-center text-gray-500 dark:text-gray-400">
+                                Ничего не найдено
+                            </td>
+                        </tr>
+                    ) : (
+                        rows.map((row) => (
+                            <tr key={row[keyField]} className="hover:bg-gray-50 dark:hover:bg-gray-800">
+                                {columns.map((col) => (
+                                    <td key={col.key} className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
+                                        {col.render ? col.render(row) : row[col.key]}
+                                    </td>
+                                ))}
+                            </tr>
+                        ))
+                    )}
                 </tbody>
             </table>
         </div>

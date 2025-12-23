@@ -1,7 +1,9 @@
+
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Employee, Organization, EmployeeType, EMPLOYEE_TYPE_TRANSLATIONS, WaybillBlankBatch } from '../../types';
 import { getEmployees, createEmployee, updateEmployee, deleteEmployee } from '../../services/api/employeeApi';
 import { getOrganizations } from '../../services/organizationApi';
+import { getFuelCardsForDriver } from '../../services/stockApi'; // Import added
 import { PencilIcon, TrashIcon, PlusIcon, ArrowUpIcon, ArrowDownIcon, XIcon } from '../Icons';
 import useTable from '../../hooks/useTable';
 import Modal from '../shared/Modal';
@@ -107,7 +109,7 @@ const generateShortNameClient = (fullName: string): string => {
     const lastName = parts[0];
     const firstNameInitial = parts.length > 1 && parts[1] ? `${parts[1][0]}.` : '';
     const middleNameInitial = parts.length > 2 && parts[2] ? `${parts[2][0]}.` : '';
-    return `${lastName} ${firstNameInitial}${middleNameInitial}`.trim();
+    return `${lastName} ${firstNameInitial}${middleNameInitial} `.trim();
 };
 
 const EmployeeList: React.FC = () => {
@@ -178,6 +180,25 @@ const EmployeeList: React.FC = () => {
     useEffect(() => {
         fetchData();
     }, []);
+
+    // FIX: Fetch additional driver details (fuel card) when opening modal
+    useEffect(() => {
+        if (currentItem?.id && currentItem.employeeType === 'driver') {
+            getFuelCardsForDriver(currentItem.id).then(cards => {
+                const activeCard = cards[0]; // API returns only active cards
+                if (activeCard) {
+                    setCurrentItem(prev => {
+                        if (!prev || prev.id !== currentItem.id) return prev;
+                        return {
+                            ...prev,
+                            fuelCardNumber: activeCard.cardNumber,
+                            fuelCardBalance: activeCard.balanceLiters || 0
+                        };
+                    });
+                }
+            }).catch(console.error);
+        }
+    }, [currentItem?.id, currentItem?.employeeType]);
 
     const enrichedData = useMemo(() => {
         return employees.map(e => ({
@@ -322,11 +343,11 @@ const EmployeeList: React.FC = () => {
     const formatSnils = (value: string): string => {
         const digits = value.replace(/\D/g, '').slice(0, 11);
         if (digits.length > 9) {
-            return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6, 9)} ${digits.slice(9, 11)}`;
+            return `${digits.slice(0, 3)} -${digits.slice(3, 6)} -${digits.slice(6, 9)} ${digits.slice(9, 11)} `;
         } else if (digits.length > 6) {
-            return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6, 9)}`;
+            return `${digits.slice(0, 3)} -${digits.slice(3, 6)} -${digits.slice(6, 9)} `;
         } else if (digits.length > 3) {
-            return `${digits.slice(0, 3)}-${digits.slice(3, 6)}`;
+            return `${digits.slice(0, 3)} -${digits.slice(3, 6)} `;
         }
         return digits;
     };
@@ -387,7 +408,7 @@ const EmployeeList: React.FC = () => {
                 onClose={() => setIsDeleteModalOpen(false)}
                 onConfirm={handleConfirmDelete}
                 title="Подтвердить удаление"
-                message={`Вы уверены, что хотите удалить сотрудника "${employeeToDelete?.shortName}"?`}
+                message={`Вы уверены, что хотите удалить сотрудника "${employeeToDelete?.shortName}" ? `}
                 confirmText="Удалить"
                 confirmButtonClass="bg-red-600 hover:bg-red-700 focus:ring-red-500"
             />
@@ -401,7 +422,7 @@ const EmployeeList: React.FC = () => {
                 isOpen={!!currentItem}
                 onClose={handleCancel}
                 isDirty={isDirty}
-                title={currentItem?.id ? `Редактирование: ${currentItem.fullName}` : 'Добавить нового сотрудника'}
+                title={currentItem?.id ? `Редактирование: ${currentItem.fullName} ` : 'Добавить нового сотрудника'}
                 footer={
                     <>
                         <button onClick={handleCancel} className="bg-gray-200 dark:bg-gray-600 text-gray-800 dark:text-white font-semibold py-2 px-6 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-500">Отмена</button>
@@ -543,7 +564,7 @@ const EmployeeList: React.FC = () => {
                             </tr>
                             <tr>
                                 {columns.map(col => (
-                                    <th key={`${col.key}-filter`} className="px-2 py-1">
+                                    <th key={`${col.key} -filter`} className="px-2 py-1">
                                         <input
                                             type="text"
                                             value={filters[col.key] || ''}
@@ -574,7 +595,7 @@ const EmployeeList: React.FC = () => {
                                     <td className="px-6 py-4 font-mono">{e.fuelCardBalance?.toFixed(2) ?? '0.00'}</td>
                                     <td className="px-6 py-4">{e.organizationName}</td>
                                     <td className="px-6 py-4">
-                                        <span className={`px-2 py-1 text-xs font-semibold rounded-full ${e.status === 'Active' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'}`}>
+                                        <span className={`px - 2 py - 1 text - xs font - semibold rounded - full ${e.status === 'Active' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'} `}>
                                             {e.status === 'Active' ? 'Активен' : 'Неактивен'}
                                         </span>
                                     </td>

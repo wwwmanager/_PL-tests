@@ -1,11 +1,17 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { getStockBalances, getStockItems } from '../../services/api/stockApi';
-import { LocationBalance, GarageStockItem } from '../../types';
+import { getStockBalances, getStockItems, getStockLocations } from '../../services/api/stockApi';
+import { getVehicles } from '../../services/api/vehicleApi';
+import { LocationBalance, GarageStockItem, StockLocation, Vehicle } from '../../types';
 import { useToast } from '../../hooks/useToast';
+import DataTable from '../shared/DataTable';
 
 const FuelBalances: React.FC = () => {
+    // ... (state declarations remain same)
     const [balances, setBalances] = useState<LocationBalance[]>([]);
+
     const [items, setItems] = useState<GarageStockItem[]>([]);
+    const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+    const [locations, setLocations] = useState<StockLocation[]>([]);
     const [loading, setLoading] = useState(false);
     const [asOf, setAsOf] = useState(new Date().toISOString().slice(0, 16));
 
@@ -16,6 +22,8 @@ const FuelBalances: React.FC = () => {
 
     const { showToast } = useToast();
 
+    // ... (loadData remains same)
+
     const loadData = useCallback(async () => {
         setLoading(true);
         try {
@@ -24,6 +32,16 @@ const FuelBalances: React.FC = () => {
             if (items.length === 0) {
                 currentItems = await getStockItems(true);
                 setItems(currentItems);
+            }
+
+            // Load metadata (vehicles, locations) if not loaded
+            if (vehicles.length === 0) {
+                const [vData, lData] = await Promise.all([
+                    getVehicles({}),
+                    getStockLocations()
+                ]);
+                setVehicles(vData);
+                setLocations(lData);
             }
 
             // Set default stockItemId if not set
@@ -43,7 +61,7 @@ const FuelBalances: React.FC = () => {
         } finally {
             setLoading(false);
         }
-    }, [asOf, filters.stockItemId, showToast, items.length]);
+    }, [asOf, filters.stockItemId, showToast, items.length, vehicles.length]);
 
     useEffect(() => {
         loadData();
@@ -70,6 +88,71 @@ const FuelBalances: React.FC = () => {
             default: return type;
         }
     };
+
+    const getDriverForLocation = (locationId: string, type: string) => {
+        if (type !== 'VEHICLE_TANK') return null;
+
+        const loc = locations.find(l => l.id === locationId);
+        if (!loc || !loc.vehicleId) return null;
+
+        const vehicle = vehicles.find(v => v.id === loc.vehicleId);
+        if (!vehicle || !vehicle.assignedDriver) return null;
+
+        return vehicle.assignedDriver.fullName;
+    };
+
+    const columns = [
+        {
+            key: 'locationName',
+            label: 'Локация',
+            sortable: true,
+            render: (row: LocationBalance) => <span className="text-sm font-medium text-gray-900 dark:text-white">{row.locationName}</span>
+        },
+        {
+            key: 'locationType',
+            label: 'Тип',
+            sortable: true,
+            render: (row: LocationBalance) => (
+                <span className="text-sm text-gray-600 dark:text-gray-300">
+                    {getLocationTypeLabel(row.locationType)}
+                </span>
+            )
+        },
+        {
+            key: 'stockItemName',
+            label: 'Товар',
+            sortable: true,
+            render: (row: LocationBalance) => <span className="text-sm text-gray-600 dark:text-gray-300">{row.stockItemName}</span>
+        },
+        {
+            key: 'balance',
+            label: 'Остаток',
+            sortable: true,
+            render: (row: LocationBalance) => (
+                <span className={`font-bold ${row.balance < 0 ? 'text-red-600' : 'text-green-600'}`}>
+                    {row.balance.toLocaleString('ru-RU', { minimumFractionDigits: 2 })}
+                </span>
+            )
+        },
+        {
+            key: 'unit',
+            label: 'Ед. изм.',
+            sortable: true,
+            render: (row: LocationBalance) => <span className="text-sm text-gray-500 dark:text-gray-400">{row.unit}</span>
+        },
+
+        {
+            key: 'driver',
+            label: 'Водитель / Ответственный',
+            sortable: false,
+            render: (row: LocationBalance) => {
+                const driverName = getDriverForLocation(row.locationId, row.locationType);
+                if (!driverName) return <span className="text-gray-400">-</span>;
+                return <span className="text-sm font-medium text-gray-800 dark:text-gray-200">{driverName}</span>;
+            }
+        },
+
+    ];
 
     return (
         <div className="p-4 space-y-4">
@@ -124,53 +207,18 @@ const FuelBalances: React.FC = () => {
             </div>
 
             {/* Table */}
-            <div className="overflow-x-auto border dark:border-gray-700 rounded-lg shadow-sm">
-                <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                    <thead className="bg-gray-50 dark:bg-gray-800">
-                        <tr>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Локация</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Тип</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Товар</th>
-                            <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Остаток</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Ед. изм.</th>
-                        </tr>
-                    </thead>
-                    <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-800">
-                        {loading ? (
-                            <tr>
-                                <td colSpan={5} className="px-6 py-12 text-center text-gray-500">Загрузка...</td>
-                            </tr>
-                        ) : filteredBalances.length === 0 ? (
-                            <tr>
-                                <td colSpan={5} className="px-6 py-12 text-center text-gray-500">
-                                    Нет данных об остатках на выбранную дату
-                                </td>
-                            </tr>
-                        ) : (
-                            filteredBalances.map((b, idx) => (
-                                <tr key={`${b.locationId}-${b.stockItemId || idx}`} className="hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
-                                        {b.locationName}
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">
-                                        {getLocationTypeLabel(b.locationType)}
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">
-                                        {b.stockItemName}
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-right">
-                                        <span className={`font-bold ${b.balance < 0 ? 'text-red-600' : 'text-green-600'}`}>
-                                            {b.balance.toLocaleString('ru-RU', { minimumFractionDigits: 2 })}
-                                        </span>
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                                        {b.unit}
-                                    </td>
-                                </tr>
-                            ))
-                        )}
-                    </tbody>
-                </table>
+            <div className="bg-white dark:bg-gray-800 border dark:border-gray-700 rounded-lg shadow-sm">
+                {loading ? (
+                    <div className="p-12 text-center text-gray-500">Загрузка...</div>
+                ) : (
+                    <DataTable
+                        columns={columns}
+                        data={filteredBalances}
+                        keyField="locationId" // Assuming unique by locationId here since filtered by single stockItem usually
+                        emptyMessage="Нет данных об остатках на выбранную дату"
+                        searchable={true}
+                    />
+                )}
             </div>
         </div>
     );

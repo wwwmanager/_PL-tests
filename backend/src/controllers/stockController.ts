@@ -127,7 +127,9 @@ export async function listStockMovements(req: Request, res: Response, next: Next
             driverId?: string;
         };
 
-        const where: any = {};
+        const where: any = {
+            isVoid: false, // P1-3: Exclude voided movements
+        };
         if (organizationId) where.organizationId = organizationId;
         if (stockItemId) where.stockItemId = stockItemId;
         if (waybillId) where.documentId = waybillId;
@@ -162,66 +164,22 @@ export async function listStockMovements(req: Request, res: Response, next: Next
     }
 }
 
+// P0-1: STOCK-LEGACY-POST-410 — Legacy endpoint disabled
 export async function createStockMovement(req: Request, res: Response, next: NextFunction) {
-    try {
-        if (!req.user) {
-            return res.status(401).json({ error: 'Unauthorized' });
+    return res.status(410).json({
+        error: 'This endpoint is deprecated and has been disabled.',
+        code: 'ENDPOINT_GONE',
+        migration: {
+            endpoint: 'POST /api/stock/movements/v2',
+            changes: [
+                'Use Zod-validated DTO',
+                'Use stockLocationId instead of warehouseId',
+                'Specify movementType: INCOME | EXPENSE | ADJUSTMENT | TRANSFER',
+                'All movements go through Service Layer with balance checks'
+            ],
+            documentation: 'See STOCK_MOVEMENT_AUDIT.md for details'
         }
-
-        const { stockItemId, warehouseId, movementType, quantity, documentType, documentId, comment, items } = req.body;
-        const organizationId = req.user.organizationId;
-        const userId = req.user.id;
-
-        if (!organizationId) {
-            return res.status(400).json({ error: 'organizationId required' });
-        }
-
-        // Handle legacy format with items array
-        if (items && Array.isArray(items) && items.length > 0) {
-            const movements = await Promise.all(items.map(async (item: any) => {
-                return prisma.stockMovement.create({
-                    data: {
-                        organizationId,
-                        stockItemId: item.stockItemId,
-                        warehouseId: warehouseId || null,
-                        movementType: movementType === 'income' ? StockMovementType.INCOME : StockMovementType.EXPENSE,
-                        quantity: item.quantity,
-                        documentType: documentType || null,
-                        documentId: documentId || null,
-                        comment: comment || item.notes || null,
-                        createdByUserId: userId,
-                    },
-                    include: {
-                        stockItem: true,
-                    },
-                });
-            }));
-            return res.status(201).json({ data: movements[0], all: movements });
-        }
-
-        // Single movement
-        const movement = await prisma.stockMovement.create({
-            data: {
-                organizationId,
-                stockItemId,
-                warehouseId: warehouseId || null,
-                movementType: movementType === 'income' ? StockMovementType.INCOME : StockMovementType.EXPENSE,
-                quantity,
-                documentType: documentType || null,
-                documentId: documentId || null,
-                comment: comment || null,
-                createdByUserId: userId,
-            },
-            include: {
-                stockItem: true,
-            },
-        });
-
-        res.status(201).json({ data: movement });
-    } catch (err) {
-        console.error('[createStockMovement] Error:', err);
-        next(err);
-    }
+    });
 }
 
 export async function updateStockMovement(req: Request, res: Response, next: NextFunction) {
@@ -232,23 +190,39 @@ export async function updateStockMovement(req: Request, res: Response, next: Nex
 
         const { id } = req.params;
         const { stockItemId, warehouseId, movementType, quantity, documentType, documentId, comment } = req.body;
+        const organizationId = req.user.organizationId;
 
         // For now, limited update support - mainly for comment changes
-        const movement = await prisma.stockMovement.update({
-            where: { id },
-            data: {
-                stockItemId,
-                warehouseId: warehouseId || null,
-                movementType: movementType === 'income' ? StockMovementType.INCOME : StockMovementType.EXPENSE,
-                quantity,
-                documentType: documentType || null,
-                documentId: documentId || null,
-                comment: comment || null,
-            },
+        // Use robust service method that handles balance checks and locking
+        const { updateStockMovement } = await import('../services/stockService');
+
+        const movement = await updateStockMovement({
+            id,
+            organizationId,
+            userId: req.user.id,
+            movementType: movementType ? (StockMovementType[movementType as keyof typeof StockMovementType] || movementType) : undefined,
+            stockItemId,
+            quantity,
+            stockLocationId: req.body.stockLocationId, // Ensure these are passed from body
+            fromLocationId: req.body.fromLocationId,
+            toLocationId: req.body.toLocationId,
+            occurredAt: req.body.occurredAt ? new Date(req.body.occurredAt) : undefined,
+            externalRef: req.body.externalRef,
+            comment,
+        });
+
+        // Refetch to include relations for response consistency
+        const updated = await prisma.stockMovement.findUnique({
+            where: { id: movement.id },
             include: {
                 stockItem: true,
-            },
+                stockLocation: true,
+                fromStockLocation: true,
+                toStockLocation: true
+            }
         });
+
+        res.json({ data: updated });
 
         res.json({ data: movement });
     } catch (err) {
@@ -257,6 +231,7 @@ export async function updateStockMovement(req: Request, res: Response, next: Nex
     }
 }
 
+// P0-2: STOCK-DELETE-BLOCK — Hard delete blocked, use void operation instead
 export async function deleteStockMovement(req: Request, res: Response, next: NextFunction) {
     try {
         if (!req.user) {
@@ -264,14 +239,83 @@ export async function deleteStockMovement(req: Request, res: Response, next: Nex
         }
 
         const { id } = req.params;
+        const organizationId = req.user.organizationId;
 
-        await prisma.stockMovement.delete({
-            where: { id },
+        // Get movement to check documentType
+        const movement = await prisma.stockMovement.findFirst({
+            where: { id, organizationId },
+            select: { documentType: true }
         });
 
-        res.status(204).send();
+        if (!movement) {
+            return res.status(404).json({ error: 'Movement not found' });
+        }
+
+        // P0-2: Block system movements (CRITICAL)
+        const systemDocTypes = ['WAYBILL', 'FUEL_CARD_RESET', 'FUEL_CARD_TOPUP'];
+        if (movement.documentType && systemDocTypes.includes(movement.documentType)) {
+            return res.status(403).json({
+                error: 'Cannot delete system-generated movements',
+                code: 'SYSTEM_MOVEMENT_DELETE_FORBIDDEN',
+                documentType: movement.documentType,
+                hint: 'System movements are immutable. Contact administrator if correction is needed.'
+            });
+        }
+
+        // P0-2: Block ALL hard deletes (temporary until void is implemented)
+        return res.status(405).json({
+            error: 'Hard delete is disabled. Use void operation instead.',
+            code: 'DELETE_METHOD_NOT_ALLOWED',
+            migration: {
+                endpoint: 'POST /api/stock/movements/:id/void',
+                status: 'Coming in PR2 (STOCK-VOID)',
+                eta: 'Next release'
+            }
+        });
+
+        // This code will never execute, but kept for reference
+        // await prisma.stockMovement.delete({ where: { id } });
+        // res.status(204).send();
     } catch (err) {
         console.error('[deleteStockMovement] Error:', err);
+        next(err);
+    }
+}
+
+// P1-1: STOCK-VOID — Void endpoint for manual movements
+export async function voidStockMovementController(req: Request, res: Response, next: NextFunction) {
+    try {
+        if (!req.user) {
+            return res.status(401).json({ error: 'Unauthorized' });
+        }
+
+        const { id } = req.params;
+        const { reason } = req.body;
+
+        // Validation
+        if (!reason || typeof reason !== 'string' || reason.trim().length < 5) {
+            return res.status(400).json({
+                error: 'Void reason is required and must be at least 5 characters',
+                code: 'INVALID_VOID_REASON',
+            });
+        }
+
+        const { voidStockMovement } = await import('../services/stockService');
+
+        const voided = await voidStockMovement({
+            id,
+            organizationId: req.user.organizationId,
+            userId: req.user.id,
+            reason: reason.trim(),
+        });
+
+        res.json({ success: true, data: voided });
+    } catch (err: any) {
+        console.error('[voidStockMovement] Full error:', {
+            message: err.message,
+            stack: err.stack,
+            name: err.name,
+        });
         next(err);
     }
 }

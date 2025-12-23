@@ -150,7 +150,10 @@ export async function listMovementsV2(
         const pageSize = Math.min(200, Math.max(1, parseInt(String(pageSizeStr || '50'), 10)));
 
         // Build where clause
-        const where: any = { organizationId: user.organizationId };
+        const where: any = {
+            organizationId: user.organizationId,
+            isVoid: false, // P1-3: Exclude voided movements
+        };
 
         if (movementType) {
             where.movementType = String(movementType);

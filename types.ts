@@ -208,6 +208,7 @@ export interface Vehicle {
   fuelStockItemId?: string | null;
   fuelConsumptionRates: FuelConsumptionRates;
   assignedDriverId: string | null;
+  assignedDriver?: { id: string; fullName: string; } | null;
   organizationId: string | null;
   currentFuel?: number;
   year?: number;

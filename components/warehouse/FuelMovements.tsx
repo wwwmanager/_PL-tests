@@ -6,6 +6,7 @@ import { PlusIcon, TrashIcon } from '../Icons';
 import { RequireCapability } from '../../services/auth';
 import MovementCreateModal from './MovementCreateModal';
 import ConfirmationModal from '../shared/ConfirmationModal';
+import DataTable from '../shared/DataTable';
 
 const FuelMovements: React.FC = () => {
     const [movements, setMovements] = useState<StockMovementV2[]>([]);
@@ -16,6 +17,7 @@ const FuelMovements: React.FC = () => {
     const [page, setPage] = useState(1);
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [movementToDelete, setMovementToDelete] = useState<StockMovementV2 | null>(null);
+    const [editMovement, setEditMovement] = useState<StockMovementV2 | null>(null);
     const limit = 20;
 
     const [filters, setFilters] = useState({
@@ -87,6 +89,102 @@ const FuelMovements: React.FC = () => {
             default: return { label: type, color: 'bg-gray-100 text-gray-800' };
         }
     };
+
+    const columns = [
+        {
+            key: 'occurredAt',
+            label: 'Дата',
+            sortable: true,
+            render: (row: StockMovementV2) => new Date(row.occurredAt).toLocaleString('ru-RU', { dateStyle: 'short', timeStyle: 'short' })
+        },
+        {
+            key: 'movementType',
+            label: 'Тип',
+            sortable: true,
+            render: (row: StockMovementV2) => {
+                const type = getTypeLabel(row.movementType);
+                return (
+                    <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${type.color}`}>
+                        {type.label}
+                    </span>
+                );
+            }
+        },
+        {
+            key: 'stockItemName',
+            label: 'Товар',
+            sortable: true,
+            render: (row: StockMovementV2) => <span className="font-medium text-gray-900 dark:text-white">{row.stockItemName}</span>
+        },
+        {
+            key: 'quantity',
+            label: 'Кол-во',
+            sortable: true,
+            render: (row: StockMovementV2) => (
+                <span className="font-semibold text-gray-700 dark:text-gray-200">
+                    {row.quantity.toLocaleString('ru-RU', { minimumFractionDigits: 2 })}
+                </span>
+            )
+        },
+        {
+            key: 'location',
+            label: 'Локация',
+            render: (row: StockMovementV2) => (
+                <div className="text-sm text-gray-600 dark:text-gray-300">
+                    {row.movementType === 'TRANSFER' ? (
+                        <div className="flex flex-col">
+                            <span className="text-xs text-gray-400 italic font-normal">из:</span>
+                            <span>{row.fromStockLocationName}</span>
+                            <span className="text-xs text-gray-400 italic font-normal">в:</span>
+                            <span>{row.toStockLocationName}</span>
+                        </div>
+                    ) : (
+                        row.stockLocationName
+                    )}
+                </div>
+            )
+        },
+        {
+            key: 'document',
+            label: 'Основание / Коммент.',
+            render: (row: StockMovementV2) => (
+                <div className="flex flex-col text-sm text-gray-500 dark:text-gray-400">
+                    {row.documentType && <span className="font-medium text-gray-600 dark:text-gray-300">{row.documentType}: {row.documentId}</span>}
+                    {row.comment && <span className="italic">"{row.comment}"</span>}
+                    {row.externalRef && <span className="text-[10px] text-gray-400">ID: {row.externalRef}</span>}
+                </div>
+            )
+        },
+        {
+            key: 'actions',
+            label: 'Действия',
+            render: (row: StockMovementV2) => (
+                <div className="flex justify-center space-x-2">
+                    <RequireCapability cap="stock.manage">
+                        <button
+                            onClick={() => {
+                                setEditMovement(row);
+                                setIsCreateModalOpen(true);
+                            }}
+                            className="p-1 text-blue-500 hover:text-blue-700 transition-colors"
+                            title="Редактировать"
+                        >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                            </svg>
+                        </button>
+                        <button
+                            onClick={() => setMovementToDelete(row)}
+                            className="p-1 text-red-500 hover:text-red-700 transition-colors"
+                            title="Удалить операцию"
+                        >
+                            <TrashIcon className="w-4 h-4" />
+                        </button>
+                    </RequireCapability>
+                </div>
+            )
+        }
+    ];
 
     const totalPages = Math.ceil(total / limit);
 
@@ -187,85 +285,18 @@ const FuelMovements: React.FC = () => {
             </div>
 
             {/* Table */}
-            <div className="overflow-x-auto border dark:border-gray-700 rounded-lg shadow-sm">
-                <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                    <thead className="bg-gray-50 dark:bg-gray-800">
-                        <tr>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Дата</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Тип</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Товар</th>
-                            <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Кол-во</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Локация</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Основание / Коммент.</th>
-                            <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Действия</th>
-                        </tr>
-                    </thead>
-                    <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-800">
-                        {loading ? (
-                            <tr>
-                                <td colSpan={6} className="px-6 py-12 text-center text-gray-500">Загрузка...</td>
-                            </tr>
-                        ) : movements.length === 0 ? (
-                            <tr>
-                                <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
-                                    {Object.values(filters).some(v => v !== '') ? 'По вашему запросу ничего не найдено' : 'Движений еще нет'}
-                                </td>
-                            </tr>
-                        ) : (
-                            movements.map((m) => {
-                                const type = getTypeLabel(m.movementType);
-                                return (
-                                    <tr key={m.id} className="hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">
-                                            {new Date(m.occurredAt).toLocaleString('ru-RU', { dateStyle: 'short', timeStyle: 'short' })}
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap">
-                                            <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${type.color}`}>
-                                                {type.label}
-                                            </span>
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
-                                            {m.stockItemName}
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-semibold text-gray-700 dark:text-gray-200">
-                                            {m.quantity.toLocaleString('ru-RU', { minimumFractionDigits: 2 })}
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">
-                                            {m.movementType === 'TRANSFER' ? (
-                                                <div className="flex flex-col">
-                                                    <span className="text-xs text-gray-400 italic font-normal">из:</span>
-                                                    <span>{m.fromStockLocationName}</span>
-                                                    <span className="text-xs text-gray-400 italic font-normal">в:</span>
-                                                    <span>{m.toStockLocationName}</span>
-                                                </div>
-                                            ) : (
-                                                m.stockLocationName
-                                            )}
-                                        </td>
-                                        <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">
-                                            <div className="flex flex-col">
-                                                {m.documentType && <span className="font-medium text-gray-600 dark:text-gray-300">{m.documentType}: {m.documentId}</span>}
-                                                {m.comment && <span className="italic">"{m.comment}"</span>}
-                                                {m.externalRef && <span className="text-[10px] text-gray-400">ID: {m.externalRef}</span>}
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4 text-center">
-                                            <RequireCapability cap="stock.manage">
-                                                <button
-                                                    onClick={() => setMovementToDelete(m)}
-                                                    className="p-1 text-red-500 hover:text-red-700 transition-colors"
-                                                    title="Удалить операцию"
-                                                >
-                                                    <TrashIcon className="w-4 h-4" />
-                                                </button>
-                                            </RequireCapability>
-                                        </td>
-                                    </tr>
-                                );
-                            })
-                        )}
-                    </tbody>
-                </table>
+            <div className="bg-white dark:bg-gray-800 border dark:border-gray-700 rounded-lg shadow-sm">
+                {loading ? (
+                    <div className="p-12 text-center text-gray-500">Загрузка...</div>
+                ) : (
+                    <DataTable
+                        columns={columns}
+                        data={movements}
+                        keyField="id"
+                        emptyMessage={Object.values(filters).some(v => v !== '') ? 'По вашему запросу ничего не найдено' : 'Движений еще нет'}
+                        searchable={true}
+                    />
+                )}
             </div>
 
             {/* Pagination */}
@@ -293,7 +324,11 @@ const FuelMovements: React.FC = () => {
 
             <MovementCreateModal
                 isOpen={isCreateModalOpen}
-                onClose={handleCloseCreateModal}
+                onClose={(refresh) => {
+                    handleCloseCreateModal(refresh);
+                    setEditMovement(null);
+                }}
+                initialData={editMovement}
             />
 
             <ConfirmationModal

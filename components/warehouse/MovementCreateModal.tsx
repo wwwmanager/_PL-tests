@@ -3,35 +3,47 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import Modal from '../shared/Modal';
-import { getStockItems, getStockLocations, createStockMovement } from '../../services/api/stockApi';
-import { GarageStockItem, StockLocation } from '../../types';
+import { getStockItems, getStockLocations, createStockMovement, updateStockMovementV2 } from '../../services/api/stockApi';
+import { GarageStockItem, StockLocation, StockMovementV2 } from '../../types';
 import { useToast } from '../../hooks/useToast';
 
 const movementSchema = z.object({
     occurredAt: z.string().min(1, 'Укажите дату и время'),
-    movementType: z.enum(['INCOME', 'TRANSFER']),
+    movementType: z.enum(['INCOME', 'TRANSFER', 'EXPENSE', 'ADJUSTMENT']),
     stockItemId: z.string().min(1, 'Выберите товар'),
-    quantity: z.preprocess((val) => Number(val), z.number().positive('Количество должно быть больше 0')),
+    quantity: z.preprocess((val) => Number(val), z.number()), // Allow negative for adjustments if needed, though validation below might restrict
     fromStockLocationId: z.string().optional(),
-    toStockLocationId: z.string().min(1, 'Укажите назначение'),
+    toStockLocationId: z.string().optional(),
     comment: z.string().optional(),
     externalRef: z.string().optional(),
 }).refine(data => {
     if (data.movementType === 'TRANSFER' && !data.fromStockLocationId) return false;
+    if (data.movementType === 'INCOME' && !data.toStockLocationId) return false;
+    // For EXPENSE, typically we need a source location (stockLocationId in DB)
+    // Our UI maps 'toStockLocationId' to stockLocationId for INCOME.
+    // We should probably have a single 'locationId' field for simple moves.
+    // Let's stick to current UI logic:
+    // INCOME: toStockLocationId -> stockLocationId
+    // TRANSFER: from -> from, to -> to
+    // EXPENSE/ADJUSTMENT: fromStockLocationId -> stockLocationId (source)
+    if ((data.movementType === 'EXPENSE' || data.movementType === 'ADJUSTMENT') && !data.fromStockLocationId) return false;
+
     return true;
-}, { message: 'Укажите источник', path: ['fromStockLocationId'] });
+}, { message: 'Укажите локацию', path: ['fromStockLocationId'] }); // General error path
 
 type MovementFormData = z.infer<typeof movementSchema>;
 
 interface Props {
     isOpen: boolean;
     onClose: (refresh?: boolean) => void;
+    initialData?: StockMovementV2 | null;
 }
 
-const MovementCreateModal: React.FC<Props> = ({ isOpen, onClose }) => {
+const MovementCreateModal: React.FC<Props> = ({ isOpen, onClose, initialData }) => {
     const [items, setItems] = useState<GarageStockItem[]>([]);
     const [locations, setLocations] = useState<StockLocation[]>([]);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [loading, setLoading] = useState(false);
     const { showToast } = useToast();
 
     const {
@@ -40,6 +52,7 @@ const MovementCreateModal: React.FC<Props> = ({ isOpen, onClose }) => {
         watch,
         reset,
         formState: { errors },
+        setValue
     } = useForm<MovementFormData>({
         resolver: zodResolver(movementSchema),
         defaultValues: {
@@ -53,18 +66,78 @@ const MovementCreateModal: React.FC<Props> = ({ isOpen, onClose }) => {
 
     useEffect(() => {
         if (isOpen) {
-            Promise.all([getStockItems(true), getStockLocations()])
-                .then(([itemsData, locationsData]) => {
-                    setItems(itemsData);
-                    setLocations(locationsData);
-                })
-                .catch(err => showToast('Ошибка загрузки данных: ' + err.message, 'error'));
+            setLoading(true);
+            const loadData = async () => {
+                try {
+                    const [itemsData, locationsData] = await Promise.allSettled([
+                        getStockItems(),
+                        getStockLocations()
+                    ]);
+
+                    if (itemsData.status === 'fulfilled') {
+                        setItems(itemsData.value);
+                    } else {
+                        console.error('Failed to load items', itemsData.reason);
+                        showToast('Не удалось загрузить товары', 'error');
+                    }
+
+                    if (locationsData.status === 'fulfilled') {
+                        setLocations(locationsData.value);
+                    } else {
+                        console.error('Failed to load locations', locationsData.reason);
+                        showToast('Не удалось загрузить локации', 'error');
+                    }
+                } catch (err: any) {
+                    console.error('Error loading modal data', err);
+                } finally {
+                    setLoading(false);
+                }
+            };
+            loadData();
         }
     }, [isOpen, showToast]);
+
+    useEffect(() => {
+        if (isOpen && initialData) {
+            console.log('Initializing form with:', initialData);
+            // Pre-fill form
+            reset({
+                occurredAt: new Date(initialData.occurredAt).toISOString().slice(0, 16),
+                movementType: initialData.movementType as any,
+                stockItemId: initialData.stockItemId || (initialData as any).stockItem?.id || '',
+                quantity: initialData.quantity,
+                externalRef: initialData.documentId || initialData.externalRef || '',
+                comment: initialData.comment || '',
+                // Map locations (try scalar first, then relation)
+                fromStockLocationId: (initialData.movementType === 'TRANSFER'
+                    ? (initialData.fromStockLocationId || (initialData as any).fromStockLocation?.id)
+                    : initialData.movementType === 'INCOME' ? undefined : (initialData.stockLocationId || (initialData as any).stockLocation?.id)) || '',
+                toStockLocationId: (initialData.movementType === 'TRANSFER'
+                    ? (initialData.toStockLocationId || (initialData as any).toStockLocation?.id)
+                    : initialData.movementType === 'INCOME' ? (initialData.stockLocationId || (initialData as any).stockLocation?.id) : undefined) || '',
+            });
+        } else if (isOpen && !initialData) {
+            reset({
+                occurredAt: new Date().toISOString().slice(0, 16),
+                movementType: 'INCOME',
+                quantity: 0,
+                fromStockLocationId: '',
+                toStockLocationId: '',
+                stockItemId: '',
+                comment: '',
+                externalRef: ''
+            });
+        }
+    }, [isOpen, initialData, reset]);
 
     const onSubmit = async (data: MovementFormData) => {
         setIsSubmitting(true);
         try {
+            // Mapping for Create
+            // INCOME: stockLocationId = to
+            // TRANSFER: from, to
+            // EXPENSE/ADJ: stockLocationId = from
+
             const payload: any = {
                 ...data,
                 occurredAt: new Date(data.occurredAt).toISOString(),
@@ -77,14 +150,25 @@ const MovementCreateModal: React.FC<Props> = ({ isOpen, onClose }) => {
             } else if (data.movementType === 'TRANSFER') {
                 payload.stockLocationId = undefined;
                 // fromStockLocationId and toStockLocationId are already in data
+            } else {
+                // EXPENSE / ADJ
+                payload.stockLocationId = data.fromStockLocationId;
+                payload.fromStockLocationId = undefined;
+                payload.toStockLocationId = undefined;
             }
 
-            await createStockMovement(payload);
-            showToast('Операция успешно создана', 'success');
+            if (initialData) {
+                await updateStockMovementV2(initialData.id, payload);
+                showToast('Операция обновлена', 'success');
+            } else {
+                await createStockMovement(payload);
+                showToast('Операция успешно создана', 'success');
+            }
+
             reset();
             onClose(true);
         } catch (err: any) {
-            showToast('Ошибка создания операции: ' + err.message, 'error');
+            showToast('Ошибка сохранения: ' + err.message, 'error');
         } finally {
             setIsSubmitting(false);
         }
@@ -105,13 +189,13 @@ const MovementCreateModal: React.FC<Props> = ({ isOpen, onClose }) => {
                 disabled={isSubmitting}
                 className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 transition-colors"
             >
-                {isSubmitting ? 'Сохранение...' : 'Создать'}
+                {isSubmitting ? 'Сохранение...' : (initialData ? 'Сохранить' : 'Создать')}
             </button>
         </div>
     );
 
     return (
-        <Modal isOpen={isOpen} onClose={() => onClose()} title="Новая операция" footer={footer}>
+        <Modal isOpen={isOpen} onClose={() => onClose()} title={initialData ? "Редактирование операции" : "Новая операция"} footer={footer}>
             <form className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
@@ -132,6 +216,8 @@ const MovementCreateModal: React.FC<Props> = ({ isOpen, onClose }) => {
                         >
                             <option value="INCOME">Поступление (INCOME)</option>
                             <option value="TRANSFER">Перемещение (TRANSFER)</option>
+                            <option value="EXPENSE">Расход (EXPENSE)</option>
+                            <option value="ADJUSTMENT">Корректировка (ADJUSTMENT)</option>
                         </select>
                     </div>
                 </div>
@@ -164,7 +250,7 @@ const MovementCreateModal: React.FC<Props> = ({ isOpen, onClose }) => {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {movementType === 'TRANSFER' && (
+                    {(movementType === 'TRANSFER' || movementType === 'EXPENSE' || movementType === 'ADJUSTMENT') && (
                         <div>
                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Откуда (Источник)</label>
                             <select
@@ -172,7 +258,7 @@ const MovementCreateModal: React.FC<Props> = ({ isOpen, onClose }) => {
                                 className={`w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white ${errors.fromStockLocationId ? 'border-red-500' : 'border-gray-300'}`}
                             >
                                 <option value="">Выберите источник...</option>
-                                {locations.filter(l => l.type !== 'VEHICLE_TANK').map(loc => (
+                                {locations.map(loc => (
                                     <option key={loc.id} value={loc.id}>{loc.name} ({loc.type})</option>
                                 ))}
                             </select>
@@ -180,21 +266,23 @@ const MovementCreateModal: React.FC<Props> = ({ isOpen, onClose }) => {
                         </div>
                     )}
 
-                    <div className={movementType === 'INCOME' ? 'md:col-span-2' : ''}>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                            Куда (Назначение)
-                        </label>
-                        <select
-                            {...register('toStockLocationId')}
-                            className={`w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white ${errors.toStockLocationId ? 'border-red-500' : 'border-gray-300'}`}
-                        >
-                            <option value="">Выберите назначение...</option>
-                            {locations.map(loc => (
-                                <option key={loc.id} value={loc.id}>{loc.name} ({loc.type})</option>
-                            ))}
-                        </select>
-                        {errors.toStockLocationId && <p className="mt-1 text-xs text-red-500">{errors.toStockLocationId.message}</p>}
-                    </div>
+                    {(movementType === 'INCOME' || movementType === 'TRANSFER') && (
+                        <div className={movementType === 'INCOME' ? 'md:col-span-2' : ''}>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                Куда (Назначение)
+                            </label>
+                            <select
+                                {...register('toStockLocationId')}
+                                className={`w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white ${errors.toStockLocationId ? 'border-red-500' : 'border-gray-300'}`}
+                            >
+                                <option value="">Выберите назначение...</option>
+                                {locations.map(loc => (
+                                    <option key={loc.id} value={loc.id}>{loc.name} ({loc.type})</option>
+                                ))}
+                            </select>
+                            {errors.toStockLocationId && <p className="mt-1 text-xs text-red-500">{errors.toStockLocationId.message}</p>}
+                        </div>
+                    )}
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

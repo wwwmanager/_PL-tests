@@ -101,3 +101,32 @@ export async function createStockMovement(data: Partial<StockMovementV2> & { occ
 export async function deleteStockMovement(id: string): Promise<void> {
     await httpClient.delete(`/stock/movements/${id}`);
 }
+
+/**
+ * Update a stock movement (V2)
+ */
+export async function updateStockMovementV2(id: string, params: Partial<StockMovementV2> & {
+    movementType?: 'INCOME' | 'EXPENSE' | 'ADJUSTMENT' | 'TRANSFER';
+    stockLocationId?: string;
+    fromLocationId?: string;
+    toLocationId?: string;
+    externalRef?: string;
+    comment?: string;
+}): Promise<StockMovementV2> {
+    const payload: any = {
+        ...params,
+    };
+
+    // Convert quantity to string for backend Decimal compatibility if needed
+    if (typeof payload.quantity === 'number') {
+        payload.quantity = String(payload.quantity);
+    }
+
+    // Normalize date
+    if (payload.occurredAt instanceof Date) {
+        payload.occurredAt = payload.occurredAt.toISOString();
+    }
+
+    const response = await httpClient.put<{ data: StockMovementV2 }>(`/stock/movements/${id}`, payload);
+    return response.data;
+}

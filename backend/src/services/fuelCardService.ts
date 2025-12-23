@@ -29,7 +29,7 @@ export interface UpdateFuelCardDTO {
 }
 
 export async function listFuelCards(user: AuthUser) {
-    return prisma.fuelCard.findMany({
+    const cards = await prisma.fuelCard.findMany({
         where: { organizationId: user.organizationId },
         orderBy: { createdAt: 'desc' },
         include: {
@@ -42,10 +42,18 @@ export async function listFuelCards(user: AuthUser) {
             assignedToVehicle: true,
         },
     });
+
+    // Calculate real balances from StockMovements
+    const cardsWithBalance = await Promise.all(cards.map(async (card) => {
+        const balance = await calculateRealBalance(card.organizationId, card.id);
+        return { ...card, balanceLiters: balance };
+    }));
+
+    return cardsWithBalance;
 }
 
 export async function getFuelCardById(user: AuthUser, id: string) {
-    return prisma.fuelCard.findFirst({
+    const card = await prisma.fuelCard.findFirst({
         where: { id, organizationId: user.organizationId },
         include: {
             organization: true,
@@ -57,6 +65,54 @@ export async function getFuelCardById(user: AuthUser, id: string) {
             assignedToVehicle: true,
         },
     });
+
+    if (card) {
+        const balance = await calculateRealBalance(card.organizationId, card.id);
+        return { ...card, balanceLiters: balance };
+    }
+    return null;
+}
+
+/**
+ * Helper to calculate real balance from StockMovements
+ */
+async function calculateRealBalance(organizationId: string, fuelCardId: string): Promise<number> {
+    const location = await prisma.stockLocation.findFirst({
+        where: { organizationId, fuelCardId },
+    });
+
+    if (!location) return 0;
+
+    const [incomes, expenses, adjustments, transfersIn, transfersOut] = await Promise.all([
+        prisma.stockMovement.aggregate({
+            where: { stockLocationId: location.id, movementType: 'INCOME' },
+            _sum: { quantity: true },
+        }),
+        prisma.stockMovement.aggregate({
+            where: { stockLocationId: location.id, movementType: 'EXPENSE' },
+            _sum: { quantity: true },
+        }),
+        prisma.stockMovement.aggregate({
+            where: { stockLocationId: location.id, movementType: 'ADJUSTMENT' },
+            _sum: { quantity: true },
+        }),
+        prisma.stockMovement.aggregate({
+            where: { toStockLocationId: location.id, movementType: 'TRANSFER' },
+            _sum: { quantity: true },
+        }),
+        prisma.stockMovement.aggregate({
+            where: { fromStockLocationId: location.id, movementType: 'TRANSFER' },
+            _sum: { quantity: true },
+        }),
+    ]);
+
+    return (
+        Number(incomes._sum.quantity || 0) -
+        Number(expenses._sum.quantity || 0) +
+        Number(adjustments._sum.quantity || 0) +
+        Number(transfersIn._sum.quantity || 0) -
+        Number(transfersOut._sum.quantity || 0)
+    );
 }
 
 export async function createFuelCard(user: AuthUser, data: CreateFuelCardDTO) {
@@ -240,17 +296,30 @@ export async function assignFuelCard(
  * @param driverId - Driver ID (references Driver table)
  * @returns List of fuel cards
  */
-export async function getFuelCardsForDriver(organizationId: string, driverId: string) {
+export async function getFuelCardsForDriver(organizationId: string, driverIdOrEmployeeId: string) {
+    // Resolve Driver ID: could be passed directly or via Employee ID
+    let targetDriverId = driverIdOrEmployeeId;
+
+    // Check if what was passed is actually an Employee ID that has a linked Driver
+    const driverByEmployee = await prisma.driver.findUnique({
+        where: { employeeId: driverIdOrEmployeeId }
+    });
+
+    if (driverByEmployee) {
+        targetDriverId = driverByEmployee.id;
+    }
+
     return prisma.fuelCard.findMany({
         where: {
             organizationId,
-            assignedToDriverId: driverId,
+            assignedToDriverId: targetDriverId,
             isActive: true
         },
         select: {
             id: true,
             cardNumber: true,
-            provider: true
+            provider: true,
+            balanceLiters: true
         },
         orderBy: { cardNumber: 'asc' }
     });

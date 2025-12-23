@@ -219,6 +219,7 @@ model User {
   approvedWaybills      Waybill[]       @relation("WaybillApprovedBy")
   completedWaybills     Waybill[]       @relation("WaybillCompletedBy")
   createdStockMovements StockMovement[] @relation("StockMovementCreatedBy")
+  voidedStockMovements  StockMovement[] @relation("StockMovementVoidedBy")  // P1-1: STOCK-VOID
   createdBlankBatches   BlankBatch[]
   auditLogs             AuditLog[]
   refreshTokens         RefreshToken[]
@@ -609,6 +610,12 @@ model StockMovement {
   comment         String?           @db.Text
   createdByUserId String?           @db.Uuid
   createdAt       DateTime          @default(now()) @db.Timestamp(6)
+  
+  // P1-1: STOCK-VOID — Soft void support
+  isVoid          Boolean           @default(false)
+  voidedAt        DateTime?         @db.Timestamp(6)
+  voidedByUserId  String?           @db.Uuid
+  voidReason      String?           @db.Text
 
   organization      Organization   @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   warehouse         Warehouse?     @relation(fields: [warehouseId], references: [id], onDelete: SetNull)
@@ -617,11 +624,13 @@ model StockMovement {
   fromStockLocation StockLocation? @relation("FromLocationTransfers", fields: [fromStockLocationId], references: [id], onDelete: SetNull)
   toStockLocation   StockLocation? @relation("ToLocationTransfers", fields: [toStockLocationId], references: [id], onDelete: SetNull)
   createdByUser     User?          @relation("StockMovementCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  voidedByUser      User?          @relation("StockMovementVoidedBy", fields: [voidedByUserId], references: [id], onDelete: SetNull)
 
   @@unique([organizationId, externalRef])
   @@index([stockLocationId, stockItemId, occurredAt])
   @@index([fromStockLocationId, stockItemId, occurredAt])
   @@index([toStockLocationId, stockItemId, occurredAt])
+  @@index([organizationId, isVoid, occurredAt])  // P1-1: for filtering out voided movements
   @@map("stock_movements")
 }
 

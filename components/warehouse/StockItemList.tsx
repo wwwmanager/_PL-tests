@@ -33,6 +33,8 @@ const CATEGORY_LABELS: Record<StockItemCategory, string> = {
     OTHER: '📋 Прочее',
 };
 
+import DataTable from '../shared/DataTable';
+
 const StockItemList: React.FC = () => {
     const [items, setItems] = useState<StockItem[]>([]);
     const [loading, setLoading] = useState(false);
@@ -47,6 +49,7 @@ const StockItemList: React.FC = () => {
         density: '',
     });
 
+    // Keeping filters for server-side filtering as well
     const [filters, setFilters] = useState({
         categoryEnum: '' as StockItemCategory | '',
         isActive: 'true',
@@ -54,6 +57,8 @@ const StockItemList: React.FC = () => {
     });
 
     const { showToast } = useToast();
+
+    // ... (rest of the state and handlers remain same until return)
 
     const loadData = useCallback(async () => {
         setLoading(true);
@@ -168,6 +173,70 @@ const StockItemList: React.FC = () => {
         }
     };
 
+    // Define columns for DataTable
+    const columns = [
+        {
+            key: 'code',
+            label: 'Код',
+            sortable: true,
+            render: (row: StockItem) => <span className="font-mono">{row.code || '—'}</span>
+        },
+        {
+            key: 'name',
+            label: 'Название',
+            sortable: true,
+            render: (row: StockItem) => (
+                <div className="font-medium text-gray-900 dark:text-white">
+                    {row.name}
+                    {row.isFuel && row.density && (
+                        <span className="ml-2 text-xs text-gray-400">ρ={row.density}</span>
+                    )}
+                </div>
+            )
+        },
+        {
+            key: 'categoryEnum',
+            label: 'Категория',
+            sortable: true,
+            render: (row: StockItem) => row.categoryEnum ? CATEGORY_LABELS[row.categoryEnum] : row.category || '—'
+        },
+        { key: 'unit', label: 'Ед. изм.', sortable: true },
+        {
+            key: 'balance',
+            label: 'Остаток',
+            sortable: true,
+            render: (row: StockItem) => (
+                <span className={`font-bold ${Number(row.balance) < 0 ? 'text-red-600' : 'text-green-600'}`}>
+                    {Number(row.balance).toLocaleString('ru-RU', { minimumFractionDigits: 2 })}
+                </span>
+            )
+        },
+        {
+            key: 'actions',
+            label: 'Действия',
+            render: (row: StockItem) => (
+                <div className="flex justify-center space-x-2">
+                    <button
+                        onClick={() => openEditModal(row)}
+                        className="text-blue-600 hover:text-blue-800 text-sm"
+                        title="Редактировать"
+                    >
+                        ✏️
+                    </button>
+                    {row.isActive && (
+                        <button
+                            onClick={() => handleDelete(row)}
+                            className="text-red-600 hover:text-red-800 text-sm"
+                            title="Архивировать"
+                        >
+                            🗑️
+                        </button>
+                    )}
+                </div>
+            )
+        }
+    ];
+
     return (
         <div className="p-4 space-y-4">
             {/* Filters */}
@@ -200,7 +269,7 @@ const StockItemList: React.FC = () => {
                     </select>
                 </div>
                 <div className="md:col-span-2">
-                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Поиск</label>
+                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Глобальный поиск</label>
                     <input
                         type="text"
                         name="search"
@@ -228,73 +297,18 @@ const StockItemList: React.FC = () => {
             </div>
 
             {/* Table */}
-            <div className="overflow-x-auto border dark:border-gray-700 rounded-lg shadow-sm">
-                <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                    <thead className="bg-gray-50 dark:bg-gray-800">
-                        <tr>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Код</th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Название</th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Категория</th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Ед. изм.</th>
-                            <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Остаток</th>
-                            <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Действия</th>
-                        </tr>
-                    </thead>
-                    <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-800">
-                        {loading ? (
-                            <tr>
-                                <td colSpan={6} className="px-4 py-12 text-center text-gray-500">Загрузка...</td>
-                            </tr>
-                        ) : items.length === 0 ? (
-                            <tr>
-                                <td colSpan={6} className="px-4 py-12 text-center text-gray-500">
-                                    Номенклатура не найдена
-                                </td>
-                            </tr>
-                        ) : (
-                            items.map(item => (
-                                <tr key={item.id} className={`hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors ${!item.isActive ? 'opacity-50' : ''}`}>
-                                    <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-300 font-mono">
-                                        {item.code || '—'}
-                                    </td>
-                                    <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">
-                                        {item.name}
-                                        {item.isFuel && item.density && (
-                                            <span className="ml-2 text-xs text-gray-400">ρ={item.density}</span>
-                                        )}
-                                    </td>
-                                    <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-300">
-                                        {item.categoryEnum ? CATEGORY_LABELS[item.categoryEnum] : item.category || '—'}
-                                    </td>
-                                    <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-300">
-                                        {item.unit}
-                                    </td>
-                                    <td className="px-4 py-3 text-sm text-right">
-                                        <span className={`font-bold ${Number(item.balance) < 0 ? 'text-red-600' : 'text-green-600'}`}>
-                                            {Number(item.balance).toLocaleString('ru-RU', { minimumFractionDigits: 2 })}
-                                        </span>
-                                    </td>
-                                    <td className="px-4 py-3 text-center space-x-2">
-                                        <button
-                                            onClick={() => openEditModal(item)}
-                                            className="text-blue-600 hover:text-blue-800 text-sm"
-                                        >
-                                            ✏️
-                                        </button>
-                                        {item.isActive && (
-                                            <button
-                                                onClick={() => handleDelete(item)}
-                                                className="text-red-600 hover:text-red-800 text-sm"
-                                            >
-                                                🗑️
-                                            </button>
-                                        )}
-                                    </td>
-                                </tr>
-                            ))
-                        )}
-                    </tbody>
-                </table>
+            <div className="bg-white dark:bg-gray-800 border dark:border-gray-700 rounded-lg shadow-sm">
+                {loading ? (
+                    <div className="p-12 text-center text-gray-500">Загрузка...</div>
+                ) : (
+                    <DataTable
+                        columns={columns}
+                        data={items}
+                        keyField="id"
+                        emptyMessage="Номенклатура не найдена"
+                        searchable={true}
+                    />
+                )}
             </div>
 
             {/* Create/Edit Modal */}

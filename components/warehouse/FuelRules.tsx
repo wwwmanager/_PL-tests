@@ -296,6 +296,7 @@ const FuelRules: React.FC = () => {
                     data={topUpRules}
                     keyField="id"
                     emptyMessage="Нет правил автопополнения"
+                    searchable={true}
                 />
             </div>
 
@@ -316,6 +317,7 @@ const FuelRules: React.FC = () => {
                     data={resetRules}
                     keyField="id"
                     emptyMessage="Нет правил обнуления"
+                    searchable={true}
                 />
             </div>
 

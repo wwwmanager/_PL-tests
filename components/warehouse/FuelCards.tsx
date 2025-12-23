@@ -574,6 +574,16 @@ const FuelCards: React.FC = () => {
             )
         },
         {
+            key: 'balanceLiters',
+            label: 'Баланс (л)',
+            sortable: true,
+            render: (row: FuelCard) => (
+                <span className={`font-medium ${row.balanceLiters < 100 ? 'text-red-600' : 'text-gray-900'}`}>
+                    {Number(row.balanceLiters || 0).toLocaleString('ru-RU', { minimumFractionDigits: 2 })}
+                </span>
+            )
+        },
+        {
             key: 'actions',
             label: 'Действия',
             render: (row: FuelCard) => (
@@ -607,13 +617,7 @@ const FuelCards: React.FC = () => {
     return (
         <div className="space-y-4">
             <div className="flex justify-between items-center">
-                <div>
-                    <h3 className="text-lg font-medium">Топливные карты</h3>
-                    <p className="text-sm text-gray-500">
-                        💡 Баланс карт смотрите во вкладке <strong>"Балансы"</strong> (данные из ledger)
-                    </p>
-                </div>
-                <div className="flex gap-2">
+                <div className="flex gap-2 ml-auto">
                     <button
                         onClick={() => setCreateModalOpen(true)}
                         className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
@@ -635,6 +639,7 @@ const FuelCards: React.FC = () => {
                 data={cards}
                 keyField="id"
                 emptyMessage="Нет топливных карт. Нажмите «Создать карту» чтобы добавить."
+                searchable={true}
             />
 
             {selectedCard && (

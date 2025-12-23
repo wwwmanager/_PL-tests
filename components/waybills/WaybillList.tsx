@@ -52,7 +52,7 @@ const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpene
       return '';
     }
   });
-  const [topLevelFilter, setTopLevelFilter] = useState({ dateFrom: '', dateTo: '', status: WaybillStatus.DRAFT });
+  const [topLevelFilter, setTopLevelFilter] = useState({ dateFrom: '', dateTo: '', status: '' as WaybillStatus | '' });
   const [selectedWaybillId, setSelectedWaybillId] = useState<string | null>(null);
   const [isDetailViewOpen, setIsDetailViewOpen] = useState(false);
   const [waybillToPrefill, setWaybillToPrefill] = useState<Waybill | null>(null);
@@ -128,6 +128,17 @@ const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpene
       onWaybillOpened();
     }
   }, [waybillToOpen, onWaybillOpened]);
+
+  // FIX: Reset stale vehicle filter from localStorage if it doesn't exist in current org
+  useEffect(() => {
+    if (!loading && vehicles.length > 0 && selectedVehicleId) {
+      const exists = vehicles.some(v => v.id === selectedVehicleId);
+      if (!exists) {
+        console.warn('Resetting stale vehicle filter:', selectedVehicleId);
+        setSelectedVehicleId('');
+      }
+    }
+  }, [vehicles, selectedVehicleId, loading]);
 
 
   const preFilteredWaybills = useMemo(() => {
@@ -311,6 +322,9 @@ const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpene
           <input type="date" value={topLevelFilter.dateTo} onChange={e => setTopLevelFilter({ ...topLevelFilter, dateTo: e.target.value })} className="bg-white dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded-md p-2 focus:ring-blue-500 focus:border-blue-500 text-gray-700 dark:text-gray-200" placeholder="Дата по" />
           <select value={topLevelFilter.status} onChange={e => setTopLevelFilter({ ...topLevelFilter, status: e.target.value as WaybillStatus })} className="bg-white dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded-md p-2 focus:ring-blue-500 focus:border-blue-500 text-gray-700 dark:text-gray-200">
             <option value="">Все статусы</option>
+            {Object.entries(WAYBILL_STATUS_TRANSLATIONS).map(([key, label]) => (
+              <option key={key} value={key}>{label}</option>
+            ))}
           </select>
           <select value={selectedVehicleId} onChange={e => setSelectedVehicleId(e.target.value)} className="bg-white dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded-md p-2 focus:ring-blue-500 focus:border-blue-500 text-gray-700 dark:text-gray-200">
             <option value="">Все ТС</option>
