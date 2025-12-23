@@ -365,7 +365,9 @@
 
 **Known Issues Resolved:**
 - ✅ **BACKEND-500-GLOBAL-001**: Zombie Node processes — see [500_ERROR_RESOLUTION.md](../backend/docs/500_ERROR_RESOLUTION.md)
-
+- ✅ **BACKEND-500-GLOBAL-002**: Preventive measures implemented (EADDRINUSE handler, troubleshooting guide)
+- ✅ **BACKEND-500-GLOBAL-003**: Documentation migration to repository (commit `6ab2d7c`)
+- ✅ **DOC-BACKEND-OPS-004**: Documentation portability accepted (commit `6ab2d7c`)
 
 ---
 
