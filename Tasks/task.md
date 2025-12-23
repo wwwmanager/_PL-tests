@@ -344,7 +344,7 @@
 ## 📊 Progress Tracking
 
 **PR1 (P0 Hotfixes):** ✅ **COMPLETE** 3/3 🟩🟩🟩 ✅ Tested  
-**PR2 (isVoid + Void Endpoint):** ✅ **COMPLETE** - All fixes applied  
+**PR2 (isVoid + Void Endpoint):** ✅ **COMPLETE** - All fixes applied + 500 error resolved  
   - ✅ voidStockMovement service function (180 lines)
   - ✅ All 13 isVoid=false filters added
   - ✅ Controller + route registered
@@ -353,13 +353,19 @@
   - ✅ Audit log enabled
   - ✅ API response format fixed
   - ✅ RBAC guard added (admin/accountant only)
+  - ✅ **BACKEND-500-GLOBAL-001 RESOLVED** (killed 6 zombie Node processes)
 **P0 (Критические):** 3/4 🟩🟩🟩⬜ (осталось: P0-4 Period Lock → PR3)  
 **P1 (Важные):** 3/3 🟩🟩🟩 (P1-1 void done, P1-3 filters done, P1-2 DocumentType postponed)  
 **P2 (Желательные):** 0/1 ⬜
 
+
 **Time spent on PR1:** ~30 минут  
 **Time spent on PR2:** ~3.5 hours (implementation + review fixes)  
 **Estimated remaining:** 1 день (PR3: Period Lock + RBAC)
+
+**Known Issues Resolved:**
+- ✅ **BACKEND-500-GLOBAL-001**: Zombie Node processes — see [500_ERROR_RESOLUTION.md](../backend/docs/500_ERROR_RESOLUTION.md)
+
 
 ---
 
