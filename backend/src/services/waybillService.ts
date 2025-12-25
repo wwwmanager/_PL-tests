@@ -2,7 +2,7 @@ import { PrismaClient, Prisma, WaybillStatus, BlankStatus } from '@prisma/client
 import { BadRequestError, NotFoundError } from '../utils/errors';
 import { validateOdometer, calculateDistanceKm, calculatePlannedFuelByMethod, FuelConsumptionRates, FuelCalculationMethod, FuelSegment } from '../domain/waybill/fuel';
 import { isWinterDate } from '../utils/dateUtils';
-import { getSeasonSettings } from './settingsService';
+import { getSeasonSettings, getAppSettings } from './settingsService';
 import { reserveNextBlankForDriver, reserveSpecificBlank, releaseBlank } from './blankService';
 // REL-103: Stock location imports
 import { getOrCreateVehicleTankLocation, getOrCreateFuelCardLocation, getOrCreateDefaultWarehouseLocation } from './stockLocationService';
@@ -42,6 +42,9 @@ export interface CreateWaybillInput {
     // WB-FIX-PL-001
     dispatcherEmployeeId?: string;
     controllerEmployeeId?: string;
+    // REL-103: Departure and return datetime
+    startAt?: string;
+    endAt?: string;
     validTo?: string;
 
     routes?: Array<{
@@ -145,7 +148,7 @@ export async function listWaybills(
     // Get data
     const data = await prisma.waybill.findMany({
         where,
-        orderBy: { date: 'desc' },
+        orderBy: { number: 'asc' }, // UX: First waybill at top
         skip,
         take: limit,
         include: {
@@ -197,6 +200,7 @@ export async function getWaybillById(userInfo: UserInfo, id: string) {
                 }
             },
             blank: true, // WB-901
+            fuelCard: { select: { id: true, cardNumber: true, provider: true, balanceLiters: true } }, // FUEL-CARD-AUTO-001
             fuelLines: true, // WB-901
             routes: true, // WB-ROUTES-040
             dispatcherEmployee: true,
@@ -290,8 +294,20 @@ export async function createWaybill(userInfo: UserInfo, input: CreateWaybillInpu
     // Use the actual driver ID for waybill creation
     const actualDriverId = driver.id;
 
-
-
+    // FUEL-CARD-AUTO-001: Auto-lookup driver's assigned fuel card
+    let autoFuelCardId: string | null = null;
+    const driverFuelCard = await prisma.fuelCard.findFirst({
+        where: {
+            organizationId,
+            assignedToDriverId: actualDriverId,
+            isActive: true
+        },
+        orderBy: { createdAt: 'desc' } // Use most recent if multiple
+    });
+    if (driverFuelCard) {
+        autoFuelCardId = driverFuelCard.id;
+        console.log(`[FUEL-CARD-AUTO] Auto-selected fuel card ${driverFuelCard.cardNumber} for driver ${actualDriverId}`);
+    }
     // BLS-202: Reserve blank for this waybill
     let validatedBlankId: string | null = null;
     let waybillNumber = '';
@@ -432,6 +448,7 @@ export async function createWaybill(userInfo: UserInfo, input: CreateWaybillInpu
             date: date,
             vehicleId: input.vehicleId,
             driverId: actualDriverId,
+            fuelCardId: autoFuelCardId, // FUEL-CARD-AUTO-001: Auto-assigned from driver's card
             blankId: validatedBlankId,
             odometerStart: input.odometerStart,
             odometerEnd: input.odometerEnd,
@@ -449,6 +466,11 @@ export async function createWaybill(userInfo: UserInfo, input: CreateWaybillInpu
             controllerEmployeeId: input.controllerEmployeeId
                 ?? (input as any).controllerId
                 ?? null,
+            // REL-103: startAt = departure datetime, endAt = return datetime
+            // DEBUG: Log startAt value
+            ...(() => { console.log('[REL-103] Creating waybill with startAt:', input.startAt, 'endAt:', input.endAt, 'validTo:', input.validTo); return {}; })(),
+            startAt: input.startAt ? new Date(input.startAt) : null,
+            endAt: input.endAt ? new Date(input.endAt) : null,
             validTo: input.validTo ? new Date(input.validTo) : null,
 
             routes: input.routes && input.routes.length > 0 ? {
@@ -629,6 +651,21 @@ export async function updateWaybill(userInfo: UserInfo, id: string, data: Partia
         }
     }
 
+    // FUEL-CARD-AUTO-001: If driver changed, update fuelCardId to new driver's card
+    let newFuelCardId: string | null | undefined = undefined; // undefined = no change
+    if (data.driverId && data.driverId !== waybill.driverId) {
+        const driverFuelCard = await prisma.fuelCard.findFirst({
+            where: {
+                organizationId,
+                assignedToDriverId: data.driverId,
+                isActive: true
+            },
+            orderBy: { createdAt: 'desc' }
+        });
+        newFuelCardId = driverFuelCard?.id || null;
+        console.log(`[FUEL-CARD-AUTO] Driver changed, new fuel card: ${newFuelCardId}`);
+    }
+
     // Use transaction for consistency
     return await prisma.$transaction(async (tx) => {
         // Replace fuel lines if provided
@@ -676,6 +713,7 @@ export async function updateWaybill(userInfo: UserInfo, id: string, data: Partia
                 date: data.date ? new Date(data.date) : undefined,
                 vehicleId: data.vehicleId,
                 driverId: data.driverId,
+                fuelCardId: newFuelCardId, // FUEL-CARD-AUTO-001: Update when driver changes
                 blankId: data.blankId,
                 odometerStart: data.odometerStart,
                 odometerEnd: data.odometerEnd,
@@ -692,6 +730,13 @@ export async function updateWaybill(userInfo: UserInfo, id: string, data: Partia
                 controllerEmployeeId: (data as any).controllerEmployeeId
                     ?? (data as any).controllerId
                     ?? undefined,
+                // REL-103: startAt = departure datetime, endAt = return datetime
+                startAt: (data as any).startAt
+                    ? new Date((data as any).startAt)
+                    : undefined,
+                endAt: (data as any).endAt
+                    ? new Date((data as any).endAt)
+                    : undefined,
                 validTo: (data as any).validTo
                     ? new Date((data as any).validTo)
                     : undefined,
@@ -750,14 +795,26 @@ export async function deleteWaybill(userInfo: UserInfo, id: string) {
     });
     if (!waybill) throw new NotFoundError('Путевой лист не найден');
 
+    // P0-F: Block deletion of POSTED waybills unless explicitly allowed in settings
+    if (waybill.status === WaybillStatus.POSTED) {
+        const appSettings = await getAppSettings();
+        if (!appSettings.allowDeletePostedWaybills) {
+            throw new BadRequestError(
+                'Нельзя удалить проведённый путевой лист. Используйте отмену проводки (скорректировать).',
+                'DELETE_POSTED_FORBIDDEN'
+            );
+        }
+        console.log('[P0-F] Deleting POSTED waybill allowed by admin setting');
+    }
+
     // WB-DEL-001: Release blank when deleting waybill
     console.log('[WB-DEL-001] Deleting waybill:', waybill.id, 'blankId:', waybill.blankId, 'blank status:', waybill.blank?.status);
 
     if (waybill.blankId && waybill.blank) {
         const blankStatus = waybill.blank.status;
 
-        // Release if RESERVED or reset if it was being used
-        if (blankStatus === BlankStatus.RESERVED) {
+        // Release if RESERVED or USED (when deleting POSTED waybill)
+        if (blankStatus === BlankStatus.RESERVED || blankStatus === BlankStatus.USED) {
             try {
                 await releaseBlank(organizationId, waybill.blankId);
                 console.log('[WB-DEL-001] ✅ Released blank back to ISSUED:', waybill.blankId);
@@ -771,8 +828,20 @@ export async function deleteWaybill(userInfo: UserInfo, id: string) {
                 console.log('[WB-DEL-001] ✅ Force-released blank via fallback:', waybill.blankId);
             }
         } else {
-            console.log('[WB-DEL-001] Blank not in RESERVED status, current:', blankStatus);
+            console.log('[WB-DEL-001] Blank not in RESERVED/USED status, current:', blankStatus);
         }
+    }
+
+    // WB-DEL-002: Delete stock movements created by this waybill (reverse POSTED operations)
+    if (waybill.status === WaybillStatus.POSTED) {
+        console.log('[WB-DEL-002] Deleting stock movements for POSTED waybill:', waybill.id);
+        const deletedMovements = await prisma.stockMovement.deleteMany({
+            where: {
+                documentType: 'WAYBILL',
+                documentId: waybill.id
+            }
+        });
+        console.log('[WB-DEL-002] ✅ Deleted', deletedMovements.count, 'stock movements');
     }
 
     return prisma.waybill.delete({ where: { id } });
@@ -818,7 +887,7 @@ export async function changeWaybillStatus(
     const allowedTransitions: Record<WaybillStatus, WaybillStatus[]> = {
         [WaybillStatus.DRAFT]: [WaybillStatus.SUBMITTED, WaybillStatus.CANCELLED],
         [WaybillStatus.SUBMITTED]: [WaybillStatus.POSTED, WaybillStatus.CANCELLED],
-        [WaybillStatus.POSTED]: [], // final state
+        [WaybillStatus.POSTED]: [WaybillStatus.DRAFT], // UX: Allow correction (return to draft)
         [WaybillStatus.CANCELLED]: [], // final state
     };
 
@@ -957,15 +1026,18 @@ export async function changeWaybillStatus(
                 const fuelReceived = Number(fuelLine.fuelReceived || 0);
 
                 if (fuelReceived > 0) {
-                    // Определяем источник заправки
+                    // FUEL-CARD-AUTO-001: Определяем источник заправки
+                    // Приоритет: 1) fuelCardId если есть, 2) sourceType, 3) склад по умолчанию
                     let sourceLocationId: string;
 
-                    if (fuelLine.sourceType === 'FUEL_CARD' && waybill.fuelCardId) {
-                        // Заправка с топливной карты
+                    // Если у ПЛ есть привязанная карта — используем её (если не указан явно склад)
+                    if (waybill.fuelCardId && fuelLine.sourceType !== 'WAREHOUSE') {
+                        // Заправка с топливной карты водителя
                         const cardLocation = await getOrCreateFuelCardLocation(waybill.fuelCardId);
                         sourceLocationId = cardLocation.id;
+                        console.log(`[FUEL-CARD-AUTO] Using driver's fuel card as source: ${waybill.fuelCardId}`);
                     } else {
-                        // Заправка со склада (по умолчанию)
+                        // Заправка со склада
                         const warehouseLocation = await getOrCreateDefaultWarehouseLocation(
                             organizationId,
                             waybill.departmentId
@@ -1034,6 +1106,20 @@ export async function changeWaybillStatus(
                     console.log('[WB-501] Blank status updated to USED:', waybill.blankId);
                 }
             }
+
+            // 4. WB-POST-VEHICLE: Обновить пробег и остаток топлива в справочнике авто
+            const fuelEnd = waybill.fuelLines.reduce((acc, fl) => {
+                return Number(fl.fuelEnd) || acc;
+            }, 0);
+
+            await tx.vehicle.update({
+                where: { id: waybill.vehicleId },
+                data: {
+                    ...(waybill.odometerEnd != null && { mileage: waybill.odometerEnd }),
+                    ...(fuelEnd > 0 && { currentFuel: fuelEnd }),
+                }
+            });
+            console.log('[WB-POST-VEHICLE] ✅ Updated vehicle:', waybill.vehicleId, 'mileage:', waybill.odometerEnd, 'fuel:', fuelEnd);
         }
 
         // Обновляем статус ПЛ
@@ -1121,14 +1207,14 @@ export async function getWaybillPrefillData(
         throw new NotFoundError('Транспортное средство не найдено');
     }
 
-    // 2. Get Last POSTED Waybill
+    // 2. Get Last Waybill (any status except CANCELLED)
     // Ordered by date desc, then created desc
     const lastWaybill = await prisma.waybill.findFirst({
         where: {
             organizationId,
             vehicleId,
-            status: WaybillStatus.POSTED,
-            date: date ? { lt: date } : undefined // Only waybills BEFORE the requested date
+            status: { not: WaybillStatus.CANCELLED },
+            date: date ? { lte: date } : undefined // Include waybills up to and including the requested date
         },
         orderBy: [
             { date: 'desc' },
@@ -1194,31 +1280,29 @@ export async function getWaybillPrefillData(
     // Odometer: Last Waybill End -> Vehicle Mileage -> 0
     let odometerStart = lastWaybill?.odometerEnd ? Number(lastWaybill.odometerEnd) : Number(vehicle.mileage);
 
-    // Fuel: Tank Balance -> Last Waybill Fuel End -> Vehicle Current Fuel -> 0
-    let fuelStart = tankBalance;
+    // P0-C: Fuel Start Priority:
+    // 1. Last POSTED Waybill fuelEnd (most accurate)
+    // 2. If no POSTED waybill, use Vehicle Card currentFuel
+    // 3. Tank Balance only as last resort (may be stale)
+    let fuelStart: number | null = null;
 
-    // Fallback logic:
-    // 1. If we have a tank balance from Stock (and it's not null), we usually trust it.
-    // 2. BUT if this is the FIRST waybill (no lastWaybill) and Stock is 0 (no history), 
-    //    we should trust the manual 'currentFuel' from the Vehicle card (Initial Balance).
-    if (fuelStart === null || (fuelStart === 0 && !lastWaybill)) {
-        // Try to get confirmation from last waybill if available
-        if (lastWaybill) {
-            const lastFuelLine = vehicle.fuelStockItemId
-                ? lastWaybill.fuelLines.find(fl => fl.stockItemId === vehicle.fuelStockItemId)
-                : lastWaybill.fuelLines[0];
-            const lastFuelEnd = lastFuelLine?.fuelEnd;
+    if (lastWaybill) {
+        // Priority 1: Use fuelEnd from last POSTED waybill
+        const lastFuelLine = vehicle.fuelStockItemId
+            ? lastWaybill.fuelLines.find(fl => fl.stockItemId === vehicle.fuelStockItemId)
+            : lastWaybill.fuelLines[0];
+        const lastFuelEnd = lastFuelLine?.fuelEnd;
 
-            // If we have history, trusting Stock=0 is safer, unless that history is broken.
-            // But if we are here, 'fuelStart' (Stock) is null or 0.
-            // If last waybill exists, usually we should trust Stock or Last Waybill.
-            if (fuelStart === null) {
-                fuelStart = lastFuelEnd ? Number(lastFuelEnd) : Number(vehicle.currentFuel);
-            }
+        if (lastFuelEnd != null) {
+            fuelStart = Number(lastFuelEnd);
+        } else if (tankBalance != null) {
+            fuelStart = tankBalance;
         } else {
-            // No history. Stock says 0 (or null). Trust Vehicle Card.
             fuelStart = Number(vehicle.currentFuel);
         }
+    } else {
+        // No POSTED waybills - use Vehicle Card currentFuel (Initial Balance)
+        fuelStart = Number(vehicle.currentFuel);
     }
 
     return {

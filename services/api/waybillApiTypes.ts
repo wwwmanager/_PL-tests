@@ -15,6 +15,9 @@ export interface BackendWaybillDto {
     date: string; // ISO 8601
     vehicleId: string;
     driverId: string;
+    // FUEL-CARD-AUTO-001
+    fuelCardId?: string | null;
+    fuelCard?: { id: string; cardNumber: string; provider?: string; balanceLiters?: number } | null;
     blankId: string | null;
     status: BackendWaybillStatus;
     odometerStart: number | null;
@@ -28,6 +31,8 @@ export interface BackendWaybillDto {
     dispatcherEmployeeId?: string | null;
     controllerEmployeeId?: string | null;
     validTo?: string | null; // from backend validTo
+    startAt?: string | null;  // departure date/time (REL-103)
+    endAt?: string | null;    // return date/time (REL-103)
     fuel?: {
         stockItemId: string | null;
         fuelStart: number | null;
@@ -88,6 +93,9 @@ export interface FrontWaybill {
     date: string;
     vehicleId: string;
     driverId: string;
+    // FUEL-CARD-AUTO-001: Fuel card assigned to this waybill
+    fuelCardId?: string | null;
+    fuelCard?: { id: string; cardNumber: string; provider?: string; balanceLiters?: number } | null;
     status: any; // WaybillStatus из types.ts
 
     // Бланки
@@ -107,6 +115,7 @@ export interface FrontWaybill {
 
     // Маршруты
     routes: any[]; // Route[]
+    fuelLines?: any[]; // FUEL-CARD-AUTO-001: Added for consistency with backend DTO and Waybill type
 
     // Прочее
     dispatcherId?: string; // Made optional for deprecated compat

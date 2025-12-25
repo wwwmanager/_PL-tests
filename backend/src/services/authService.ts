@@ -77,7 +77,7 @@ export async function login(email: string, password: string) {
         departmentId: user.departmentId,
         role: primaryRole,
         employeeId: user.employeeId,
-        tokenVersion: user.tokenVersion  // AUTH-003: для мгновенной инвалидации
+        tokenVersion: user.tokenVersion ?? 0  // AUTH-003: для мгновенной инвалидации (default 0 for legacy users)
     });
 
     // Generate refresh token and store hash in DB

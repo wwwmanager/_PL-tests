@@ -563,8 +563,8 @@ export async function reserveSpecificBlank(
 }
 
 /**
- * Release a reserved blank back to available.
- * Only blanks in RESERVED status can be released.
+ * Release a reserved or used blank back to ISSUED.
+ * Blanks in RESERVED or USED status can be released.
  */
 export async function releaseBlank(
     organizationId: string,
@@ -575,12 +575,12 @@ export async function releaseBlank(
             where: {
                 id: blankId,
                 organizationId,
-                status: BlankStatus.RESERVED
+                status: { in: [BlankStatus.RESERVED, BlankStatus.USED] }  // UX: Accept both RESERVED and USED
             }
         });
 
         if (!blank) {
-            throw new Error('Бланк не найден или не находится в статусе RESERVED');
+            throw new Error('Бланк не найден или не находится в статусе RESERVED/USED');
         }
 
         // GP-03: Return blank to ISSUED status (back to driver), NOT AVAILABLE
@@ -589,6 +589,7 @@ export async function releaseBlank(
             where: { id: blank.id },
             data: {
                 status: BlankStatus.ISSUED,
+                usedAt: null,  // Clear usedAt when returning to ISSUED
                 // Keep issuedToDriverId - blank stays with the driver
             }
         });

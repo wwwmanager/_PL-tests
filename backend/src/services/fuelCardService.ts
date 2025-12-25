@@ -319,7 +319,8 @@ export async function getFuelCardsForDriver(organizationId: string, driverIdOrEm
             id: true,
             cardNumber: true,
             provider: true,
-            balanceLiters: true
+            balanceLiters: true,
+            isActive: true // FUEL-CARD-AUTO-001
         },
         orderBy: { cardNumber: 'asc' }
     });
@@ -602,4 +603,107 @@ export async function createTransaction(
 
         return transaction;
     });
+}
+
+// ============================================================================
+// FUEL-CARD-RESET-BE-010: Manual Fuel Card Reset
+// ============================================================================
+
+import { getOrCreateFuelCardLocation, getOrCreateDefaultWarehouseLocation } from './stockLocationService';
+import { getBalanceAt, createTransfer, createExpenseMovement } from './stockService';
+
+export interface ResetFuelCardResult {
+    success: boolean;
+    fuelCardId: string;
+    previousBalance: number;
+    mode: 'TRANSFER_TO_WAREHOUSE' | 'EXPIRE_EXPENSE';
+    movementId: string;
+}
+
+/**
+ * FUEL-CARD-RESET-BE-010: Manually reset (zero out) a fuel card balance
+ * 
+ * @param organizationId - Organization ID
+ * @param fuelCardId - Fuel Card ID
+ * @param stockItemId - Fuel type to reset
+ * @param mode - TRANSFER_TO_WAREHOUSE or EXPIRE_EXPENSE
+ * @param reason - Reason for reset
+ * @param userId - User performing the reset
+ */
+export async function resetFuelCard(
+    organizationId: string,
+    fuelCardId: string,
+    stockItemId: string,
+    mode: 'TRANSFER_TO_WAREHOUSE' | 'EXPIRE_EXPENSE',
+    reason: string,
+    userId: string
+): Promise<ResetFuelCardResult> {
+    // 1. Get or create card location
+    const cardLocation = await getOrCreateFuelCardLocation(fuelCardId);
+
+    // 2. Get current balance
+    const balance = await getBalanceAt(cardLocation.id, stockItemId, new Date());
+
+    if (balance <= 0) {
+        return {
+            success: true,
+            fuelCardId,
+            previousBalance: 0,
+            mode,
+            movementId: '',
+        };
+    }
+
+    // 3. Create movement based on mode
+    let movement;
+    const externalRef = `MANUAL_RESET:${fuelCardId}:${new Date().toISOString()}`;
+
+    if (mode === 'TRANSFER_TO_WAREHOUSE') {
+        // Transfer back to default warehouse
+        const warehouseLocation = await getOrCreateDefaultWarehouseLocation(organizationId);
+
+        movement = await createTransfer({
+            organizationId,
+            stockItemId,
+            quantity: balance,
+            fromLocationId: cardLocation.id,
+            toLocationId: warehouseLocation.id,
+            occurredAt: new Date(),
+            documentType: 'FUEL_CARD_MANUAL_RESET',
+            documentId: fuelCardId,
+            externalRef,
+            comment: reason,
+            userId,
+        });
+    } else {
+        // EXPIRE_EXPENSE: Write off as expense
+        movement = await createExpenseMovement(
+            organizationId,
+            stockItemId,
+            balance,
+            'FUEL_CARD_MANUAL_RESET',
+            fuelCardId,
+            userId,
+            null,
+            reason,
+            cardLocation.id,
+            new Date()
+        );
+    }
+
+    // 4. Update FuelCard.balanceLiters to 0
+    await prisma.fuelCard.update({
+        where: { id: fuelCardId },
+        data: { balanceLiters: 0 }
+    });
+
+    console.log(`[FUEL-CARD-RESET] Card ${fuelCardId} reset: ${balance}L -> 0 (mode: ${mode})`);
+
+    return {
+        success: true,
+        fuelCardId,
+        previousBalance: balance,
+        mode,
+        movementId: movement.id,
+    };
 }

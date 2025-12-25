@@ -349,6 +349,7 @@ const BlankList: React.FC<{ key: number }> = () => {
 
     const canBeSpoiled = (status: BlankStatus) => status === 'available' || status === 'issued';
     const canBeReleased = (status: BlankStatus) => status === 'reserved';  // BLS-REL-001
+    const canBeReturned = (status: BlankStatus) => status === 'used';  // UX: Return USED blank to ISSUED
     const isSpoilAllowed = can('blanks.spoil.self') || can('blanks.spoil.warehouse') || can('blanks.spoil.override');
 
     const onSelectPage = (checked: boolean) => {
@@ -485,6 +486,12 @@ const BlankList: React.FC<{ key: number }> = () => {
                                         {canBeReleased(b.status) && (
                                             <button onClick={() => handleReleaseBlank(b.id)} className="p-1 ml-1 text-blue-600 hover:text-blue-800" title="Снять резерв (вернуть водителю)">
                                                 ↩️
+                                            </button>
+                                        )}
+                                        {/* UX: Return USED blank to ISSUED */}
+                                        {canBeReturned(b.status) && (
+                                            <button onClick={() => handleReleaseBlank(b.id)} className="p-1 ml-1 text-green-600 hover:text-green-800" title="Вернуть в статус Выдан">
+                                                🔄
                                             </button>
                                         )}
                                     </td>

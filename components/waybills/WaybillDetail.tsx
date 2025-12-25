@@ -12,7 +12,7 @@ import { getNextBlankForDriver, useBlankForWaybill, getAvailableBlanksForDriver 
 import { isWinterDate } from '../../services/dateUtils';
 import { generateId } from '../../services/api/core';
 // Stock API facade
-import { getAvailableFuelExpenses, updateStockTransaction, getStockTransactions, getGarageStockItems, getNextWaybillNumber, getFuelCardBalance } from '../../services/stockApi';
+import { getAvailableFuelExpenses, updateStockTransaction, getStockTransactions, getGarageStockItems, getNextWaybillNumber, getFuelCardsForDriver } from '../../services/stockApi';
 import { getVehicles } from '../../services/vehicleApiFacade';
 import { getEmployees } from '../../services/employeeApiFacade';
 import { listDrivers, DriverListItem } from '../../services/driverApi';
@@ -29,6 +29,7 @@ import Modal from '../shared/Modal';
 import { useAuth } from '../../services/auth';
 import CorrectionModal from './CorrectionModal';
 import CorrectionReasonModal from './CorrectionReasonModal';
+import { useNavigationGuard } from '../../contexts/NavigationGuardContext';
 
 
 import { RouteRow } from './RouteRow';
@@ -37,6 +38,8 @@ interface WaybillDetailProps {
   waybill: Waybill | null;
   isPrefill?: boolean;
   onClose: () => void;
+  // P0-5: Parent-level guard - allows parent to check if can close
+  onRequestClose?: (callback: () => void) => void;
 }
 
 const getEmptyWaybill = (): Omit<Waybill, 'id'> => ({
@@ -80,10 +83,11 @@ const FormSelect = (props: React.SelectHTMLAttributes<HTMLSelectElement>) => (
 
 
 // FIX: Changed component to be a named export to resolve module resolution errors.
-export const WaybillDetail: React.FC<WaybillDetailProps> = ({ waybill, isPrefill, onClose }) => {
+export const WaybillDetail: React.FC<WaybillDetailProps> = ({ waybill, isPrefill, onClose, onRequestClose }) => {
   // WB-FIX-ROUTES-001: Ensure routes is always an array to prevent iteration errors
   const initialWaybill = waybill && !isPrefill ? { ...waybill, routes: waybill.routes || [] } : getEmptyWaybill();
   const [formData, setFormData] = useState<Omit<Waybill, 'id'> | Waybill>(initialWaybill);
+  const stableWaybillId = waybill?.id || (isPrefill ? 'prefill' : 'new'); // stable ref for effects
   const [initialFormData, setInitialFormData] = useState<Omit<Waybill, 'id'> | Waybill | null>(null);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -96,14 +100,14 @@ export const WaybillDetail: React.FC<WaybillDetailProps> = ({ waybill, isPrefill
       getAvailableBlanksForDriver(formData.driverId)
         .then(blanks => {
           setAvailableBlanks(blanks);
-          // WB-FIX-PL-001: Auto-select first available blank if not set
-          // Only if status is DRAFT (creating or editing draft) and no blank selected
+          // P0-B: Show first blank number immediately for preview
+          // Backend will still reserve on save (prevents duplicates)
           if (formData.status === WaybillStatus.DRAFT && !formData.blankId && blanks.length > 0) {
-            const best = blanks[0]; // First one
+            const first = blanks[0];
             setFormData(prev => ({
               ...prev,
-              blankId: best.id,
-              number: best.formattedNumber
+              blankId: first.id,
+              number: first.formattedNumber
             } as any));
           }
         })
@@ -161,6 +165,7 @@ export const WaybillDetail: React.FC<WaybillDetailProps> = ({ waybill, isPrefill
   const [initialLinkedTxId, setInitialLinkedTxId] = useState<string | null>(null);
 
   const [fuelCardBalance, setFuelCardBalance] = useState<number | null>(null);
+  const [fuelCardInfo, setFuelCardInfo] = useState<{ cardNumber: string; provider?: string } | null>(null); // FUEL-CARD-AUTO-001
   const [fuelFilledError, setFuelFilledError] = useState<string | null>(null);
 
   const [linkedTransactions, setLinkedTransactions] = useState<StockTransaction[]>([]);
@@ -174,6 +179,29 @@ export const WaybillDetail: React.FC<WaybillDetailProps> = ({ waybill, isPrefill
     const initialData = { ...initialFormData, linkedTxId: initialLinkedTxId };
     return JSON.stringify(currentData) !== JSON.stringify(initialData);
   }, [formData, initialFormData, linkedTxId, initialLinkedTxId]);
+
+  // UX-DOC-GUARD-004: Register dirty state with navigation guard
+  const { registerDirty, unregisterDirty } = useNavigationGuard();
+
+  // Create stable save callback ref
+  const handleSaveRef = useRef<() => Promise<boolean>>(() => Promise.resolve(false));
+
+  useEffect(() => {
+    // Update ref when handleSave changes (after component fully mounts)
+    handleSaveRef.current = async () => {
+      const result = await handleSave(true);
+      return result !== null;
+    };
+  });
+
+  useEffect(() => {
+    if (isDirty) {
+      registerDirty('waybill-detail', () => handleSaveRef.current());
+    } else {
+      unregisterDirty('waybill-detail');
+    }
+    return () => unregisterDirty('waybill-detail');
+  }, [isDirty, registerDirty, unregisterDirty]);
 
 
   const COLLAPSED_SECTIONS_KEY = 'waybillDetail_collapsedSections';
@@ -255,10 +283,8 @@ export const WaybillDetail: React.FC<WaybillDetailProps> = ({ waybill, isPrefill
           driverId: waybill.driverId,
           odometerStart: Math.round(waybill.odometerEnd ?? 0),
           fuelAtStart: waybill.fuelAtEnd ?? 0,
+          // P0-C: Routes NOT auto-copied (user can add manually)
         };
-        if (window.confirm("Скопировать маршруты из предыдущего ПЛ?")) {
-          formDataToSet.routes = waybill.routes.map(r => ({ ...r, id: generateId() }));
-        }
       } else {
         // C1: Load from sourceWaybill
         if (sourceWaybill) {
@@ -272,7 +298,8 @@ export const WaybillDetail: React.FC<WaybillDetailProps> = ({ waybill, isPrefill
             fuelFilled: f?.fuelReceived ? Number(f.fuelReceived) : (sourceWaybill.fuelFilled || 0),
             fuelAtEnd: f?.fuelEnd ? Number(f.fuelEnd) : (sourceWaybill.fuelAtEnd || 0),
             fuelPlanned: f?.fuelPlanned ? Number(f.fuelPlanned) : (sourceWaybill.fuelPlanned || 0),
-            // Ensure dispatcher/controller/validTo are mapped
+            // Ensure dispatcher/controller/validTo/fuelCardId are mapped
+            fuelCardId: sourceWaybill.fuelCardId || '', // WB-FUELCARD-FE-010
             dispatcherEmployeeId: sourceWaybill.dispatcherEmployeeId || sourceWaybill.dispatcherId || '',
             controllerEmployeeId: sourceWaybill.controllerEmployeeId || sourceWaybill.controllerId || '',
             // WB-REG-001 FIX C: Use waybill's date as fallback, not current date
@@ -301,9 +328,33 @@ export const WaybillDetail: React.FC<WaybillDetailProps> = ({ waybill, isPrefill
       setInitialFormData(JSON.parse(JSON.stringify(formDataToSet)));
 
       if (formDataToSet.driverId) {
-        getFuelCardBalance(formDataToSet.driverId)
-          .then(setFuelCardBalance)
+        getFuelCardsForDriver(formDataToSet.driverId)
+          .then(cards => {
+            const activeCard = cards.find(c => c.isActive !== false) || cards[0];
+            if (activeCard) {
+              setFuelCardBalance(Number(activeCard.balanceLiters) || 0);
+              // Also update fuelCardInfo if it's not already set from sourceWaybill
+              if (!sourceWaybill || !('fuelCard' in sourceWaybill) || !sourceWaybill.fuelCard) {
+                setFuelCardInfo({
+                  cardNumber: activeCard.cardNumber,
+                  provider: activeCard.provider
+                });
+              }
+            } else {
+              setFuelCardBalance(null);
+            }
+          })
           .catch(() => setFuelCardBalance(null));
+      }
+
+      // FUEL-CARD-AUTO-001: Set initial card info if available in sourceWaybill
+      if (sourceWaybill && 'fuelCard' in sourceWaybill && sourceWaybill.fuelCard) {
+        setFuelCardInfo({
+          cardNumber: sourceWaybill.fuelCard.cardNumber,
+          provider: sourceWaybill.fuelCard.provider
+        });
+      } else {
+        setFuelCardInfo(null);
       }
 
       // WB-HOTFIX-UI-STATE-001: Use formDataToSet instead of waybill prop for accurate dayMode
@@ -318,7 +369,7 @@ export const WaybillDetail: React.FC<WaybillDetailProps> = ({ waybill, isPrefill
     };
     loadData();
 
-  }, [waybill, isPrefill, showToast]);
+  }, [stableWaybillId, isPrefill]); // BUGFIX-LOOP: Use ID instead of object
 
   useEffect(() => {
     // грузим только если есть ID ПЛ
@@ -347,11 +398,36 @@ export const WaybillDetail: React.FC<WaybillDetailProps> = ({ waybill, isPrefill
     };
 
     loadLinkedTransactions();
-  }, [formData]);
+  }, [stableWaybillId, JSON.stringify(formData.linkedStockTransactionIds)]); // BUGFIX-LOOP: Use stable identifiers
 
   const selectedVehicle = useMemo(() => vehicles.find(v => v.id === formData.vehicleId), [formData.vehicleId, vehicles]);
-  // REL-010: Use real Driver.id from drivers list, fallback to employee data for display
   const selectedDriver = useMemo(() => drivers.find(d => d.id === formData.driverId), [formData.driverId, drivers]);
+
+  // P0-C: WB-PREFILL-NEXT-003 - Call prefill API when vehicleId changes in a NEW waybill
+  useEffect(() => {
+    const isNew = !('id' in formData) || !formData.id;
+    if (!isNew || !formData.vehicleId) return;
+
+    const loadPrefillData = async () => {
+      try {
+        const prefill = await getWaybillPrefill(formData.vehicleId, formData.date);
+        console.log('[P0-C] Prefill data loaded:', prefill);
+
+        setFormData(prev => ({
+          ...prev,
+          // Apply prefill data if current values are empty/default
+          fuelAtStart: prefill.fuelStart ?? prev.fuelAtStart ?? 0,
+          dispatcherEmployeeId: prev.dispatcherEmployeeId || prefill.dispatcherEmployeeId || '',
+          controllerEmployeeId: prev.controllerEmployeeId || prefill.controllerEmployeeId || '',
+          odometerStart: prefill.odometerStart ?? prev.odometerStart ?? 0,
+        }));
+      } catch (err) {
+        console.warn('[P0-C] Failed to load prefill data:', err);
+      }
+    };
+
+    loadPrefillData();
+  }, [formData.vehicleId, formData.date]);
 
   const selectedOrg = useMemo(() => organizations.find(o => o.id === formData.organizationId), [formData.organizationId, organizations]);
   const selectedDispatcher = useMemo(() => employees.find(e => e.id === formData.dispatcherEmployeeId), [formData.dispatcherEmployeeId, employees]);
@@ -549,11 +625,30 @@ export const WaybillDetail: React.FC<WaybillDetailProps> = ({ waybill, isPrefill
       });
 
       if (value) {
-        getFuelCardBalance(value)
-          .then(bal => setFuelCardBalance(bal))
-          .catch(() => setFuelCardBalance(null));
+        // FUEL-CARD-AUTO-001: Fetch all card data in one go
+        getFuelCardsForDriver(value)
+          .then(cards => {
+            console.log('[FUEL-CARD-DEBUG] Cards received:', cards);
+            const activeCard = cards.find(c => c.isActive !== false) || cards[0];
+            if (activeCard) {
+              setFuelCardInfo({
+                cardNumber: activeCard.cardNumber,
+                provider: activeCard.provider
+              });
+              setFuelCardBalance(Number(activeCard.balanceLiters) || 0);
+            } else {
+              setFuelCardInfo(null);
+              setFuelCardBalance(null);
+            }
+          })
+          .catch(err => {
+            console.error('[FUEL-CARD-DEBUG] Error:', err);
+            setFuelCardInfo(null);
+            setFuelCardBalance(null);
+          });
       } else {
         setFuelCardBalance(null);
+        setFuelCardInfo(null);
       }
     } else {
       setFormData(prev => {
@@ -613,6 +708,7 @@ export const WaybillDetail: React.FC<WaybillDetailProps> = ({ waybill, isPrefill
       };
 
       applyField('driverId', data.driverId);
+      applyField('fuelCardId', data.fuelCardId); // WB-FUELCARD-FE-010: Auto-fill fuelCardId
       applyField('dispatcherEmployeeId', data.dispatcherEmployeeId);
       applyField('controllerEmployeeId', data.controllerEmployeeId);
       // Dispatcher/Controller are now fully migrated to EmployeeId fields
@@ -1001,6 +1097,9 @@ export const WaybillDetail: React.FC<WaybillDetailProps> = ({ waybill, isPrefill
         const mappedFormData = {
           ...savedWaybill,
           routes: savedWaybill.routes || [],
+          // P0-B: Apply backend-assigned blank number and blankId
+          number: savedWaybill.number || formData.number,
+          blankId: savedWaybill.blankId || formData.blankId,
           // Map fuel from flattened aggregate
           fuelAtStart: f?.fuelStart != null ? Number(f.fuelStart) : (savedWaybill.fuelAtStart || 0),
           fuelFilled: f?.fuelReceived != null ? Number(f.fuelReceived) : (savedWaybill.fuelFilled || 0),
@@ -1080,7 +1179,15 @@ export const WaybillDetail: React.FC<WaybillDetailProps> = ({ waybill, isPrefill
     }
   };
 
-  const handleConfirmClose = () => {
+  const handleSaveAndClose = async () => {
+    const saved = await handleSave(true);
+    if (saved) {
+      setIsConfirmationModalOpen(false);
+      onClose();
+    }
+  };
+
+  const handleCloseWithoutSaving = () => {
     setIsConfirmationModalOpen(false);
     onClose();
   };
@@ -1177,13 +1284,39 @@ export const WaybillDetail: React.FC<WaybillDetailProps> = ({ waybill, isPrefill
 
     try {
       const frontStatus = nextStatus.toLowerCase() as FrontWaybillStatus;
-      const updatedWaybill = await changeWaybillStatus(savedWaybill.id, frontStatus, {
+      await changeWaybillStatus(savedWaybill.id, frontStatus, {
         userId: currentUser?.id,
         appMode: appSettings?.appMode || 'driver',
       });
-      setFormData(updatedWaybill as Waybill);
-      setInitialFormData(JSON.parse(JSON.stringify(updatedWaybill)));
+
+      // P0-2: WB-POSTED-UI-002 - Reload full waybill to preserve all fields
+      const freshWaybill = await getWaybillById(savedWaybill.id);
+
+      // Map fuel from backend to form fields
+      const f = freshWaybill.fuel;
+      const mappedFormData = {
+        ...freshWaybill,
+        routes: freshWaybill.routes || [],
+        date: freshWaybill.date?.split('T')[0] || new Date().toISOString().split('T')[0],
+        fuelAtStart: f?.fuelStart ? Number(f.fuelStart) : (freshWaybill.fuelAtStart || 0),
+        fuelFilled: f?.fuelReceived ? Number(f.fuelReceived) : (freshWaybill.fuelFilled || 0),
+        fuelAtEnd: f?.fuelEnd ? Number(f.fuelEnd) : (freshWaybill.fuelAtEnd || 0),
+        fuelPlanned: f?.fuelPlanned ? Number(f.fuelPlanned) : (freshWaybill.fuelPlanned || 0),
+        fuelCardId: freshWaybill.fuelCardId || '',
+        dispatcherEmployeeId: freshWaybill.dispatcherEmployeeId || '',
+        controllerEmployeeId: freshWaybill.controllerEmployeeId || '',
+        validFrom: freshWaybill.validFrom?.slice(0, 16) || '',
+        validTo: freshWaybill.validTo?.slice(0, 16) || '',
+      };
+
+      setFormData(mappedFormData as Waybill);
+      setInitialFormData(JSON.parse(JSON.stringify(mappedFormData)));
       showToast(`Статус изменен на "${WAYBILL_STATUS_TRANSLATIONS[nextStatus]}"`, 'success');
+
+      // UX fix: Auto-close after status change
+      if (nextStatus === WaybillStatus.POSTED || nextStatus === WaybillStatus.SUBMITTED) {
+        onClose();
+      }
     } catch (e) {
       showToast((e as Error).message, 'error');
     }
@@ -1214,6 +1347,7 @@ export const WaybillDetail: React.FC<WaybillDetailProps> = ({ waybill, isPrefill
       setInitialFormData(JSON.parse(JSON.stringify(updatedWaybill)));
       showToast('Путевой лист возвращен в черновики для корректировки.', 'success');
       setIsCorrectionReasonModalOpen(false);
+      onClose();  // UX: Auto-close after correction
     } catch (e) {
       showToast((e as Error).message, 'error');
     }
@@ -1242,7 +1376,7 @@ export const WaybillDetail: React.FC<WaybillDetailProps> = ({ waybill, isPrefill
       </button>
 
       {canEdit && (
-        <button onClick={() => handleSave()} className="bg-blue-600 text-white font-semibold py-2 px-6 rounded-lg shadow-md hover:bg-blue-700">Сохранить</button>
+        <button onClick={handleSaveAndClose} className="bg-blue-600 text-white font-semibold py-2 px-6 rounded-lg shadow-md hover:bg-blue-700">Сохранить и закрыть</button>
       )}
     </>;
   };
@@ -1259,11 +1393,16 @@ export const WaybillDetail: React.FC<WaybillDetailProps> = ({ waybill, isPrefill
       <ConfirmationModal
         isOpen={isConfirmationModalOpen}
         onClose={() => setIsConfirmationModalOpen(false)}
-        onConfirm={handleConfirmClose}
-        title="Выйти без сохранения?"
-        message="У вас есть несохраненные изменения. Вы уверены, что хотите выйти? Все изменения будут потеряны."
-        confirmText="Да, выйти"
-        confirmButtonClass="bg-red-600 hover:bg-red-700"
+        onConfirm={handleSaveAndClose}
+        title="Сохранить изменения?"
+        message="У вас есть несохранённые изменения. Хотите сохранить их перед закрытием?"
+        confirmText="Сохранить и закрыть"
+        confirmButtonClass="bg-blue-600 hover:bg-blue-700"
+        secondaryAction={{
+          text: "Закрыть без сохранения",
+          className: "bg-red-600 hover:bg-red-700",
+          onClick: handleCloseWithoutSaving
+        }}
       />
       {/* WB-PREFILL-030: Prefill Confirmation Modal */}
       <ConfirmationModal
@@ -1330,10 +1469,7 @@ export const WaybillDetail: React.FC<WaybillDetailProps> = ({ waybill, isPrefill
         <CorrectionReasonModal
           isOpen={isCorrectionReasonModalOpen}
           onClose={() => setIsCorrectionReasonModalOpen(false)}
-          onSubmit={(reason) => {
-            setFormData(prev => ({ ...prev, deviationReason: reason }));
-            setIsCorrectionReasonModalOpen(false);
-          }}
+          onSubmit={handleConfirmCorrection}  // UX fix: Actually call the handler that changes status to DRAFT
         />
       )}
       {isPrintModalOpen && (
@@ -1430,7 +1566,7 @@ export const WaybillDetail: React.FC<WaybillDetailProps> = ({ waybill, isPrefill
                   <option value="">-- Выберите бланк --</option>
                   {availableBlanks.map(b => (
                     <option key={b.id} value={b.id}>
-                      {b.series} {b.number}
+                      {b.formattedNumber}
                     </option>
                   ))}
                   <option value="manual">Ввести вручную / Автоматически</option>
@@ -1504,9 +1640,18 @@ export const WaybillDetail: React.FC<WaybillDetailProps> = ({ waybill, isPrefill
                 ))}
               </FormSelect>
 
-              {fuelCardBalance != null && (
-                <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                  Доступно на карте: {fuelCardBalance.toFixed(2)} л
+              {(fuelCardBalance != null || fuelCardInfo) && (
+                <div className="mt-1 text-xs space-y-1">
+                  {fuelCardInfo && (
+                    <div className="text-blue-600 dark:text-blue-400 font-medium">
+                      Карта: {fuelCardInfo.cardNumber} {fuelCardInfo.provider ? `(${fuelCardInfo.provider})` : ''}
+                    </div>
+                  )}
+                  {fuelCardBalance != null && (
+                    <div className="text-gray-500 dark:text-gray-400">
+                      Доступно на карте: {fuelCardBalance.toFixed(2)} л
+                    </div>
+                  )}
                 </div>
               )}
             </FormField>

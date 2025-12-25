@@ -189,45 +189,27 @@ export async function deleteStockTransaction(id: string): Promise<void> {
 // ==================== HELPER FUNCTIONS ====================
 
 /**
- * Get fuel card balance for a driver
+ * REL-602: Get fuel cards assigned to a driver with balances
  */
-export async function getFuelCardBalance(driverId: string): Promise<number> {
+export async function getFuelCardsForDriver(driverId: string): Promise<FuelCardInfo[]> {
     try {
-        // WB-FIX-001: Use dedicated endpoint to get all cards for driver and sum positive balances
-        const response = await httpClient.get<{ data: FuelCard[] }>(`/fuel-cards/driver/${driverId}`);
+        console.log(`[stockApi] Fetching fuel cards for driver: ${driverId}`);
+        const response = await httpClient.get<{ data: FuelCardInfo[] }>(`/fuel-cards/driver/${driverId}`);
         const cards = response.data || [];
-
-        if (cards.length === 0) return 0;
-
-        // For now, return the balance of the first active card
-        // Ideally, we should let the user select the card if there are multiple
-        // But the current UI design implies a single balance context
-        const activeCard = cards.find(c => c.isActive) || cards[0];
-        return Number(activeCard.balanceLiters) || 0;
+        console.log(`[stockApi] Received ${cards.length} cards:`, cards);
+        return cards;
     } catch (e) {
-        console.warn('[stockApi] Failed to fetch fuel card balance', e);
-        return 0;
+        console.error('[stockApi] getFuelCardsForDriver error', e);
+        return [];
     }
 }
 
-/**
- * REL-602: Get fuel cards assigned to a driver
- */
 export interface FuelCardInfo {
     id: string;
     cardNumber: string;
     provider: string | null;
     balanceLiters?: number;
-}
-
-export async function getFuelCardsForDriver(driverId: string): Promise<FuelCardInfo[]> {
-    try {
-        const response = await httpClient.get<{ data: FuelCardInfo[] }>(`/fuel-cards/driver/${driverId}`);
-        return response.data || [];
-    } catch {
-        console.error('[stockApi] getFuelCardsForDriver error');
-        return [];
-    }
+    isActive?: boolean; // FUEL-CARD-AUTO-001
 }
 
 /**
@@ -460,6 +442,28 @@ export async function searchDrivers(query: string): Promise<DriverSearchResult[]
  */
 export async function deleteFuelCard(fuelCardId: string): Promise<void> {
     await httpClient.delete(`/fuel-cards/${fuelCardId}`);
+}
+
+/**
+ * FUEL-CARD-RESET-BE-010: Reset (zero out) a fuel card balance
+ */
+export interface ResetFuelCardParams {
+    stockItemId: string;
+    reason?: string;
+    mode?: 'TRANSFER_TO_WAREHOUSE' | 'EXPIRE_EXPENSE';
+}
+
+export interface ResetFuelCardResult {
+    success: boolean;
+    previousBalance: number;
+    mode: string;
+    movementId: string;
+}
+
+export async function resetFuelCard(fuelCardId: string, params: ResetFuelCardParams): Promise<ResetFuelCardResult> {
+    console.log('📡 [stockApi] Resetting fuel card:', fuelCardId);
+    const response = await httpClient.post<ResetFuelCardResult>(`/fuel-cards/${fuelCardId}/reset`, params);
+    return response;
 }
 
 /**

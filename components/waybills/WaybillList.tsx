@@ -20,6 +20,7 @@ import SeasonSettingsModal from './SeasonSettingsModal';
 import { subscribe } from '../../services/bus';
 import { EmptyState, getEmptyStateFromError } from '../common/EmptyState';
 import { HttpError } from '../../services/httpClient';
+import { useAuth } from '../../services/auth';
 
 
 type EnrichedWaybill = Waybill & { mileage?: number; rowNumber?: number; };
@@ -56,7 +57,7 @@ const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpene
   const [selectedWaybillId, setSelectedWaybillId] = useState<string | null>(null);
   const [isDetailViewOpen, setIsDetailViewOpen] = useState(false);
   const [waybillToPrefill, setWaybillToPrefill] = useState<Waybill | null>(null);
-  const [isExtendedView, setIsExtendedView] = useState(false);
+  const [isExtendedView, setIsExtendedView] = useState(true); // Default: extended view ON
   const [isSeasonModalOpen, setIsSeasonModalOpen] = useState(false);
 
   // Pagination state
@@ -69,6 +70,7 @@ const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpene
   const [modalProps, setModalProps] = useState({ title: '', message: '', confirmText: '', confirmButtonClass: '', onConfirm: () => { } });
 
   const { showToast } = useToast();
+  const { appSettings } = useAuth();
 
   const setSelectedVehicleId = (vehicleId: string) => {
     setSelectedVehicleIdState(vehicleId);
@@ -258,6 +260,10 @@ const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpene
     }
   };
 
+  // P0-5: Parent-level navigation guard
+  const [pendingClose, setPendingClose] = useState(false);
+  const [canCloseCallback, setCanCloseCallback] = useState<(() => void) | null>(null);
+
   const handleCloseDetail = () => {
     setIsDetailViewOpen(false);
     setSelectedWaybillId(null);
@@ -265,12 +271,27 @@ const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpene
     fetchData(); // Refetch data after closing detail view
   };
 
+  const handleRequestClose = () => {
+    // P0-5: Request close from detail - detail will check isDirty and call callback
+    if (canCloseCallback) {
+      canCloseCallback();
+    } else {
+      // Fallback if detail doesn't use callback pattern
+      handleCloseDetail();
+    }
+  };
+
+  // BUGFIX-LOOP: Memoize selectedWaybill to prevent infinite re-renders of child
+  // Move out of IF to follow Rules of Hooks
+  const selectedWaybill = useMemo(() => {
+    return selectedWaybillId
+      ? { id: selectedWaybillId } as Waybill
+      : waybillToPrefill;
+  }, [selectedWaybillId, waybillToPrefill]);
+
   if (isDetailViewOpen) {
     // WB-REG-001 FIX B/D: For editing, pass only ID so WaybillDetail loads full data from backend
     // For prefill, pass the waybill data for copying
-    const selectedWaybill = selectedWaybillId
-      ? { id: selectedWaybillId } as Waybill
-      : waybillToPrefill;
     const isPrefill = !selectedWaybillId && !!waybillToPrefill;
     // WB-REG-001 FIX B: key prop forces React to re-create component on ID change
     // BUGFIX: Use stable key for new waybills (not Date.now() which changes on every render!)
@@ -279,10 +300,15 @@ const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpene
   }
 
   const renderActionButtons = (waybill: EnrichedWaybill) => {
+    // P0-F: Check if delete should be hidden for POSTED waybills
+    const canDelete = waybill.status !== WaybillStatus.POSTED || appSettings?.allowDeletePostedWaybills;
+
     return (
       <td className="px-6 py-4 text-center whitespace-nowrap">
         <button onClick={() => handleEdit(waybill)} className="p-2 text-blue-500 transition-all duration-200 transform hover:scale-110" title="Редактировать"><PencilIcon className="h-5 w-5" /></button>
-        <button onClick={() => handleRequestDelete(waybill)} className="p-2 text-red-500 transition-all duration-200 transform hover:scale-110" title="Удалить"><TrashIcon className="h-5 w-5" /></button>
+        {canDelete && (
+          <button onClick={() => handleRequestDelete(waybill)} className="p-2 text-red-500 transition-all duration-200 transform hover:scale-110" title="Удалить"><TrashIcon className="h-5 w-5" /></button>
+        )}
       </td>
     );
   };

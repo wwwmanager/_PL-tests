@@ -287,11 +287,13 @@ const MovementCreateModal: React.FC<Props> = ({ isOpen, onClose, initialData }) 
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Внешний номер (Ref)</label>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                            {movementType === 'INCOME' ? 'Поставщик / Документ' : 'Внешний номер (Ref)'}
+                        </label>
                         <input
                             type="text"
                             {...register('externalRef')}
-                            placeholder="Напр. номер накладной"
+                            placeholder={movementType === 'INCOME' ? 'Например: ООО Ромашка, накл. №12345' : 'Напр. номер накладной'}
                             className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white"
                         />
                     </div>

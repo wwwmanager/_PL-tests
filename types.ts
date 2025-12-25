@@ -124,6 +124,9 @@ export interface Waybill {
   date: string;
   vehicleId: string;
   driverId: string;
+  // FUEL-CARD-AUTO-001: Fuel card assigned to this waybill (auto-filled from driver)
+  fuelCardId?: string | null;
+  fuelCard?: { id: string; cardNumber: string; provider?: string; balanceLiters?: number } | null;
   status: WaybillStatus;
 
   // НОВОЕ: штампы и «кто сделал»
@@ -374,6 +377,8 @@ export interface AppSettings {
   blanks?: {
     driverCanAddBatches: boolean;
   };
+  // P0-F: Allow deletion of POSTED waybills (default: false)
+  allowDeletePostedWaybills?: boolean;
 }
 
 export type StorageType =
