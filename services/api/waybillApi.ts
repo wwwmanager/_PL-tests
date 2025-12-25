@@ -1,6 +1,8 @@
 // Waybill API Facade
 import { httpClient } from '../httpClient';
 import { Waybill } from '../../types';
+import { mapBackendWaybillToFront } from './waybillMapper';
+import { BackendWaybillDto } from './waybillApiTypes';
 
 export interface WaybillFilters {
     organizationId?: string;
@@ -38,13 +40,16 @@ export async function getWaybills(filters: WaybillFilters = {}): Promise<Waybill
     if (filters.page) params.append('page', String(filters.page));
     if (filters.limit) params.append('limit', String(filters.limit));
 
-    const response = await httpClient.get<{ data: Waybill[]; pagination: { total: number; page: number; limit: number; pages: number } }>(
+    const response = await httpClient.get<{ data: BackendWaybillDto[]; pagination: { total: number; page: number; limit: number; pages: number } }>(
         `/waybills?${params.toString()}`
     );
 
+    // REL-103: Apply mapper to convert startAt->validFrom
+    const mappedWaybills = response.data.map(mapBackendWaybillToFront);
+
     // Adapt new backend format {data, pagination} to old WaybillsResponse format
     return {
-        waybills: response.data,
+        waybills: mappedWaybills,
         total: response.pagination.total,
         page: response.pagination.page,
         limit: response.pagination.limit,
@@ -54,8 +59,9 @@ export async function getWaybills(filters: WaybillFilters = {}): Promise<Waybill
 }
 
 export async function getWaybillById(id: string): Promise<Waybill> {
-    const response = await httpClient.get<Waybill>(`/waybills/${id}`);
-    return response;
+    const response = await httpClient.get<BackendWaybillDto>(`/waybills/${id}`);
+    // REL-103: Apply mapper to convert startAt->validFrom
+    return mapBackendWaybillToFront(response);
 }
 
 export async function createWaybill(data: Partial<Waybill>): Promise<Waybill> {

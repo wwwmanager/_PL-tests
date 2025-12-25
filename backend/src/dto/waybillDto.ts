@@ -99,6 +99,9 @@ export const createWaybillSchema = z.object({
     // WB-FIX-PL-001: New fields
     dispatcherEmployeeId: z.string().uuid().optional().nullable(),
     controllerEmployeeId: z.string().uuid().optional().nullable(),
+    // REL-103: Departure and return datetime
+    startAt: z.string().datetime().optional().nullable(),
+    endAt: z.string().datetime().optional().nullable(),
     validTo: z.string().datetime().optional().nullable(),
     // Legacy aliases
     dispatcherId: z.string().uuid().optional().nullable(),
@@ -144,6 +147,9 @@ export const updateWaybillSchema = z.object({
     // WB-FIX-PL-001: New fields
     dispatcherEmployeeId: z.string().uuid().optional().nullable(),
     controllerEmployeeId: z.string().uuid().optional().nullable(),
+    // REL-103: Departure and return datetime
+    startAt: z.string().datetime().optional().nullable(),
+    endAt: z.string().datetime().optional().nullable(),
     validTo: z.string().datetime().optional().nullable(),
     // Legacy aliases
     dispatcherId: z.string().uuid().optional().nullable(),

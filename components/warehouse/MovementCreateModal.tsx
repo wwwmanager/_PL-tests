@@ -4,16 +4,18 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import Modal from '../shared/Modal';
 import { getStockItems, getStockLocations, createStockMovement, updateStockMovementV2 } from '../../services/api/stockApi';
-import { GarageStockItem, StockLocation, StockMovementV2 } from '../../types';
+import { getOrganizations } from '../../services/organizationApi';
+import { GarageStockItem, StockLocation, StockMovementV2, Organization } from '../../types';
 import { useToast } from '../../hooks/useToast';
 
 const movementSchema = z.object({
     occurredAt: z.string().min(1, 'Укажите дату и время'),
     movementType: z.enum(['INCOME', 'TRANSFER', 'EXPENSE', 'ADJUSTMENT']),
     stockItemId: z.string().min(1, 'Выберите товар'),
-    quantity: z.preprocess((val) => Number(val), z.number()), // Allow negative for adjustments if needed, though validation below might restrict
+    quantity: z.preprocess((val) => Number(val), z.number()),
     fromStockLocationId: z.string().optional(),
     toStockLocationId: z.string().optional(),
+    supplierOrgId: z.string().optional(), // INCOME: организация-поставщик
     comment: z.string().optional(),
     externalRef: z.string().optional(),
 }).refine(data => {
@@ -42,6 +44,7 @@ interface Props {
 const MovementCreateModal: React.FC<Props> = ({ isOpen, onClose, initialData }) => {
     const [items, setItems] = useState<GarageStockItem[]>([]);
     const [locations, setLocations] = useState<StockLocation[]>([]);
+    const [organizations, setOrganizations] = useState<Organization[]>([]);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [loading, setLoading] = useState(false);
     const { showToast } = useToast();
@@ -69,9 +72,10 @@ const MovementCreateModal: React.FC<Props> = ({ isOpen, onClose, initialData }) 
             setLoading(true);
             const loadData = async () => {
                 try {
-                    const [itemsData, locationsData] = await Promise.allSettled([
+                    const [itemsData, locationsData, orgsData] = await Promise.allSettled([
                         getStockItems(),
-                        getStockLocations()
+                        getStockLocations(),
+                        getOrganizations()
                     ]);
 
                     if (itemsData.status === 'fulfilled') {
@@ -87,6 +91,12 @@ const MovementCreateModal: React.FC<Props> = ({ isOpen, onClose, initialData }) 
                         console.error('Failed to load locations', locationsData.reason);
                         showToast('Не удалось загрузить локации', 'error');
                     }
+
+                    if (orgsData.status === 'fulfilled') {
+                        setOrganizations(orgsData.value);
+                    } else {
+                        console.error('Failed to load organizations', orgsData.reason);
+                    }
                 } catch (err: any) {
                     console.error('Error loading modal data', err);
                 } finally {
@@ -100,14 +110,20 @@ const MovementCreateModal: React.FC<Props> = ({ isOpen, onClose, initialData }) 
     useEffect(() => {
         if (isOpen && initialData) {
             console.log('Initializing form with:', initialData);
+            // Format date for datetime-local input (local timezone, not UTC)
+            const d = new Date(initialData.occurredAt);
+            const localDateTime = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}T${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+
             // Pre-fill form
             reset({
-                occurredAt: new Date(initialData.occurredAt).toISOString().slice(0, 16),
+                occurredAt: localDateTime,
                 movementType: initialData.movementType as any,
                 stockItemId: initialData.stockItemId || (initialData as any).stockItem?.id || '',
                 quantity: initialData.quantity,
                 externalRef: initialData.documentId || initialData.externalRef || '',
                 comment: initialData.comment || '',
+                // For INCOME, documentId stores the supplier organization ID
+                supplierOrgId: initialData.movementType === 'INCOME' ? (initialData.documentId || '') : '',
                 // Map locations (try scalar first, then relation)
                 fromStockLocationId: (initialData.movementType === 'TRANSFER'
                     ? (initialData.fromStockLocationId || (initialData as any).fromStockLocation?.id)
@@ -117,15 +133,18 @@ const MovementCreateModal: React.FC<Props> = ({ isOpen, onClose, initialData }) 
                     : initialData.movementType === 'INCOME' ? (initialData.stockLocationId || (initialData as any).stockLocation?.id) : undefined) || '',
             });
         } else if (isOpen && !initialData) {
+            const now = new Date();
+            const localNow = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}T${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
             reset({
-                occurredAt: new Date().toISOString().slice(0, 16),
+                occurredAt: localNow,
                 movementType: 'INCOME',
                 quantity: 0,
                 fromStockLocationId: '',
                 toStockLocationId: '',
                 stockItemId: '',
                 comment: '',
-                externalRef: ''
+                externalRef: '',
+                supplierOrgId: ''
             });
         }
     }, [isOpen, initialData, reset]);
@@ -147,6 +166,11 @@ const MovementCreateModal: React.FC<Props> = ({ isOpen, onClose, initialData }) 
                 payload.stockLocationId = data.toStockLocationId;
                 payload.fromStockLocationId = undefined;
                 payload.toStockLocationId = undefined;
+                // Store supplier org ID in documentId
+                if (data.supplierOrgId) {
+                    payload.documentId = data.supplierOrgId;
+                    payload.documentType = 'INCOME';
+                }
             } else if (data.movementType === 'TRANSFER') {
                 payload.stockLocationId = undefined;
                 // fromStockLocationId and toStockLocationId are already in data
@@ -286,17 +310,34 @@ const MovementCreateModal: React.FC<Props> = ({ isOpen, onClose, initialData }) 
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                            {movementType === 'INCOME' ? 'Поставщик / Документ' : 'Внешний номер (Ref)'}
-                        </label>
-                        <input
-                            type="text"
-                            {...register('externalRef')}
-                            placeholder={movementType === 'INCOME' ? 'Например: ООО Ромашка, накл. №12345' : 'Напр. номер накладной'}
-                            className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white"
-                        />
-                    </div>
+                    {movementType === 'INCOME' ? (
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                Поставщик (организация)
+                            </label>
+                            <select
+                                {...register('supplierOrgId')}
+                                className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white"
+                            >
+                                <option value="">Выберите поставщика...</option>
+                                {organizations.map(org => (
+                                    <option key={org.id} value={org.id}>{org.shortName || org.fullName}</option>
+                                ))}
+                            </select>
+                        </div>
+                    ) : (
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                Внешний номер (Ref)
+                            </label>
+                            <input
+                                type="text"
+                                {...register('externalRef')}
+                                placeholder="Напр. номер накладной"
+                                className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white"
+                            />
+                        </div>
+                    )}
                     <div>
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Комментарий</label>
                         <input

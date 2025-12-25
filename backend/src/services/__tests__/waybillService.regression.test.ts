@@ -184,10 +184,10 @@ describe('Waybill Regression Tests (WB-REG-002)', () => {
         };
 
         const updated = await updateWaybill(userInfo as any, created.id, updateInput as any);
-        console.log('Updated Routes Length:', updated.routes ? updated.routes.length : 'undefined');
+        console.log('Updated Routes Length:', (updated as any).routes ? (updated as any).routes.length : 'undefined');
 
         // 3. Reopen (GetById)
-        const loaded = await getWaybillById(created.id);
+        const loaded = await getWaybillById(userInfo as any, created.id);
         console.log('Loaded Routes Length:', loaded?.routes?.length);
         // console.log('Loaded Routes:', JSON.stringify(loaded?.routes, null, 2));
 

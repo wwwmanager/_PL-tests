@@ -32,3 +32,6 @@ router.delete('/:id/topup-rule', fuelCardController.deleteTopUpRule);
 // FUEL-001: Transactions
 router.get('/:id/transactions', fuelCardController.getTransactions);
 router.post('/:id/transactions', fuelCardController.createTransaction);
+
+// FUEL-CARD-RESET-BE-010: Manual reset
+router.post('/:id/reset', fuelCardController.resetFuelCard);

@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import * as stockService from '../services/stockService';
 import * as stockLocationService from '../services/stockLocationService';
+import * as stornoService from '../services/stornoService';
 import { BadRequestError } from '../utils/errors';
 import { prisma } from '../db/prisma';
 
@@ -336,6 +337,105 @@ export async function createMovement(
         }
 
         res.status(201).json(result);
+    } catch (error) {
+        next(error);
+    }
+}
+
+/**
+ * LEDGER-DOCS-BE-020: Storno Document
+ * POST /stock/documents/:documentType/:documentId/storno
+ * Создать сторнирующие движения для документа
+ */
+export async function stornoDocument(
+    req: Request,
+    res: Response,
+    next: NextFunction
+) {
+    try {
+        const user = req.user as { organizationId: string; id: string };
+        const { documentType, documentId } = req.params;
+        const { reason } = req.body;
+
+        if (!reason) {
+            throw new BadRequestError('reason обязателен');
+        }
+
+        const result = await stornoService.stornoDocument(
+            user.organizationId,
+            documentType,
+            documentId,
+            reason,
+            user.id
+        );
+
+        res.json(result);
+    } catch (error) {
+        next(error);
+    }
+}
+
+/**
+ * LEDGER-DOCS-BE-030: Create Correction
+ * POST /stock/corrections
+ * Создать документ корректировки (ADJUSTMENT с автоматическим documentType='CORRECTION')
+ * 
+ * Body: {
+ *   stockItemId: string,
+ *   stockLocationId: string,
+ *   quantity: number,  // положительное = добавить, отрицательное = списать
+ *   reason: string,    // обязательная причина
+ *   occurredAt?: string // дата корректировки (по умолчанию now)
+ * }
+ */
+export async function createCorrection(
+    req: Request,
+    res: Response,
+    next: NextFunction
+) {
+    try {
+        const user = req.user as { organizationId: string; id: string };
+        const { stockItemId, stockLocationId, quantity, reason, occurredAt } = req.body;
+
+        if (!stockItemId) {
+            throw new BadRequestError('stockItemId обязателен');
+        }
+        if (!stockLocationId) {
+            throw new BadRequestError('stockLocationId обязателен');
+        }
+        if (quantity === undefined || quantity === null) {
+            throw new BadRequestError('quantity обязателен');
+        }
+        if (!reason) {
+            throw new BadRequestError('reason обязателен');
+        }
+
+        const parsedQuantity = typeof quantity === 'string' ? parseFloat(quantity) : Number(quantity);
+        if (isNaN(parsedQuantity)) {
+            throw new BadRequestError('quantity должен быть числом');
+        }
+
+        // Generate unique documentId for this correction
+        const documentId = crypto.randomUUID();
+        const occurredAtDate = occurredAt ? new Date(occurredAt) : new Date();
+
+        const movement = await stockService.createAdjustment({
+            organizationId: user.organizationId,
+            stockItemId,
+            stockLocationId,
+            quantity: parsedQuantity,
+            occurredAt: occurredAtDate,
+            documentType: 'CORRECTION', // LEDGER-DOCS: Fixed document type
+            documentId,
+            comment: reason,
+            userId: user.id,
+        });
+
+        res.status(201).json({
+            success: true,
+            correctionId: documentId,
+            movement,
+        });
     } catch (error) {
         next(error);
     }

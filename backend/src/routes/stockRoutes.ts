@@ -11,7 +11,7 @@ import {
     getFuelCardBalance, getAvailableFuelExpenses
 } from '../controllers/stockController';
 import {
-    getBalances, getBalance, createMovement, listMovementsV2
+    getBalances, getBalance, createMovement, listMovementsV2, stornoDocument, createCorrection
 } from '../controllers/stockBalanceController';
 
 export const router = Router();
@@ -38,8 +38,13 @@ router.put('/movements/:id', updateStockMovement);// PUT /api/stock/movements/:i
 router.delete('/movements/:id', deleteStockMovement); // DELETE /api/stock/movements/:id
 router.post('/movements/:id/void', requireRoleAny(['admin', 'accountant']), voidStockMovementController); // P1-1: STOCK-VOID + RBAC
 
+// LEDGER-DOCS-BE-020: Storno API
+router.post('/documents/:documentType/:documentId/storno', requireRoleAny(['admin', 'accountant']), stornoDocument);
+
+// LEDGER-DOCS-BE-030: Corrections API
+router.post('/corrections', requireRoleAny(['admin', 'accountant']), createCorrection);
+
 // Helper endpoints
 router.get('/fuel-card-balance/:driverId', getFuelCardBalance);  // GET /api/stock/fuel-card-balance/:driverId
 router.get('/available-fuel-expenses/:driverId', getAvailableFuelExpenses); // GET /api/stock/available-fuel-expenses/:driverId
-
 

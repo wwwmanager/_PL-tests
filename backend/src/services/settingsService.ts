@@ -13,6 +13,8 @@ export interface AppSettings {
     blanks?: {
         driverCanAddBatches: boolean;
     };
+    // P0-F: Allow deletion of POSTED waybills (default: false = blocked)
+    allowDeletePostedWaybills?: boolean;
 }
 
 export type SeasonSettings =
@@ -32,7 +34,8 @@ export type SeasonSettings =
 const DEFAULT_APP_SETTINGS: AppSettings = {
     isParserEnabled: true,
     appMode: 'central',
-    blanks: { driverCanAddBatches: false }
+    blanks: { driverCanAddBatches: false },
+    allowDeletePostedWaybills: false, // P0-F: By default, block deletion of POSTED waybills
 };
 
 const DEFAULT_SEASON_SETTINGS: SeasonSettings = {

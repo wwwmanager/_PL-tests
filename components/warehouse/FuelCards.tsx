@@ -10,6 +10,7 @@ import {
     assignFuelCard,
     searchDrivers,
     deleteFuelCard,
+    resetFuelCard,
     type FuelCard,
     type StockLocation,
     type StockItemOption,
@@ -491,6 +492,153 @@ function AssignDriverModal({ card, isOpen, onClose, onSuccess }: AssignDriverMod
     );
 }
 
+// ==================== RESET CARD MODAL ====================
+
+interface ResetCardModalProps {
+    card: FuelCard;
+    isOpen: boolean;
+    onClose: () => void;
+    onSuccess: () => void;
+}
+
+function ResetCardModal({ card, isOpen, onClose, onSuccess }: ResetCardModalProps) {
+    const [fuelTypes, setFuelTypes] = useState<StockItemOption[]>([]);
+    const [loading, setLoading] = useState(false);
+    const [submitting, setSubmitting] = useState(false);
+    const { showToast } = useToast();
+
+    const [formData, setFormData] = useState({
+        stockItemId: '',
+        reason: 'Ручное обнуление баланса карты',
+        mode: 'EXPIRE_EXPENSE' as 'EXPIRE_EXPENSE' | 'TRANSFER_TO_WAREHOUSE',
+    });
+
+    useEffect(() => {
+        if (isOpen) {
+            setLoading(true);
+            getFuelTypes()
+                .then((fuels) => {
+                    setFuelTypes(fuels);
+                    if (fuels.length > 0) setFormData(f => ({ ...f, stockItemId: fuels[0].id }));
+                })
+                .catch(err => showToast('Ошибка загрузки типов топлива: ' + err.message, 'error'))
+                .finally(() => setLoading(false));
+        }
+    }, [isOpen]);
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+
+        if (!formData.stockItemId) {
+            showToast('Выберите тип топлива', 'error');
+            return;
+        }
+
+        setSubmitting(true);
+        try {
+            const result = await resetFuelCard(card.id, {
+                stockItemId: formData.stockItemId,
+                reason: formData.reason || 'Ручное обнуление',
+                mode: formData.mode,
+            });
+
+            if (result.previousBalance > 0) {
+                showToast(`Карта ${card.cardNumber} обнулена. Списано: ${result.previousBalance.toFixed(2)} л`, 'success');
+            } else {
+                showToast(`Карта ${card.cardNumber} уже имеет нулевой баланс`, 'info');
+            }
+            onSuccess();
+            onClose();
+        } catch (err: any) {
+            console.error('[ResetCard] Error:', err);
+            showToast('Ошибка обнуления: ' + (err.message || 'Неизвестная ошибка'), 'error');
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    return (
+        <Modal isOpen={isOpen} onClose={onClose} title={`Обнулить карту ${card.cardNumber}`}>
+            {loading ? (
+                <div className="text-center py-8">Загрузка...</div>
+            ) : (
+                <form onSubmit={handleSubmit} className="space-y-4">
+                    <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+                        <p className="text-sm text-yellow-800">
+                            ⚠️ Текущий баланс карты: <strong>{Number(card.balanceLiters || 0).toFixed(2)} л</strong>
+                        </p>
+                        <p className="text-xs text-yellow-600 mt-1">
+                            Баланс будет списан и обнулён.
+                        </p>
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Тип топлива *
+                        </label>
+                        <select
+                            value={formData.stockItemId}
+                            onChange={(e) => setFormData(f => ({ ...f, stockItemId: e.target.value }))}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                            required
+                        >
+                            <option value="">Выберите...</option>
+                            {fuelTypes.map(ft => (
+                                <option key={ft.id} value={ft.id}>{ft.name}</option>
+                            ))}
+                        </select>
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Режим обнуления
+                        </label>
+                        <select
+                            value={formData.mode}
+                            onChange={(e) => setFormData(f => ({ ...f, mode: e.target.value as any }))}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                        >
+                            <option value="EXPIRE_EXPENSE">Списание (сгорание)</option>
+                            <option value="TRANSFER_TO_WAREHOUSE">Возврат на склад</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Причина
+                        </label>
+                        <input
+                            type="text"
+                            value={formData.reason}
+                            onChange={(e) => setFormData(f => ({ ...f, reason: e.target.value }))}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                            placeholder="Причина обнуления"
+                        />
+                    </div>
+
+                    <div className="flex justify-end gap-2 pt-4 border-t">
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            className="px-4 py-2 text-gray-600 hover:text-gray-800"
+                            disabled={submitting}
+                        >
+                            Отмена
+                        </button>
+                        <button
+                            type="submit"
+                            disabled={submitting}
+                            className="px-4 py-2 bg-orange-600 text-white rounded-md hover:bg-orange-700 disabled:opacity-50"
+                        >
+                            {submitting ? 'Обнуление...' : '🔄 Обнулить'}
+                        </button>
+                    </div>
+                </form>
+            )}
+        </Modal>
+    );
+}
+
 // ==================== FUEL CARDS COMPONENT ====================
 
 const FuelCards: React.FC = () => {
@@ -499,6 +647,7 @@ const FuelCards: React.FC = () => {
     const [selectedCard, setSelectedCard] = useState<FuelCard | null>(null);
     const [topUpModalOpen, setTopUpModalOpen] = useState(false);
     const [assignModalOpen, setAssignModalOpen] = useState(false);
+    const [resetModalOpen, setResetModalOpen] = useState(false);
     const [createModalOpen, setCreateModalOpen] = useState(false);
     const [deleteConfirmCard, setDeleteConfirmCard] = useState<FuelCard | null>(null);
     const { showToast } = useToast();
@@ -527,6 +676,11 @@ const FuelCards: React.FC = () => {
     const handleAssign = (card: FuelCard) => {
         setSelectedCard(card);
         setAssignModalOpen(true);
+    };
+
+    const handleReset = (card: FuelCard) => {
+        setSelectedCard(card);
+        setResetModalOpen(true);
     };
 
     const handleTopUpSuccess = () => {
@@ -603,6 +757,13 @@ const FuelCards: React.FC = () => {
                         👤 Привязать
                     </button>
                     <button
+                        onClick={() => handleReset(row)}
+                        className="px-3 py-1 bg-orange-500 text-white rounded text-sm hover:bg-orange-600"
+                        title="Обнулить баланс карты"
+                    >
+                        🔄 Обнулить
+                    </button>
+                    <button
                         onClick={() => setDeleteConfirmCard(row)}
                         className="px-3 py-1 bg-red-500 text-white rounded text-sm hover:bg-red-600"
                         title="Удалить карту"
@@ -663,6 +824,18 @@ const FuelCards: React.FC = () => {
                         setSelectedCard(null);
                     }}
                     onSuccess={handleAssignSuccess}
+                />
+            )}
+
+            {selectedCard && (
+                <ResetCardModal
+                    card={selectedCard}
+                    isOpen={resetModalOpen}
+                    onClose={() => {
+                        setResetModalOpen(false);
+                        setSelectedCard(null);
+                    }}
+                    onSuccess={loadCards}
                 />
             )}
 

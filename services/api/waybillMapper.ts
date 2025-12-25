@@ -83,6 +83,9 @@ export function mapBackendWaybillToFront(dto: BackendWaybillDto): FrontWaybill {
         date: dto.date, // backend may return ISO or date-only; UI обычно режет до YYYY-MM-DD где нужно
         vehicleId: dto.vehicleId,
         driverId: dto.driverId,
+        // FUEL-CARD-AUTO-001
+        fuelCardId: dto.fuelCardId ?? null,
+        fuelCard: dto.fuelCard ?? null,
         status: enumStatus,
 
         blankId: dto.blankId ?? null,
@@ -110,12 +113,15 @@ export function mapBackendWaybillToFront(dto: BackendWaybillDto): FrontWaybill {
         // Legacy compat (если где-то UI ещё читает dispatcherId)
         dispatcherId: dto.dispatcherEmployeeId ?? '',
 
-        // validFrom: backend хранит только date + validTo (по вашему описанию).
-        // Держим validFrom как date (или UI может хранить отдельно).
-        validFrom: dto.date,
-        validTo: dto.validTo ?? dto.date,
+        // validFrom: use startAt (departure time) if present, else fallback to date
+        // DEBUG: trace startAt value
+        ...(() => { console.log('[MAPPER] dto:', dto.number, 'startAt:', dto.startAt, 'date:', dto.date); return {}; })(),
+        validFrom: dto.startAt ?? dto.date,
+        validTo: dto.validTo ?? dto.endAt ?? dto.date,
 
         fuel: dto.fuel ?? undefined,
+        // REL-103: Pass fuelLines for WaybillList (fuelAtStart/fuelAtEnd columns)
+        fuelLines: dto.fuelLines,
 
         createdAt: dto.createdAt,
         updatedAt: dto.updatedAt,
@@ -160,6 +166,8 @@ export function mapFrontWaybillToBackendCreate(waybill: Omit<FrontWaybill, 'id'>
         dispatcherEmployeeId: dispatcherEmployeeId ?? null,
         controllerEmployeeId: controllerEmployeeId ?? null,
 
+        // startAt = departure datetime (from validFrom)
+        startAt: normalizeToIsoDateTimeOrNull((waybill as any).validFrom, { dateOnlyMode: 'startOfDay' }),
         // validTo в backend DTO = ISO datetime (z.string().datetime()) или null/undefined
         validTo: normalizeToIsoDateTimeOrNull((waybill as any).validTo, { dateOnlyMode: 'endOfDay' }),
 
@@ -229,6 +237,8 @@ export function mapFrontWaybillToBackendUpdate(waybill: FrontWaybill) {
         dispatcherEmployeeId: dispatcherEmployeeId ?? null,
         controllerEmployeeId: controllerEmployeeId ?? null,
 
+        // startAt = departure datetime (from validFrom)
+        startAt: normalizeToIsoDateTimeOrNull((waybill as any).validFrom, { dateOnlyMode: 'startOfDay' }),
         validTo: normalizeToIsoDateTimeOrNull((waybill as any).validTo, { dateOnlyMode: 'endOfDay' }),
 
         fuel: (waybill as any).fuel,

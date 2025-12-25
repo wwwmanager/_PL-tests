@@ -4,6 +4,7 @@ import * as Sentry from '@sentry/react';
 import { AuthProvider, useAuth } from './services/auth';
 import { ToastProvider } from './contexts/ToastContext';
 import { MeProvider } from './contexts/MeContext';
+import { NavigationGuardProvider, useNavigationGuard } from './contexts/NavigationGuardContext';
 import LoadingSpinner from './components/common/LoadingSpinner';
 import { ContextBar } from './components/common/ContextBar';
 import Login from './components/auth/Login';
@@ -32,9 +33,15 @@ type Page =
 
 const AppContent: React.FC = () => {
   const { currentUser, logout, logoutAll, appSettings } = useAuth();
+  const { requestNavigation } = useNavigationGuard();
   const [currentPage, setCurrentPage] = React.useState<Page>('dashboard');
   const [selectedWaybillId, setSelectedWaybillId] = React.useState<string | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = React.useState(true);
+
+  // UX-DOC-GUARD-004: Safe navigation wrapper that checks for unsaved changes
+  const navigateTo = React.useCallback((page: Page) => {
+    requestNavigation(() => setCurrentPage(page));
+  }, [requestNavigation]);
 
   // Если нет пользователя - показываем Login
   if (!currentUser) {
@@ -85,12 +92,12 @@ const AppContent: React.FC = () => {
         </div>
         <nav className="mt-4">
           <ul>
-            <li><button onClick={() => setCurrentPage('dashboard')} className={`w-full text-left px-6 py-3 hover:bg-gray-100 dark:hover:bg-gray-700 ${currentPage === 'dashboard' ? 'bg-blue-50 dark:bg-blue-900 border-r-4 border-blue-500' : ''}`}>Панель управления</button></li>
-            <li><button onClick={() => setCurrentPage('waybills')} className={`w-full text-left px-6 py-3 hover:bg-gray-100 dark:hover:bg-gray-700 ${currentPage === 'waybills' ? 'bg-blue-50 dark:bg-blue-900 border-r-4 border-blue-500' : ''}`}>Путевые листы</button></li>
-            <li><button onClick={() => setCurrentPage('dictionaries')} className={`w-full text-left px-6 py-3 hover:bg-gray-100 dark:hover:bg-gray-700 ${currentPage === 'dictionaries' ? 'bg-blue-50 dark:bg-blue-900 border-r-4 border-blue-500' : ''}`}>Справочники</button></li>
-            <li><button data-testid="nav-reports" onClick={() => setCurrentPage('reports')} className={`w-full text-left px-6 py-3 hover:bg-gray-100 dark:hover:bg-gray-700 ${currentPage === 'reports' ? 'bg-blue-50 dark:bg-blue-900 border-r-4 border-blue-500' : ''}`}>Отчеты</button></li>
-            <li><button data-testid="nav-warehouse" onClick={() => setCurrentPage('warehouse')} className={`w-full text-left px-6 py-3 hover:bg-gray-100 dark:hover:bg-gray-700 ${currentPage === 'warehouse' ? 'bg-blue-50 dark:bg-blue-900 border-r-4 border-blue-500' : ''}`}>Склад</button></li>
-            <li><button data-testid="nav-admin" onClick={() => setCurrentPage('admin')} className={`w-full text-left px-6 py-3 hover:bg-gray-100 dark:hover:bg-gray-700 ${currentPage === 'admin' ? 'bg-blue-50 dark:bg-blue-900 border-r-4 border-blue-500' : ''}`}>Настройки</button></li>
+            <li><button onClick={() => navigateTo('dashboard')} className={`w-full text-left px-6 py-3 hover:bg-gray-100 dark:hover:bg-gray-700 ${currentPage === 'dashboard' ? 'bg-blue-50 dark:bg-blue-900 border-r-4 border-blue-500' : ''}`}>Панель управления</button></li>
+            <li><button onClick={() => navigateTo('waybills')} className={`w-full text-left px-6 py-3 hover:bg-gray-100 dark:hover:bg-gray-700 ${currentPage === 'waybills' ? 'bg-blue-50 dark:bg-blue-900 border-r-4 border-blue-500' : ''}`}>Путевые листы</button></li>
+            <li><button onClick={() => navigateTo('dictionaries')} className={`w-full text-left px-6 py-3 hover:bg-gray-100 dark:hover:bg-gray-700 ${currentPage === 'dictionaries' ? 'bg-blue-50 dark:bg-blue-900 border-r-4 border-blue-500' : ''}`}>Справочники</button></li>
+            <li><button data-testid="nav-reports" onClick={() => navigateTo('reports')} className={`w-full text-left px-6 py-3 hover:bg-gray-100 dark:hover:bg-gray-700 ${currentPage === 'reports' ? 'bg-blue-50 dark:bg-blue-900 border-r-4 border-blue-500' : ''}`}>Отчеты</button></li>
+            <li><button data-testid="nav-warehouse" onClick={() => navigateTo('warehouse')} className={`w-full text-left px-6 py-3 hover:bg-gray-100 dark:hover:bg-gray-700 ${currentPage === 'warehouse' ? 'bg-blue-50 dark:bg-blue-900 border-r-4 border-blue-500' : ''}`}>Склад</button></li>
+            <li><button data-testid="nav-admin" onClick={() => navigateTo('admin')} className={`w-full text-left px-6 py-3 hover:bg-gray-100 dark:hover:bg-gray-700 ${currentPage === 'admin' ? 'bg-blue-50 dark:bg-blue-900 border-r-4 border-blue-500' : ''}`}>Настройки</button></li>
           </ul>
         </nav>
         <div className="p-4 border-t dark:border-gray-700 space-y-2">
@@ -157,9 +164,11 @@ const App: React.FC = () => {
       <ToastProvider>
         <AuthProvider>
           <MeProvider>
-            <Suspense fallback={<LoadingSpinner />}>
-              <AppContent />
-            </Suspense>
+            <NavigationGuardProvider>
+              <Suspense fallback={<LoadingSpinner />}>
+                <AppContent />
+              </Suspense>
+            </NavigationGuardProvider>
           </MeProvider>
         </AuthProvider>
       </ToastProvider>

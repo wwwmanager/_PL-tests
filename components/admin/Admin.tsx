@@ -735,6 +735,24 @@ export const AppSettingsComponent: React.FC = () => {
           <div className="font-medium text-gray-800 dark:text-white">Настройки бланков ПЛ</div>
           <label className="flex items-center gap-2"><input type="checkbox" checked={blanksSettings.driverCanAddBatches} onChange={e => handleBlanksSettingChange('driverCanAddBatches', e.target.checked)} /><span>Водитель может добавлять пачки</span></label>
         </div>
+        {/* P0-F: Allow deletion of POSTED waybills */}
+        <label className="flex items-center justify-between p-3 rounded-lg bg-gray-50 dark:bg-gray-700/50">
+          <div>
+            <div className="font-medium text-gray-800 dark:text-white">Разрешить удаление проведённых ПЛ</div>
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              По умолчанию проведённые путевые листы нельзя удалить. Включите для отмены этого ограничения.
+            </p>
+          </div>
+          <div className="relative inline-flex items-center cursor-pointer">
+            <input
+              type="checkbox"
+              checked={settings.allowDeletePostedWaybills || false}
+              onChange={(e) => handleSettingChange('allowDeletePostedWaybills', e.target.checked)}
+              className="sr-only peer"
+            />
+            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-600 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-500 peer-checked:bg-blue-600"></div>
+          </div>
+        </label>
       </div>
     </section>
   );

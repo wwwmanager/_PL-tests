@@ -212,3 +212,41 @@ export async function createTransaction(req: Request, res: Response, next: NextF
         next(err);
     }
 }
+
+/**
+ * FUEL-CARD-RESET-BE-010: Manually reset (zero out) a fuel card balance
+ * POST /fuel-cards/:id/reset
+ * Body: {
+ *   stockItemId: string (required - fuel type to reset),
+ *   reason?: string (optional - reason for reset),
+ *   mode?: 'TRANSFER_TO_WAREHOUSE' | 'EXPIRE_EXPENSE' (default: EXPIRE_EXPENSE)
+ * }
+ */
+export async function resetFuelCard(req: Request, res: Response, next: NextFunction) {
+    try {
+        const user = req.user!;
+        const { id } = req.params;
+        const { stockItemId, reason, mode } = req.body as {
+            stockItemId: string;
+            reason?: string;
+            mode?: 'TRANSFER_TO_WAREHOUSE' | 'EXPIRE_EXPENSE';
+        };
+
+        if (!stockItemId) {
+            return res.status(400).json({ error: 'stockItemId обязателен' });
+        }
+
+        const result = await fuelCardService.resetFuelCard(
+            user.organizationId,
+            id,
+            stockItemId,
+            mode || 'EXPIRE_EXPENSE',
+            reason || 'Ручное обнуление карты',
+            user.id
+        );
+
+        res.json(result);
+    } catch (err) {
+        next(err);
+    }
+}

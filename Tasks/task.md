@@ -369,6 +369,17 @@
 - ✅ **BACKEND-500-GLOBAL-003**: Documentation migration to repository (commit `6ab2d7c`)
 - ✅ **DOC-BACKEND-OPS-004**: Documentation portability accepted (commit `6ab2d7c`)
 
+**2025-12-25 Completed:**
+- ✅ **P0-F (WB-DELETE-POSTED-BLOCK-006)**: Block deletion of POSTED waybills with admin toggle
+  - `settingsService.ts`: Added `allowDeletePostedWaybills` setting
+  - `waybillService.ts`: Added check in `deleteWaybill`
+  - `WaybillList.tsx`: Hidden delete button for POSTED (unless setting enabled)
+  - `Admin.tsx`: Added toggle in settings UI
+- ✅ **LEDGER-DOCS-001**: Document-based ledger operations
+  - `stornoService.ts`: NEW — Storno logic (reverse movements)
+  - `POST /api/stock/documents/:documentType/:documentId/storno`: Storno API
+  - `POST /api/stock/corrections`: Corrections API (ADJUSTMENT with documentType='CORRECTION')
+
 ---
 
 ## 🧪 PR1 Sanity Test Results (2025-12-23)
