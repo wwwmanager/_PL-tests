@@ -339,6 +339,14 @@ export const WaybillDetail: React.FC<WaybillDetailProps> = ({ waybill, isPrefill
       if (formDataToSet.driverId) {
         getFuelCardsForDriver(formDataToSet.driverId)
           .then(cards => {
+            // FUEL-CARD-SELECTOR-FE-011 FIX: Also populate driverCards for dropdown
+            setDriverCards(cards.map(c => ({
+              id: c.id,
+              cardNumber: c.cardNumber,
+              provider: c.provider,
+              balanceLiters: Number(c.balanceLiters) || 0
+            })));
+
             const activeCard = cards.find(c => c.isActive !== false) || cards[0];
             if (activeCard) {
               setFuelCardBalance(Number(activeCard.balanceLiters) || 0);
@@ -359,6 +367,7 @@ export const WaybillDetail: React.FC<WaybillDetailProps> = ({ waybill, isPrefill
             }
           })
           .catch(() => {
+            setDriverCards([]);
             setFuelCardBalance(null);
             setFuelCardReserve(0);
           });
