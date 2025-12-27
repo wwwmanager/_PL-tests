@@ -137,7 +137,19 @@ export async function runFuelCardTopUps(batchSize = 50, runAtUtc: Date = new Dat
                             if (r.sourceLocationId) {
                                 sourceLocationId = r.sourceLocationId;
                             } else {
-                                const warehouseLocation = await getOrCreateDefaultWarehouseLocation(r.organizationId);
+                                // OWN-ORG-DEPT-TOPUP-010: Get departmentId from card's vehicle/driver
+                                const cardWithDept = await tx.fuelCard.findUnique({
+                                    where: { id: r.fuelCardId },
+                                    include: {
+                                        assignedToVehicle: { select: { departmentId: true } },
+                                        assignedToDriver: { include: { employee: { select: { departmentId: true } } } }
+                                    }
+                                });
+                                const departmentId = cardWithDept?.assignedToVehicle?.departmentId
+                                    || cardWithDept?.assignedToDriver?.employee?.departmentId
+                                    || null;
+
+                                const warehouseLocation = await getOrCreateDefaultWarehouseLocation(r.organizationId, departmentId);
                                 sourceLocationId = warehouseLocation.id;
                             }
 

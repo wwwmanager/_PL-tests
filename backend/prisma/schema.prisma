@@ -142,6 +142,7 @@ model Organization {
   createdAt DateTime @default(now()) @db.Timestamp(6)
   updatedAt DateTime @default(now()) @updatedAt @db.Timestamp(6)
   stockLockedAt DateTime? @db.Timestamp(6) // P0-4: STOCK-PERIOD-LOCK
+  isOwn         Boolean  @default(false)   // OWN-ORG-001: Собственная организация
 
   departments    Department[]
   users          User[]
@@ -158,6 +159,7 @@ model Organization {
   auditLogs      AuditLog[]
   resetRules     FuelCardResetRule[]  // REL-105
 
+  @@index([isOwn])
   @@map("organizations")
 }
 

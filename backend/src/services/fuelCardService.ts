@@ -743,8 +743,20 @@ export async function resetFuelCard(
     const externalRef = `MANUAL_RESET:${fuelCardId}:${new Date().toISOString()}`;
 
     if (mode === 'TRANSFER_TO_WAREHOUSE') {
-        // Transfer back to default warehouse
-        const warehouseLocation = await getOrCreateDefaultWarehouseLocation(organizationId);
+        // OWN-ORG-DEPT-TOPUP-020: Get departmentId from card's vehicle/driver
+        const cardWithDept = await prisma.fuelCard.findUnique({
+            where: { id: fuelCardId },
+            include: {
+                assignedToVehicle: { select: { departmentId: true } },
+                assignedToDriver: { include: { employee: { select: { departmentId: true } } } }
+            }
+        });
+        const departmentId = cardWithDept?.assignedToVehicle?.departmentId
+            || cardWithDept?.assignedToDriver?.employee?.departmentId
+            || null;
+
+        // Transfer back to department's warehouse (or central if no dept)
+        const warehouseLocation = await getOrCreateDefaultWarehouseLocation(organizationId, departmentId);
 
         movement = await createTransfer({
             organizationId,

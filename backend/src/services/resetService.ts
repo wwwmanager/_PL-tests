@@ -211,7 +211,19 @@ export async function runResets(options: RunResetsOptions): Promise<ResetResult>
                             if (rule.targetLocationId) {
                                 targetLocationId = rule.targetLocationId;
                             } else {
-                                const warehouseLocation = await getOrCreateDefaultWarehouseLocation(organizationId);
+                                // OWN-ORG-DEPT-RESET-030: Get departmentId from card's vehicle/driver
+                                const cardWithDept = await prisma.fuelCard.findUnique({
+                                    where: { id: card.id },
+                                    include: {
+                                        assignedToVehicle: { select: { departmentId: true } },
+                                        assignedToDriver: { include: { employee: { select: { departmentId: true } } } }
+                                    }
+                                });
+                                const cardDeptId = cardWithDept?.assignedToVehicle?.departmentId
+                                    || cardWithDept?.assignedToDriver?.employee?.departmentId
+                                    || null;
+
+                                const warehouseLocation = await getOrCreateDefaultWarehouseLocation(organizationId, cardDeptId);
                                 targetLocationId = warehouseLocation.id;
                             }
 

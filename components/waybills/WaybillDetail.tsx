@@ -168,6 +168,8 @@ export const WaybillDetail: React.FC<WaybillDetailProps> = ({ waybill, isPrefill
   const [fuelCardReserve, setFuelCardReserve] = useState<number>(0);
   const [fuelCardInfo, setFuelCardInfo] = useState<{ cardNumber: string; provider?: string } | null>(null); // FUEL-CARD-AUTO-001
   const [fuelFilledError, setFuelFilledError] = useState<string | null>(null);
+  // FUEL-CARD-SELECTOR-FE-011: List of driver's fuel cards for dropdown
+  const [driverCards, setDriverCards] = useState<Array<{ id: string; cardNumber: string; provider?: string; balanceLiters: number }>>([]);
 
   const [linkedTransactions, setLinkedTransactions] = useState<StockTransaction[]>([]);
 
@@ -640,10 +642,18 @@ export const WaybillDetail: React.FC<WaybillDetailProps> = ({ waybill, isPrefill
       });
 
       if (value) {
-        // FUEL-CARD-AUTO-001: Fetch all card data in one go
+        // FUEL-CARD-SELECTOR-FE-011: Fetch all cards for driver and populate dropdown
         getFuelCardsForDriver(value)
           .then(cards => {
             console.log('[FUEL-CARD-DEBUG] Cards received:', cards);
+            // Store all cards for dropdown
+            setDriverCards(cards.map(c => ({
+              id: c.id,
+              cardNumber: c.cardNumber,
+              provider: c.provider,
+              balanceLiters: Number(c.balanceLiters) || 0
+            })));
+
             const activeCard = cards.find(c => c.isActive !== false) || cards[0];
             if (activeCard) {
               setFuelCardInfo({
@@ -653,19 +663,25 @@ export const WaybillDetail: React.FC<WaybillDetailProps> = ({ waybill, isPrefill
               setFuelCardBalance(Number(activeCard.balanceLiters) || 0);
               const currentId = formData && 'id' in formData ? (formData as any).id : undefined;
               getFuelCardDraftReserve(activeCard.id, currentId).then(res => setFuelCardReserve(res.reserved));
+
+              // FUEL-CARD-SELECTOR-FE-011: Auto-select first card into formData
+              setFormData(prev => ({ ...prev, fuelCardId: activeCard.id }));
             } else {
               setFuelCardInfo(null);
               setFuelCardBalance(null);
               setFuelCardReserve(0);
+              setFormData(prev => ({ ...prev, fuelCardId: null }));
             }
           })
           .catch(err => {
             console.error('[FUEL-CARD-DEBUG] Error:', err);
+            setDriverCards([]);
             setFuelCardInfo(null);
             setFuelCardBalance(null);
             setFuelCardReserve(0);
           });
       } else {
+        setDriverCards([]);
         setFuelCardBalance(null);
         setFuelCardInfo(null);
       }
@@ -1690,7 +1706,44 @@ export const WaybillDetail: React.FC<WaybillDetailProps> = ({ waybill, isPrefill
                 ))}
               </FormSelect>
 
-              {(fuelCardBalance != null || fuelCardInfo) && (
+              {/* FUEL-CARD-SELECTOR-FE-011: Dropdown when driver has multiple cards */}
+              {driverCards.length > 1 ? (
+                <div className="mt-2">
+                  <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Топливная карта</label>
+                  <select
+                    className="w-full bg-gray-50 dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded-md p-2 text-sm text-gray-700 dark:text-gray-200"
+                    value={(formData as any).fuelCardId || ''}
+                    onChange={(e) => {
+                      const cardId = e.target.value || null;
+                      setFormData(prev => ({ ...prev, fuelCardId: cardId }));
+                      const selectedCard = driverCards.find(c => c.id === cardId);
+                      if (selectedCard) {
+                        setFuelCardInfo({ cardNumber: selectedCard.cardNumber, provider: selectedCard.provider });
+                        setFuelCardBalance(selectedCard.balanceLiters);
+                        const currentId = formData && 'id' in formData ? (formData as any).id : undefined;
+                        getFuelCardDraftReserve(selectedCard.id, currentId).then(res => setFuelCardReserve(res.reserved));
+                      } else {
+                        setFuelCardInfo(null);
+                        setFuelCardBalance(null);
+                        setFuelCardReserve(0);
+                      }
+                    }}
+                    disabled={!canEdit}
+                  >
+                    <option value="">Не выбрана</option>
+                    {driverCards.map(c => (
+                      <option key={c.id} value={c.id}>
+                        {c.cardNumber} {c.provider ? `(${c.provider})` : ''} — {c.balanceLiters.toFixed(2)} л
+                      </option>
+                    ))}
+                  </select>
+                  {fuelCardReserve > 0 && (
+                    <div className="mt-1 text-xs text-orange-600 dark:text-orange-400">
+                      Резерв в черновиках: {fuelCardReserve.toFixed(2)} л
+                    </div>
+                  )}
+                </div>
+              ) : (fuelCardBalance != null || fuelCardInfo) && (
                 <div className="mt-1 text-xs space-y-1">
                   {fuelCardInfo && (
                     <div className="text-blue-600 dark:text-blue-400 font-medium">

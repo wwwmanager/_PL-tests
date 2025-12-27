@@ -268,11 +268,19 @@ export const selectiveDelete = async (req: Request, res: Response) => {
                         deletedCounts.blankBatches = bbc.count;
                         break;
                     case 'employees':
-                        await tx.driver.deleteMany();  // FK dependency
+                        // Delete waybills first (Waybill.driverId has onDelete: Restrict)
+                        await tx.waybillFuel.deleteMany();
+                        await tx.waybillRoute.deleteMany();
+                        await tx.waybill.deleteMany();
+                        await tx.driver.deleteMany();
                         const ec = await tx.employee.deleteMany();
                         deletedCounts.employees = ec.count;
                         break;
                     case 'drivers':
+                        // Delete waybills first (Waybill.driverId has onDelete: Restrict)
+                        await tx.waybillFuel.deleteMany();
+                        await tx.waybillRoute.deleteMany();
+                        await tx.waybill.deleteMany();
                         const dc = await tx.driver.deleteMany();
                         deletedCounts.drivers = dc.count;
                         break;
@@ -361,10 +369,34 @@ export const selectiveDelete = async (req: Request, res: Response) => {
                 }
             }
 
-            // Delete specific items
+            // Delete specific items - ORDERED by FK dependencies
+            // Order: waybills -> blanks -> blankBatches -> drivers -> employees -> vehicles -> ...
             if (items) {
-                for (const [tableName, ids] of Object.entries(items)) {
+                // Define deletion order (FK dependencies: waybills reference drivers, so delete waybills first)
+                const deletionOrder = [
+                    'waybills',      // Must be first (references drivers, vehicles)
+                    'stockMovements', // Before stockItems
+                    'blanks',        // Before blankBatches, references drivers
+                    'blankBatches',
+                    'drivers',       // Before employees
+                    'employees',
+                    'vehicles',
+                    'fuelCards',
+                    'routes',
+                    'fuelTypes',
+                    'warehouses',
+                    'stockItems',
+                    'departments',
+                    'settings',
+                    'auditLogs',
+                    'organizations',
+                ];
+
+                // Process in dependency order
+                for (const tableName of deletionOrder) {
+                    const ids = items[tableName];
                     if (!ids || ids.length === 0) continue;
+                    logger.info({ tableName, idsCount: ids.length, sampleIds: ids.slice(0, 3) }, 'Processing selective delete');
 
                     switch (tableName) {
                         case 'waybills':
@@ -382,15 +414,47 @@ export const selectiveDelete = async (req: Request, res: Response) => {
                             const bbc = await tx.blankBatch.deleteMany({ where: { id: { in: ids } } });
                             deletedCounts.blankBatches = (deletedCounts.blankBatches || 0) + bbc.count;
                             break;
-                        case 'employees':
-                            await tx.driver.deleteMany({ where: { employeeId: { in: ids } } });
+                        case 'employees': {
+                            // Get driver IDs for employees first
+                            const employeeDrivers = await tx.driver.findMany({
+                                where: { employeeId: { in: ids } },
+                                select: { id: true }
+                            });
+                            const employeeDriverIds = employeeDrivers.map(d => d.id);
+                            // Delete waybills first (Waybill.driverId has onDelete: Restrict)
+                            if (employeeDriverIds.length > 0) {
+                                const waybillsToDelete = await tx.waybill.findMany({
+                                    where: { driverId: { in: employeeDriverIds } },
+                                    select: { id: true }
+                                });
+                                const waybillIds = waybillsToDelete.map(w => w.id);
+                                if (waybillIds.length > 0) {
+                                    await tx.waybillFuel.deleteMany({ where: { waybillId: { in: waybillIds } } });
+                                    await tx.waybillRoute.deleteMany({ where: { waybillId: { in: waybillIds } } });
+                                    await tx.waybill.deleteMany({ where: { id: { in: waybillIds } } });
+                                }
+                                await tx.driver.deleteMany({ where: { id: { in: employeeDriverIds } } });
+                            }
                             const ec = await tx.employee.deleteMany({ where: { id: { in: ids } } });
                             deletedCounts.employees = (deletedCounts.employees || 0) + ec.count;
                             break;
-                        case 'drivers':
+                        }
+                        case 'drivers': {
+                            // Delete waybills first (Waybill.driverId has onDelete: Restrict)
+                            const waybillsForDrivers = await tx.waybill.findMany({
+                                where: { driverId: { in: ids } },
+                                select: { id: true }
+                            });
+                            const driverWaybillIds = waybillsForDrivers.map(w => w.id);
+                            if (driverWaybillIds.length > 0) {
+                                await tx.waybillFuel.deleteMany({ where: { waybillId: { in: driverWaybillIds } } });
+                                await tx.waybillRoute.deleteMany({ where: { waybillId: { in: driverWaybillIds } } });
+                                await tx.waybill.deleteMany({ where: { id: { in: driverWaybillIds } } });
+                            }
                             const dc = await tx.driver.deleteMany({ where: { id: { in: ids } } });
                             deletedCounts.drivers = (deletedCounts.drivers || 0) + dc.count;
                             break;
+                        }
                         case 'vehicles':
                             const vc = await tx.vehicle.deleteMany({ where: { id: { in: ids } } });
                             deletedCounts.vehicles = (deletedCounts.vehicles || 0) + vc.count;

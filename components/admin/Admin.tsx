@@ -19,6 +19,8 @@ const RoleManagement = lazy(() => import('./RoleManagement'));
 const BusinessAuditLog = lazy(() => import('./BusinessAuditLog'));
 const BlankManagement = lazy(() => import('./BlankManagement'));
 const DataDeletionModal = lazy(() => import('./DataDeletionModal'));
+const DataImportModal = lazy(() => import('./DataImportModal'));
+const DataExportModal = lazy(() => import('./DataExportModal'));
 
 // ===== Метаданные/совместимость =====
 
@@ -1295,8 +1297,42 @@ const Admin: React.FC = () => {
   return (
     <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6">
       <input type="file" ref={fileInputRef} onChange={handleFileSelect} accept=".json" className="hidden" />
-      {showExportModal && <ExportModal onClose={() => setShowExportModal(false)} onConfirm={(keys) => handleExportConfirm(keys)} />}
-      {importBundle && importPolicy && <ImportPreviewModal bundle={importBundle} policy={importPolicy} onClose={() => { setImportBundle(null); setIsImporting(false); }} onApply={(rows) => applySelectiveImport(rows, importPolicy)} />}
+      <React.Suspense fallback={<div className="p-4 text-center">Загрузка...</div>}>
+        {showExportModal && (
+          <DataExportModal
+            isOpen={showExportModal}
+            onClose={() => setShowExportModal(false)}
+            onExport={(selectedData) => {
+              // Convert selectedData to keys for legacy handleExportConfirm
+              const keys = Object.keys(selectedData);
+              handleExportConfirm(keys, selectedData);
+            }}
+          />
+        )}
+      </React.Suspense>
+      <React.Suspense fallback={<div className="p-4 text-center">Загрузка...</div>}>
+        {importBundle && importPolicy && (
+          <DataImportModal
+            isOpen={!!importBundle}
+            bundle={importBundle}
+            onClose={() => { setImportBundle(null); setIsImporting(false); }}
+            onImport={async (selectedData, settings) => {
+              // Convert new modal data format to old ImportRow format for compatibility
+              const rows = Object.entries(selectedData).map(([key, items]) => ({
+                key,
+                display: key,
+                category: inferCategoryByKeyName(key) as any,
+                existing: null,
+                incoming: items,
+                stats: { existingCount: 0, incomingCount: items.length, newCount: items.length, updateCount: 0 },
+                action: settings[key] || { enabled: true, insertNew: true, updateMode: 'merge' as const, deleteMissing: false },
+                known: true
+              }));
+              await applySelectiveImport(rows, importPolicy);
+            }}
+          />
+        )}
+      </React.Suspense>
       <React.Suspense fallback={<div className="p-4 text-center">Загрузка...</div>}>
         <DataDeletionModal
           isOpen={isClearDataModalOpen}

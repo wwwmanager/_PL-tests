@@ -335,6 +335,7 @@ export interface Organization {
   medicalLicenseIssueDate?: string;
   storageIds?: string[];
   stockLockedAt?: string;
+  isOwn?: boolean;  // OWN-ORG-FE-030: Собственная организация
 }
 
 export type SeasonSettings =

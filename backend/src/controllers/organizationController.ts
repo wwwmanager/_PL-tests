@@ -65,6 +65,18 @@ export async function createOrganization(req: Request, res: Response, next: Next
             data.stockLockedAt = new Date(stockLockedAt);
         }
 
+        // OWN-ORG-BE-020: Validate only one organization can have isOwn=true
+        if (data.isOwn === true) {
+            const existingOwn = await prisma.organization.findFirst({
+                where: { isOwn: true }
+            });
+            if (existingOwn) {
+                return res.status(400).json({
+                    error: 'Только одна организация может быть собственной'
+                });
+            }
+        }
+
         const organization = await prisma.organization.create({
             data
         });
@@ -102,6 +114,18 @@ export async function updateOrganization(req: Request, res: Response, next: Next
                 data.stockLockedAt = null;
             }
             // Empty string = skip update
+        }
+
+        // OWN-ORG-BE-020: Validate only one organization can have isOwn=true
+        if (data.isOwn === true) {
+            const existingOwn = await prisma.organization.findFirst({
+                where: { isOwn: true, id: { not: id } }
+            });
+            if (existingOwn) {
+                return res.status(400).json({
+                    error: 'Только одна организация может быть собственной'
+                });
+            }
         }
 
         const organization = await prisma.organization.update({

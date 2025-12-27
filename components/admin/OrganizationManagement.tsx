@@ -64,6 +64,7 @@ const organizationSchema = z.object({
     medicalLicenseNumber: z.string().nullish(),
     medicalLicenseIssueDate: z.string().nullish(),
     stockLockedAt: z.string().nullish(),
+    isOwn: z.boolean().optional(),  // OWN-ORG-FE-030
 });
 
 type OrganizationFormData = z.infer<typeof organizationSchema>;
@@ -75,7 +76,8 @@ const defaultValues: OrganizationFormData = {
     bankAccount: '', correspondentAccount: '', bankName: '', bankBik: '',
     accountCurrency: '', paymentPurpose: '', group: '', notes: '',
     medicalLicenseIssueDate: '', medicalLicenseNumber: '',
-    stockLockedAt: ''
+    stockLockedAt: '',
+    isOwn: false  // OWN-ORG-FE-030
 };
 
 
@@ -209,8 +211,12 @@ const OrganizationManagement = () => {
             showToast("Изменения сохранены");
             setIsModalOpen(false);
             fetchData();
-        } catch (error) {
-            showToast("Не удалось сохранить изменения.", 'error');
+        } catch (error: any) {
+            // OWN-ORG-FE-030: Handle 400 error for isOwn uniqueness validation
+            const message = error?.response?.data?.error
+                || error?.message
+                || "Не удалось сохранить изменения.";
+            showToast(message, 'error');
         }
     };
 
@@ -278,6 +284,22 @@ const OrganizationManagement = () => {
                             <FormField label="Группа" required={requiredProps.group}><FormSelect {...register("group")}><option value="">Без группы</option><option value="Перевозчик">Перевозчик</option><option value="Заказчик">Заказчик</option><option value="Филиал">Филиал</option><option value="Мед. учреждение">Мед. учреждение</option></FormSelect></FormField>
                             <FormField label="Статус" required={requiredProps.status}><FormSelect {...register("status")}>{Object.values(OrganizationStatus).map(s => <option key={s} value={s}>{ORGANIZATION_STATUS_TRANSLATIONS[s]}</option>)}</FormSelect></FormField>
                             <div className="md:col-span-2"><FormField label="Юридический адрес"><FormInput {...register("address")} /></FormField></div>
+                            {/* OWN-ORG-FE-030: Checkbox for Own Organization */}
+                            <div className="md:col-span-2">
+                                <label className="flex items-center gap-2 cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        {...register("isOwn")}
+                                        className="h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                    />
+                                    <span className="text-sm font-medium text-gray-900 dark:text-white">
+                                        Собственная организация
+                                    </span>
+                                    <span className="text-xs text-gray-500">
+                                        (только одна организация может быть собственной)
+                                    </span>
+                                </label>
+                            </div>
                         </div>
                     </CollapsibleSection>
                     {watchedGroup === 'Мед. учреждение' && (
@@ -380,7 +402,14 @@ const OrganizationManagement = () => {
                             {isLoading ? (<tr><td colSpan={columns.length + 1} className="text-center p-4">Загрузка...</td></tr>)
                                 : rows.map(o => (
                                     <tr key={o.id} className="bg-white dark:bg-gray-800 border-b dark:border-gray-700">
-                                        <td className="px-6 py-4 font-medium text-gray-900 dark:text-white">{o.shortName}</td>
+                                        <td className="px-6 py-4 font-medium text-gray-900 dark:text-white">
+                                            {o.shortName}
+                                            {o.isOwn && (
+                                                <span className="ml-2 px-2 py-0.5 text-xs font-bold bg-blue-100 text-blue-800 rounded-full">
+                                                    СВОЯ
+                                                </span>
+                                            )}
+                                        </td>
                                         <td className="px-6 py-4">{o.inn}</td>
                                         <td className="px-6 py-4">{o.address}</td>
                                         <td className="px-6 py-4"><span className={`px-2 py-1 text-xs font-semibold rounded-full ${ORGANIZATION_STATUS_COLORS[o.status]}`}>{ORGANIZATION_STATUS_TRANSLATIONS[o.status]}</span></td>
