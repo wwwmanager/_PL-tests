@@ -18,6 +18,7 @@ interface RouteRowProps {
     selectedVehicle?: Vehicle | undefined;
     onChange: (id: string, field: keyof Route, value: any) => void;
     onRemove: (id: string) => void;
+    onDateBlur?: (id: string, value: string) => void;  // WB-ROUTE-DATE: Validate on blur
 }
 
 /**
@@ -37,6 +38,7 @@ const RouteRowComponent: React.FC<RouteRowProps> = ({
     selectedVehicle,
     onChange,
     onRemove,
+    onDateBlur,
 }) => {
     const [fromSuggestions, setFromSuggestions] = useState<string[]>([]);
     const [toSuggestions, setToSuggestions] = useState<string[]>([]);
@@ -99,6 +101,7 @@ const RouteRowComponent: React.FC<RouteRowProps> = ({
                         name="date"
                         value={route.date || ''}
                         onChange={(e) => onChange(route.id, 'date', e.target.value)}
+                        onBlur={(e) => onDateBlur?.(route.id, e.target.value)}
                         className="w-full bg-gray-50 dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded-md p-2"
                     />
                 </FormField>

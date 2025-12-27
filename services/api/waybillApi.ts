@@ -88,8 +88,11 @@ export async function getLastWaybillForVehicle(vehicleId: string): Promise<Waybi
     return response.waybills[0] || null;
 }
 
-export async function changeWaybillStatus(id: string, status: string): Promise<Waybill> {
-    const response = await httpClient.patch<Waybill>(`/waybills/${id}/status`, { status });
+export async function changeWaybillStatus(id: string, status: string, options?: { reason?: string }): Promise<Waybill> {
+    const response = await httpClient.patch<Waybill>(`/waybills/${id}/status`, {
+        status,
+        reason: options?.reason
+    });
     return response;
 }
 

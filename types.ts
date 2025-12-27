@@ -334,6 +334,7 @@ export interface Organization {
   medicalLicenseNumber?: string;
   medicalLicenseIssueDate?: string;
   storageIds?: string[];
+  stockLockedAt?: string;
 }
 
 export type SeasonSettings =

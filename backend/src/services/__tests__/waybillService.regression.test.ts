@@ -176,7 +176,8 @@ describe('Waybill Regression Tests (WB-REG-002)', () => {
                     distanceKm: 200,
                     isCityDriving: true,
                     isWarming: false,
-                    comment: 'Test Route'
+                    comment: 'Test Route',
+                    date: '2025-12-25' // WB-ROUTE-DATE
                 }
             ],
 
@@ -189,7 +190,6 @@ describe('Waybill Regression Tests (WB-REG-002)', () => {
         // 3. Reopen (GetById)
         const loaded = await getWaybillById(userInfo as any, created.id);
         console.log('Loaded Routes Length:', loaded?.routes?.length);
-        // console.log('Loaded Routes:', JSON.stringify(loaded?.routes, null, 2));
 
         expect(loaded).toBeDefined();
         if (!loaded) return;
@@ -200,7 +200,13 @@ describe('Waybill Regression Tests (WB-REG-002)', () => {
         }
         expect(loaded.routes).toHaveLength(1);
         expect(loaded.routes![0].fromPoint).toBe('Depot A');
-        expect(loaded.routes![0].distanceKm).toBe(200);
+        // Fix Decimal comparison
+        expect(Number(loaded.routes![0].distanceKm)).toBe(200);
+
+        // WB-ROUTE-DATE: Verify date is saved
+        const route = loaded.routes![0] as any;
+        expect(route.date).toBeDefined();
+        expect(new Date(route.date!).toISOString().split('T')[0]).toBe('2025-12-25');
 
         // Assert Fuel
         // Casting to any to access flattened fuel if mapped, OR traverse fuelLines if not flattened in backend service DTO.
@@ -210,10 +216,10 @@ describe('Waybill Regression Tests (WB-REG-002)', () => {
         // If it returns Raw Prisma object, we check fuelLines.
         const fuelLines = (loaded as any).fuelLines;
         if (fuelLines && fuelLines.length > 0) {
-            expect(fuelLines[0].fuelStart).toBe(50);
-            expect(fuelLines[0].fuelEnd).toBe(120);
+            expect(Number(fuelLines[0].fuelStart)).toBe(50);
+            expect(Number(fuelLines[0].fuelEnd)).toBe(120);
         } else if ((loaded as any).fuel) {
-            expect((loaded as any).fuel.fuelStart).toBe(50);
+            expect(Number((loaded as any).fuel.fuelStart)).toBe(50);
         }
     });
 });

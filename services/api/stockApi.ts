@@ -41,8 +41,8 @@ export async function getStockMovements(filters: StockMovementFilters = {}): Pro
     if (filters.locationId) params.append('locationId', filters.locationId);
     if (filters.stockItemId) params.append('stockItemId', filters.stockItemId);
     if (filters.movementType) params.append('movementType', filters.movementType);
-    if (filters.from) params.append('from', filters.from instanceof Date ? filters.from.toISOString() : filters.from);
-    if (filters.to) params.append('to', filters.to instanceof Date ? filters.to.toISOString() : filters.to);
+    if (filters.from) params.append('occurredFrom', filters.from instanceof Date ? filters.from.toISOString() : filters.from);
+    if (filters.to) params.append('occurredTo', filters.to instanceof Date ? filters.to.toISOString() : filters.to);
     if (filters.search) params.append('search', filters.search);
     if (filters.page) params.append('page', String(filters.page));
     if (filters.limit) params.append('limit', String(filters.limit));

@@ -3,7 +3,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import Modal from '../shared/Modal';
-import { getStockItems, getStockLocations, createStockMovement, updateStockMovementV2 } from '../../services/api/stockApi';
+import { getStockItems, getStockLocations, createStockMovement, updateStockMovementV2, getStockMovements } from '../../services/api/stockApi';
 import { getOrganizations } from '../../services/organizationApi';
 import { GarageStockItem, StockLocation, StockMovementV2, Organization } from '../../types';
 import { useToast } from '../../hooks/useToast';
@@ -18,6 +18,7 @@ const movementSchema = z.object({
     supplierOrgId: z.string().optional(), // INCOME: организация-поставщик
     comment: z.string().optional(),
     externalRef: z.string().optional(),
+    baseMovementId: z.string().optional(), // Документ для корректировки
 }).refine(data => {
     if (data.movementType === 'TRANSFER' && !data.fromStockLocationId) return false;
     if (data.movementType === 'INCOME' && !data.toStockLocationId) return false;
@@ -45,6 +46,7 @@ const MovementCreateModal: React.FC<Props> = ({ isOpen, onClose, initialData }) 
     const [items, setItems] = useState<GarageStockItem[]>([]);
     const [locations, setLocations] = useState<StockLocation[]>([]);
     const [organizations, setOrganizations] = useState<Organization[]>([]);
+    const [movementsToAdjust, setMovementsToAdjust] = useState<StockMovementV2[]>([]);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [loading, setLoading] = useState(false);
     const { showToast } = useToast();
@@ -107,6 +109,46 @@ const MovementCreateModal: React.FC<Props> = ({ isOpen, onClose, initialData }) 
         }
     }, [isOpen, showToast]);
 
+    // Load recent movements for adjustment search
+    useEffect(() => {
+        if (isOpen && movementType === 'ADJUSTMENT') {
+            const loadMovements = async () => {
+                try {
+                    const resp = await getStockMovements({ limit: 50 });
+                    setMovementsToAdjust(resp.data || []);
+                } catch (err) {
+                    console.error('Failed to load movements for adjustment', err);
+                }
+            };
+            loadMovements();
+        }
+    }, [isOpen, movementType]);
+
+    const baseMovementId = watch('baseMovementId');
+
+    // Auto-fill form when base document is selected
+    useEffect(() => {
+        if (baseMovementId && movementType === 'ADJUSTMENT') {
+            const original = movementsToAdjust.find(m => m.id === baseMovementId);
+            if (original) {
+                setValue('stockItemId', original.stockItemId || (original as any).stockItem?.id || '');
+
+                // For ADJUSTMENT we use fromStockLocationId as the main location
+                const locId = original.stockLocationId || original.fromStockLocationId || (original as any).stockLocation?.id || '';
+                setValue('fromStockLocationId', locId);
+
+                // Set negative quantity as default for correction/storno
+                setValue('quantity', -Number(original.quantity));
+
+                setValue('comment', `Корректировка к: ${original.documentType || 'Док'} ${original.documentId || ''} (${original.id.slice(0, 8)})`);
+
+                if (original.documentId) {
+                    setValue('supplierOrgId', original.documentId);
+                }
+            }
+        }
+    }, [baseMovementId, movementType, movementsToAdjust, setValue]);
+
     useEffect(() => {
         if (isOpen && initialData) {
             console.log('Initializing form with:', initialData);
@@ -122,8 +164,10 @@ const MovementCreateModal: React.FC<Props> = ({ isOpen, onClose, initialData }) 
                 quantity: initialData.quantity,
                 externalRef: initialData.documentId || initialData.externalRef || '',
                 comment: initialData.comment || '',
-                // For INCOME, documentId stores the supplier organization ID
-                supplierOrgId: initialData.movementType === 'INCOME' ? (initialData.documentId || '') : '',
+                // For INCOME/EXPENSE/ADJUSTMENT, documentId stores the organization ID
+                supplierOrgId: (initialData.movementType === 'INCOME' || initialData.movementType === 'EXPENSE' || initialData.movementType === 'ADJUSTMENT')
+                    ? (initialData.documentId || '')
+                    : '',
                 // Map locations (try scalar first, then relation)
                 fromStockLocationId: (initialData.movementType === 'TRANSFER'
                     ? (initialData.fromStockLocationId || (initialData as any).fromStockLocation?.id)
@@ -179,6 +223,16 @@ const MovementCreateModal: React.FC<Props> = ({ isOpen, onClose, initialData }) 
                 payload.stockLocationId = data.fromStockLocationId;
                 payload.fromStockLocationId = undefined;
                 payload.toStockLocationId = undefined;
+
+                if (data.movementType === 'ADJUSTMENT' && data.baseMovementId) {
+                    // Linked adjustment/storno
+                    payload.documentId = data.baseMovementId;
+                    payload.documentType = 'STORNO';
+                } else if (data.supplierOrgId) {
+                    // Store recipient/adjustment org ID in documentId
+                    payload.documentId = data.supplierOrgId;
+                    payload.documentType = data.movementType;
+                }
             }
 
             if (initialData) {
@@ -231,7 +285,6 @@ const MovementCreateModal: React.FC<Props> = ({ isOpen, onClose, initialData }) 
                         />
                         {errors.occurredAt && <p className="mt-1 text-xs text-red-500">{errors.occurredAt.message}</p>}
                     </div>
-
                     <div>
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Тип операции</label>
                         <select
@@ -245,6 +298,29 @@ const MovementCreateModal: React.FC<Props> = ({ isOpen, onClose, initialData }) 
                         </select>
                     </div>
                 </div>
+
+                {movementType === 'ADJUSTMENT' && (
+                    <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-md border border-blue-200 dark:border-blue-800">
+                        <label className="block text-sm font-medium text-blue-800 dark:text-blue-300 mb-1">
+                            Документ-основание (для корректировки)
+                        </label>
+                        <select
+                            {...register('baseMovementId')}
+                            className="w-full p-2 border border-blue-300 dark:border-blue-700 rounded-md dark:bg-gray-800 dark:text-white text-sm"
+                        >
+                            <option value="">Выберите документ для корректировки...</option>
+                            {movementsToAdjust.map(m => (
+                                <option key={m.id} value={m.id}>
+                                    {new Date(m.occurredAt).toLocaleDateString()} — {m.movementType} — {m.stockItemName || 'Товар'} — {m.quantity} {(m as any).unit || (m as any).stockItem?.unit || ''}
+                                    {m.comment ? ` (${m.comment})` : ''}
+                                </option>
+                            ))}
+                        </select>
+                        <p className="mt-1 text-[10px] text-blue-600 dark:text-blue-400">
+                            При выборе документа поля ниже будут заполнены автоматически
+                        </p>
+                    </div>
+                )}
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
@@ -310,25 +386,29 @@ const MovementCreateModal: React.FC<Props> = ({ isOpen, onClose, initialData }) 
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {movementType === 'INCOME' ? (
-                        <div>
+                    {(movementType === 'INCOME' || movementType === 'EXPENSE' || movementType === 'ADJUSTMENT') ? (
+                        <div className={movementType === 'INCOME' ? 'md:col-span-2' : ''}>
                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                Поставщик (организация)
+                                {movementType === 'INCOME' ? 'Поставщик (организация)' :
+                                    movementType === 'EXPENSE' ? 'Получатель (организация)' :
+                                        'Организация / Основание'}
                             </label>
                             <select
                                 {...register('supplierOrgId')}
                                 className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white"
                             >
-                                <option value="">Выберите поставщика...</option>
-                                {organizations.map(org => (
-                                    <option key={org.id} value={org.id}>{org.shortName || org.fullName}</option>
-                                ))}
+                                <option value="">Выберите организацию...</option>
+                                {organizations
+                                    .filter(org => (org.shortName && org.shortName.trim() !== '') || (org.fullName && org.fullName.trim() !== ''))
+                                    .map(org => (
+                                        <option key={org.id} value={org.id}>{org.shortName || org.fullName}</option>
+                                    ))}
                             </select>
                         </div>
                     ) : (
                         <div>
                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                Внешний номер (Ref)
+                                Номер документа (Ref)
                             </label>
                             <input
                                 type="text"
@@ -338,17 +418,31 @@ const MovementCreateModal: React.FC<Props> = ({ isOpen, onClose, initialData }) 
                             />
                         </div>
                     )}
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Комментарий</label>
-                        <input
-                            type="text"
-                            {...register('comment')}
-                            className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white"
-                        />
-                    </div>
+                    {movementType === 'INCOME' ? (
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                Номер документа (Ref)
+                            </label>
+                            <input
+                                type="text"
+                                {...register('externalRef')}
+                                placeholder="Напр. номер накладной"
+                                className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white"
+                            />
+                        </div>
+                    ) : (
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Комментарий</label>
+                            <input
+                                type="text"
+                                {...register('comment')}
+                                className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white"
+                            />
+                        </div>
+                    )}
                 </div>
             </form>
-        </Modal>
+        </Modal >
     );
 };
 

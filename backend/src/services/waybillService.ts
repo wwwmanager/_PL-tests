@@ -7,6 +7,8 @@ import { reserveNextBlankForDriver, reserveSpecificBlank, releaseBlank } from '.
 // REL-103: Stock location imports
 import { getOrCreateVehicleTankLocation, getOrCreateFuelCardLocation, getOrCreateDefaultWarehouseLocation } from './stockLocationService';
 import { createTransfer, createExpenseMovement, getBalanceAt } from './stockService';
+import { stornoDocument, executeStorno } from './stornoService';
+import { findActiveCardForDriver } from './fuelCardService';
 
 const prisma = new PrismaClient();
 
@@ -56,6 +58,7 @@ export interface CreateWaybillInput {
         isCityDriving?: boolean;
         isWarming?: boolean;
         comment?: string;
+        date?: string;  // WB-ROUTE-DATE: Route-specific date for multi-day waybills
     }>;
     // Flattened fuel input for WB-FIX-PL-001
     fuel?: {
@@ -483,7 +486,8 @@ export async function createWaybill(userInfo: UserInfo, input: CreateWaybillInpu
                     distanceKm: r.distanceKm || 0,
                     isCityDriving: r.isCityDriving || false,
                     isWarming: r.isWarming || false,
-                    comment: r.comment || null
+                    comment: r.comment || null,
+                    date: r.date ? new Date(r.date) : null,  // WB-ROUTE-DATE: Support multi-day routes
                 }))
             } : undefined,
             fuelLines: fuelLinesCreate.length > 0 ? {
@@ -603,6 +607,18 @@ export async function updateWaybill(userInfo: UserInfo, id: string, data: Partia
     const waybillDate = data.date || waybill.date.toISOString().slice(0, 10);
     const odometerDistanceKm = calculateDistanceKm(newOdometerStart, newOdometerEnd);
 
+    // FUEL-CARD-AUTO-001: Try to auto-select fuel card if currently null or driver changed
+    let fuelCardId = waybill.fuelCardId;
+    const driverIdChanged = data.driverId && data.driverId !== waybill.driverId;
+
+    if (!fuelCardId || driverIdChanged) {
+        const autoCardId = await findActiveCardForDriver(organizationId, data.driverId || waybill.driverId);
+        if (autoCardId) {
+            fuelCardId = autoCardId;
+            console.log(`[FUEL-CARD-AUTO] Auto-selected card ${fuelCardId} for waybill ${id} during update`);
+        }
+    }
+
     if (vehicle?.fuelConsumptionRates) {
         const seasonSettings = await getSeasonSettings();
         const isWinter = isWinterDate(waybillDate, seasonSettings);
@@ -700,7 +716,8 @@ export async function updateWaybill(userInfo: UserInfo, id: string, data: Partia
                         distanceKm: r.distanceKm || 0,
                         isCityDriving: r.isCityDriving || false,
                         isWarming: r.isWarming || false,
-                        comment: r.comment || null
+                        comment: r.comment || null,
+                        date: r.date ? new Date(r.date) : null,  // WB-ROUTE-DATE: Support multi-day routes
                     }))
                 });
             }
@@ -713,7 +730,7 @@ export async function updateWaybill(userInfo: UserInfo, id: string, data: Partia
                 date: data.date ? new Date(data.date) : undefined,
                 vehicleId: data.vehicleId,
                 driverId: data.driverId,
-                fuelCardId: newFuelCardId, // FUEL-CARD-AUTO-001: Update when driver changes
+                fuelCardId, // FUEL-CARD-AUTO-001: Auto-selected or existing
                 blankId: data.blankId,
                 odometerStart: data.odometerStart,
                 odometerEnd: data.odometerEnd,
@@ -852,7 +869,8 @@ export async function changeWaybillStatus(
     id: string,
     status: WaybillStatus,
     userId: string,
-    hasOverridePermission: boolean = false // WB-701: Permission to override norm excess
+    hasOverridePermission: boolean = false, // WB-701: Permission to override norm excess
+    reason?: string
 ) {
     const organizationId = userInfo.organizationId;
     // WB-906: Restriction for driver role
@@ -998,6 +1016,20 @@ export async function changeWaybillStatus(
 
     // WB-501: Wrap all operations in atomic transaction
     return prisma.$transaction(async (tx) => {
+        // FUEL-CARD-AUTO-001: Final attempt to find an active fuel card before posting if still null
+        let effectiveFuelCardId = waybill.fuelCardId;
+        if (!effectiveFuelCardId && status === WaybillStatus.POSTED) {
+            const autoCardId = await findActiveCardForDriver(organizationId, waybill.driverId);
+            if (autoCardId) {
+                effectiveFuelCardId = autoCardId;
+                await tx.waybill.update({
+                    where: { id },
+                    data: { fuelCardId: autoCardId }
+                });
+                console.log(`[FUEL-CARD-AUTO] Final auto-assignment of card ${autoCardId} to waybill ${waybill.id} before posting`);
+            }
+        }
+
         // WB-701: Log norm excess if allowed with permission
         if (normExcessLines.length > 0 && hasOverridePermission) {
             await tx.auditLog.create({
@@ -1030,12 +1062,12 @@ export async function changeWaybillStatus(
                     // Приоритет: 1) fuelCardId если есть, 2) sourceType, 3) склад по умолчанию
                     let sourceLocationId: string;
 
-                    // Если у ПЛ есть привязанная карта — используем её (если не указан явно склад)
-                    if (waybill.fuelCardId && fuelLine.sourceType !== 'WAREHOUSE') {
+                    // Если у ПЛ есть привязанная карта (явно или через авто-подбор выше) — используем её
+                    if (effectiveFuelCardId && fuelLine.sourceType !== 'WAREHOUSE') {
                         // Заправка с топливной карты водителя
-                        const cardLocation = await getOrCreateFuelCardLocation(waybill.fuelCardId);
+                        const cardLocation = await getOrCreateFuelCardLocation(effectiveFuelCardId);
                         sourceLocationId = cardLocation.id;
-                        console.log(`[FUEL-CARD-AUTO] Using driver's fuel card as source: ${waybill.fuelCardId}`);
+                        console.log(`[FUEL-CARD-AUTO] Using driver's fuel card as source: ${effectiveFuelCardId}`);
                     } else {
                         // Заправка со склада
                         const warehouseLocation = await getOrCreateDefaultWarehouseLocation(
@@ -1050,45 +1082,94 @@ export async function changeWaybillStatus(
                         || waybill.startAt
                         || waybill.date;
 
-                    await createTransfer({
-                        organizationId,
-                        stockItemId: fuelLine.stockItemId,
-                        quantity: fuelReceived,
-                        fromLocationId: sourceLocationId,
-                        toLocationId: vehicleTank.id,
-                        occurredAt: refueledAt,
-                        occurredSeq: lineIndex * 100,  // 0, 100, 200...
-                        documentType: 'WAYBILL',
-                        documentId: waybill.id,
-                        comment: `Заправка по ПЛ №${waybill.number}`,
-                        userId,
+                    // IDEMPOTENCY-FIX: Use unique externalRef with version to prevent duplicates
+                    // Version is determined by counting existing voided movements with same pattern
+                    const baseExternalRef = `WB:REFUEL:${waybill.id}:${lineIndex}`;
+
+                    // Count voided movements to determine version for re-post
+                    const voidedCount = await tx.stockMovement.count({
+                        where: {
+                            organizationId,
+                            externalRef: { startsWith: baseExternalRef },
+                            isVoid: true
+                        }
                     });
 
-                    console.log(`[REL-103] TRANSFER created: ${fuelReceived}L from ${sourceLocationId} to tank ${vehicleTank.id}`);
+                    const refuelExternalRef = voidedCount > 0
+                        ? `${baseExternalRef}:v${voidedCount + 1}`
+                        : baseExternalRef;
+
+                    // Check if this refueling movement already exists (not voided)
+                    const existingRefuel = await tx.stockMovement.findFirst({
+                        where: {
+                            organizationId,
+                            externalRef: refuelExternalRef,
+                            isVoid: false
+                        }
+                    });
+
+                    if (existingRefuel) {
+                        console.log(`[IDEMPOTENCY] Skipping duplicate refueling TRANSFER: ${refuelExternalRef}`);
+                    } else {
+                        await createTransfer({
+                            organizationId,
+                            stockItemId: fuelLine.stockItemId,
+                            quantity: fuelReceived,
+                            fromLocationId: sourceLocationId,
+                            toLocationId: vehicleTank.id,
+                            occurredAt: refueledAt,
+                            occurredSeq: lineIndex * 100,  // 0, 100, 200...
+                            documentType: 'WAYBILL',
+                            documentId: waybill.id,
+                            externalRef: refuelExternalRef,  // IDEMPOTENCY-FIX with version
+                            comment: `Заправка по ПЛ №${waybill.number}`,
+                            userId,
+                        });
+
+                        console.log(`[REL-103] TRANSFER created: ${fuelReceived}L from ${sourceLocationId} to tank ${vehicleTank.id}`);
+                    }
                 }
             }
 
             // 2. REL-103: EXPENSE расхода топлива из бака
             const expenseOccurredAt = waybill.endAt || waybill.date;
 
-            for (const fuelLine of waybill.fuelLines) {
+            for (let expenseIndex = 0; expenseIndex < waybill.fuelLines.length; expenseIndex++) {
+                const fuelLine = waybill.fuelLines[expenseIndex];
                 const fuelConsumed = Number(fuelLine.fuelConsumed || 0);
 
                 if (fuelConsumed > 0) {
-                    await createExpenseMovement(
-                        organizationId,
-                        fuelLine.stockItemId,
-                        fuelConsumed,
-                        'WAYBILL',
-                        waybill.id,
-                        userId,
-                        null,  // warehouseId deprecated
-                        `Расход по ПЛ №${waybill.number} от ${waybill.date.toISOString().slice(0, 10)}`,
-                        vehicleTank.id,  // stockLocationId = бак ТС
-                        expenseOccurredAt  // occurredAt = endAt или date
-                    );
+                    // IDEMPOTENCY-FIX: Check if this expense movement already exists
+                    const existingExpense = await tx.stockMovement.findFirst({
+                        where: {
+                            organizationId,
+                            documentType: 'WAYBILL',
+                            documentId: waybill.id,
+                            movementType: 'EXPENSE',
+                            stockLocationId: vehicleTank.id,
+                            stockItemId: fuelLine.stockItemId,
+                            isVoid: false
+                        }
+                    });
 
-                    console.log(`[REL-103] EXPENSE created: ${fuelConsumed}L from tank ${vehicleTank.id}`);
+                    if (existingExpense) {
+                        console.log(`[IDEMPOTENCY] Skipping duplicate EXPENSE for waybill ${waybill.id}`);
+                    } else {
+                        await createExpenseMovement(
+                            organizationId,
+                            fuelLine.stockItemId,
+                            fuelConsumed,
+                            'WAYBILL',
+                            waybill.id,
+                            userId,
+                            null,  // warehouseId deprecated
+                            `Расход по ПЛ №${waybill.number} от ${waybill.date.toISOString().slice(0, 10)}`,
+                            vehicleTank.id,  // stockLocationId = бак ТС
+                            expenseOccurredAt  // occurredAt = endAt или date
+                        );
+
+                        console.log(`[REL-103] EXPENSE created: ${fuelConsumed}L from tank ${vehicleTank.id}`);
+                    }
                 }
             }
 
@@ -1129,8 +1210,42 @@ export async function changeWaybillStatus(
                 status,
                 ...(status === WaybillStatus.POSTED && { completedByUserId: userId }),
                 ...(status === WaybillStatus.SUBMITTED && { approvedByUserId: userId }),
+                // REL-304: Store correction reason
+                ...(status === WaybillStatus.DRAFT && reason && { reviewerComment: reason }),
             },
         });
+
+        // 5. LEDGER-DOCS: Create STORNO if returning from POSTED to DRAFT
+        if (currentStatus === WaybillStatus.POSTED && status === WaybillStatus.DRAFT) {
+            console.log(`[STORNO] Waybill №${waybill.number} returned to DRAFT. Reversing movements.`);
+
+            // 5a. WB-CORRECTION-ROLLBACK: Restore Vehicle mileage and fuel to values before this waybill
+            if (waybill.vehicleId) {
+                const fuelStart = waybill.fuelLines.length > 0
+                    ? Number(waybill.fuelLines[0].fuelStart || 0)
+                    : 0;
+
+                await tx.vehicle.update({
+                    where: { id: waybill.vehicleId },
+                    data: {
+                        mileage: waybill.odometerStart || 0,
+                        currentFuel: fuelStart,
+                    }
+                });
+                console.log(`[WB-CORRECTION-ROLLBACK] Vehicle ${waybill.vehicleId} rolled back: mileage=${waybill.odometerStart}, fuel=${fuelStart}`);
+            }
+
+            // 5b. Execute storno for stock movements
+            try {
+                await executeStorno(tx, organizationId, 'WAYBILL', id, reason || 'Корректировка ПЛ', userId);
+            } catch (err) {
+                if ((err as any).name === 'NotFoundError') {
+                    console.warn('[STORNO] No movements found to storno for posted waybill');
+                } else {
+                    throw err;
+                }
+            }
+        }
 
         // Логируем в audit
         await tx.auditLog.create({

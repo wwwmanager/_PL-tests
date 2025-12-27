@@ -177,3 +177,18 @@ export interface TransferOrganizationDataResponse {
 export async function transferOrganizationData(data: TransferOrganizationDataRequest): Promise<TransferOrganizationDataResponse> {
     return httpClient.post<TransferOrganizationDataResponse>('/admin/transfer-organization', data);
 }
+
+/**
+ * P0-4: STOCK-PERIOD-LOCK — Lock stock period for an organization
+ */
+export async function lockStockPeriod(organizationId: string, lockedAt: string): Promise<{ success: boolean; data: any }> {
+    return httpClient.post('/admin/stock-period/lock', { organizationId, lockedAt });
+}
+
+/**
+ * P0-4: STOCK-PERIOD-LOCK — Unlock stock period for an organization
+ */
+export async function unlockStockPeriod(organizationId: string): Promise<{ success: boolean; data: any }> {
+    return httpClient.post('/admin/stock-period/unlock', { organizationId });
+}
+

@@ -1,6 +1,7 @@
 // Employee Service - CRUD operations for employees
 import { PrismaClient, Prisma } from '@prisma/client';
 import { BadRequestError } from '../utils/errors';
+import { normalizeCardNumber, calculateRealBalance } from './fuelCardService';
 
 const prisma = new PrismaClient();
 
@@ -45,6 +46,14 @@ export async function getEmployees(filters: EmployeeFilters = {}) {
             include: {
                 organization: true,
                 department: true,
+                driver: { // REL-601: Include driver records to get linked fuel cards
+                    include: {
+                        fuelCards: {
+                            where: { isActive: true },
+                            take: 1
+                        }
+                    }
+                }
             },
             orderBy: {
                 fullName: 'asc',
@@ -55,8 +64,26 @@ export async function getEmployees(filters: EmployeeFilters = {}) {
         prisma.employee.count({ where }),
     ]);
 
+    // REL-601: Enrich employees with real fuel card balances
+    const enrichedEmployees = await Promise.all(employees.map(async (emp: any) => {
+        const driver = emp.driver;
+        const fuelCard = driver?.fuelCards?.[0];
+
+        let realBalance = emp.fuelCardBalance;
+        if (fuelCard) {
+            realBalance = await calculateRealBalance(emp.organizationId, fuelCard.id);
+        }
+
+        return {
+            ...emp,
+            fuelCardBalance: realBalance,
+            fuelCardNumber: fuelCard?.cardNumber || emp.fuelCardNumber,
+            driver: undefined // Remove from final response to save bandwidth
+        };
+    }));
+
     return {
-        employees,
+        employees: enrichedEmployees,
         total,
         page,
         limit,
@@ -141,18 +168,18 @@ export async function createEmployee(data: any) {
             console.log(`[REL-302] Auto-created Driver for new employee ${employee.id} (${employee.fullName})`);
         }
 
-        // FUEL-CARD-LINK-AUTO: Auto-link FuelCard when fuelCardNumber is provided
         if (data.fuelCardNumber && driverId) {
             const cardNumber = data.fuelCardNumber.trim();
-            const normalizedCardNumber = cardNumber.replace(/[-\s]/g, '');
+            const normalized = normalizeCardNumber(cardNumber);
 
             const fuelCard = await tx.fuelCard.findFirst({
                 where: {
+                    organizationId: data.organizationId,
+                    isActive: true, // Only link active cards
                     OR: [
                         { cardNumber: cardNumber },
-                        { cardNumber: { contains: normalizedCardNumber } },
+                        { cardNumber: { contains: normalized } },
                     ],
-                    organizationId: data.organizationId,
                 },
             });
 
@@ -273,15 +300,15 @@ export async function updateEmployee(id: string, data: any) {
 
                 // Link new card if provided
                 if (newCardNumber) {
-                    // Find the FuelCard by cardNumber (try normalized matching)
-                    const normalizedCardNumber = newCardNumber.replace(/[-\s]/g, '');
+                    const normalized = normalizeCardNumber(newCardNumber);
                     const fuelCard = await tx.fuelCard.findFirst({
                         where: {
+                            organizationId: employee.organizationId,
+                            isActive: true,
                             OR: [
                                 { cardNumber: newCardNumber },
-                                { cardNumber: { contains: normalizedCardNumber } },
+                                { cardNumber: { contains: normalized } },
                             ],
-                            organizationId: employee.organizationId,
                         },
                     });
 

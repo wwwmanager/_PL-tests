@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { authMiddleware } from '../middleware/authMiddleware';
 import * as fuelCardController from '../controllers/fuelCardController';
+import * as fuelCardService from '../services/fuelCardService';
 
 export const router = Router();
 
@@ -35,3 +36,16 @@ router.post('/:id/transactions', fuelCardController.createTransaction);
 
 // FUEL-CARD-RESET-BE-010: Manual reset
 router.post('/:id/reset', fuelCardController.resetFuelCard);
+
+// GET /api/fuel-cards/:id/reserve - Get fuel reserved in DRAFT waybills
+router.get('/:id/reserve', async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        const { excludeWaybillId } = req.query;
+        // User is attached by requireAuth
+        const result = await fuelCardService.getDraftReserve(req.user as any, id, typeof excludeWaybillId === 'string' ? excludeWaybillId : undefined);
+        res.json({ success: true, data: result });
+    } catch (error) {
+        next(error);
+    }
+});

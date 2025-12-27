@@ -259,6 +259,9 @@ export async function createMovement(
         let result;
         const occurredAtDate = occurredAt ? new Date(occurredAt) : new Date();
 
+        // Track affected locations for tank sync
+        const affectedLocationIds: string[] = [];
+
         switch (movementType) {
             case 'TRANSFER':
                 if (!fromLocationId || !toLocationId) {
@@ -278,6 +281,7 @@ export async function createMovement(
                     comment,
                     userId: user.id,
                 });
+                affectedLocationIds.push(fromLocationId, toLocationId);
                 break;
 
             case 'INCOME':
@@ -293,6 +297,7 @@ export async function createMovement(
                     stockLocationId,
                     occurredAtDate
                 );
+                if (stockLocationId) affectedLocationIds.push(stockLocationId);
                 break;
 
             case 'EXPENSE':
@@ -308,6 +313,7 @@ export async function createMovement(
                     stockLocationId,
                     occurredAtDate
                 );
+                if (stockLocationId) affectedLocationIds.push(stockLocationId);
                 break;
 
             case 'ADJUSTMENT':
@@ -330,15 +336,53 @@ export async function createMovement(
                     comment,
                     userId: user.id,
                 });
+                affectedLocationIds.push(stockLocationId);
                 break;
 
             default:
                 throw new BadRequestError(`Неизвестный movementType: ${movementType}`);
         }
 
+        // VEHICLE-TANK-SYNC: Update Vehicle.currentFuel if any affected location is a VEHICLE_TANK
+        for (const locId of affectedLocationIds) {
+            await syncVehicleTankBalance(locId, stockItemId);
+        }
+
         res.status(201).json(result);
     } catch (error) {
         next(error);
+    }
+}
+
+/**
+ * VEHICLE-TANK-SYNC: Helper function to sync Vehicle.currentFuel with ledger balance
+ * Called after movements that affect VEHICLE_TANK locations
+ */
+async function syncVehicleTankBalance(locationId: string, stockItemId: string): Promise<void> {
+    try {
+        // 1. Check if location is a VEHICLE_TANK
+        const location = await prisma.stockLocation.findUnique({
+            where: { id: locationId },
+            select: { type: true, vehicleId: true }
+        });
+
+        if (!location || location.type !== 'VEHICLE_TANK' || !location.vehicleId) {
+            return; // Not a tank location, skip
+        }
+
+        // 2. Get current balance from ledger
+        const balance = await stockService.getBalanceAt(locationId, stockItemId, new Date());
+
+        // 3. Update Vehicle.currentFuel
+        await prisma.vehicle.update({
+            where: { id: location.vehicleId },
+            data: { currentFuel: balance }
+        });
+
+        console.log(`[VEHICLE-TANK-SYNC] Updated vehicle ${location.vehicleId} currentFuel to ${balance}`);
+    } catch (err) {
+        // Log but don't throw - sync is best-effort
+        console.error('[VEHICLE-TANK-SYNC] Error syncing tank balance:', err);
     }
 }
 
@@ -430,6 +474,9 @@ export async function createCorrection(
             comment: reason,
             userId: user.id,
         });
+
+        // VEHICLE-TANK-SYNC: Update Vehicle.currentFuel if correction is for a VEHICLE_TANK
+        await syncVehicleTankBalance(stockLocationId, stockItemId);
 
         res.status(201).json({
             success: true,

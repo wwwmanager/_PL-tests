@@ -141,6 +141,7 @@ model Organization {
   medicalLicenseIssueDate String? @db.Text
   createdAt DateTime @default(now()) @db.Timestamp(6)
   updatedAt DateTime @default(now()) @updatedAt @db.Timestamp(6)
+  stockLockedAt DateTime? @db.Timestamp(6) // P0-4: STOCK-PERIOD-LOCK
 
   departments    Department[]
   users          User[]
@@ -794,6 +795,7 @@ model WaybillRoute {
   comment     String?  @db.Text
   isCityDriving Boolean?
   isWarming     Boolean?
+  date        DateTime? @db.Date  // Added: route-specific date for multi-day waybills
 
   waybill Waybill @relation(fields: [waybillId], references: [id], onDelete: Cascade)
   route   Route?  @relation(fields: [routeId], references: [id], onDelete: SetNull)

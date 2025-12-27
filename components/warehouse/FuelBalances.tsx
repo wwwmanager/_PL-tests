@@ -67,13 +67,32 @@ const FuelBalances: React.FC = () => {
         loadData();
     }, [loadData]);
 
+    const getDriverForLocation = useCallback((locationId: string, type: string) => {
+        if (type !== 'VEHICLE_TANK') return null;
+
+        const loc = locations.find(l => l.id === locationId);
+        if (!loc || !loc.vehicleId) return null;
+
+        const vehicle = vehicles.find(v => v.id === loc.vehicleId);
+        if (!vehicle || !vehicle.assignedDriver) return null;
+
+        return vehicle.assignedDriver.fullName;
+    }, [locations, vehicles]);
+
     const filteredBalances = useMemo(() => {
         return balances.filter(b => {
             const matchItem = !filters.stockItemId || b.stockItemId === filters.stockItemId;
             const matchType = !filters.locationType || b.locationType === filters.locationType;
             return matchItem && matchType;
+        }).map(b => {
+            // Enrich with driver name for DataTable filtering/sorting
+            const driverName = getDriverForLocation(b.locationId, b.locationType);
+            return {
+                ...b,
+                driver: driverName || ''
+            };
         });
-    }, [balances, filters]);
+    }, [balances, filters, getDriverForLocation]);
 
     const handleFilterChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value } = e.target;
@@ -87,18 +106,6 @@ const FuelBalances: React.FC = () => {
             case 'VEHICLE_TANK': return '🚛 Бак ТС';
             default: return type;
         }
-    };
-
-    const getDriverForLocation = (locationId: string, type: string) => {
-        if (type !== 'VEHICLE_TANK') return null;
-
-        const loc = locations.find(l => l.id === locationId);
-        if (!loc || !loc.vehicleId) return null;
-
-        const vehicle = vehicles.find(v => v.id === loc.vehicleId);
-        if (!vehicle || !vehicle.assignedDriver) return null;
-
-        return vehicle.assignedDriver.fullName;
     };
 
     const columns = [
@@ -140,15 +147,13 @@ const FuelBalances: React.FC = () => {
             sortable: true,
             render: (row: LocationBalance) => <span className="text-sm text-gray-500 dark:text-gray-400">{row.unit}</span>
         },
-
         {
             key: 'driver',
             label: 'Водитель / Ответственный',
             sortable: false,
             render: (row: LocationBalance) => {
-                const driverName = getDriverForLocation(row.locationId, row.locationType);
-                if (!driverName) return <span className="text-gray-400">-</span>;
-                return <span className="text-sm font-medium text-gray-800 dark:text-gray-200">{driverName}</span>;
+                // Driver name is already enriched in filteredBalances
+                return <span className="text-sm font-medium text-gray-800 dark:text-gray-200">{(row as any).driver || '-'}</span>;
             }
         },
 

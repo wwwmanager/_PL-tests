@@ -1,4 +1,4 @@
-import { PrismaClient, TopUpScheduleType } from '@prisma/client';
+import { PrismaClient, TopUpScheduleType, WaybillStatus } from '@prisma/client';
 import { BadRequestError, NotFoundError } from '../utils/errors';
 import { computeNextRunAt } from '../utils/topUpUtils';
 
@@ -10,6 +10,11 @@ export interface AuthUser {
     organizationId: string;
     departmentId: string | null;
     role: string;
+}
+
+export interface DraftReserveResult {
+    reserved: number;
+    count: number;
 }
 
 export interface CreateFuelCardDTO {
@@ -74,9 +79,45 @@ export async function getFuelCardById(user: AuthUser, id: string) {
 }
 
 /**
+ * Calculate reserved fuel amount in DRAFT waybills for a specific card
+ */
+export async function getDraftReserve(user: AuthUser, fuelCardId: string, excludeWaybillId?: string): Promise<DraftReserveResult> {
+    const drafts = await prisma.waybill.findMany({
+        where: {
+            organizationId: user.organizationId,
+            // Exclude finalized statuses where fuel is already deducted (POSTED) or irrelevant (ARCHIVED)
+            status: {
+                notIn: [WaybillStatus.POSTED, WaybillStatus.CANCELLED]
+            },
+            fuelCardId,
+            id: excludeWaybillId ? { not: excludeWaybillId } : undefined,
+        },
+        include: {
+            fuelLines: true,
+        }
+    });
+
+    let reserved = 0;
+
+    for (const d of drafts) {
+        if (d.fuelLines && d.fuelLines.length > 0) {
+            for (const line of d.fuelLines) {
+                // Sum fuelReceived (refueled from card)
+                reserved += Number(line.fuelReceived || 0);
+            }
+        }
+    }
+
+    return {
+        reserved,
+        count: drafts.length
+    };
+}
+
+/**
  * Helper to calculate real balance from StockMovements
  */
-async function calculateRealBalance(organizationId: string, fuelCardId: string): Promise<number> {
+export async function calculateRealBalance(organizationId: string, fuelCardId: string): Promise<number> {
     const location = await prisma.stockLocation.findFirst({
         where: { organizationId, fuelCardId },
     });
@@ -292,9 +333,44 @@ export async function assignFuelCard(
 }
 
 /**
+ * Helper to normalize card number for searching
+ */
+export function normalizeCardNumber(cardNumber: string): string {
+    return cardNumber.trim().replace(/[-\s]/g, '');
+}
+
+/**
+ * REL-601: Find the most appropriate active fuel card for a driver
+ */
+export async function findActiveCardForDriver(organizationId: string, driverIdOrEmployeeId: string): Promise<string | null> {
+    // Resolve Driver ID: could be passed directly or via Employee ID
+    let targetDriverId = driverIdOrEmployeeId;
+
+    const driverByEmployee = await prisma.driver.findUnique({
+        where: { employeeId: driverIdOrEmployeeId }
+    });
+
+    if (driverByEmployee) {
+        targetDriverId = driverByEmployee.id;
+    }
+
+    const card = await prisma.fuelCard.findFirst({
+        where: {
+            organizationId,
+            assignedToDriverId: targetDriverId,
+            isActive: true
+        },
+        orderBy: { createdAt: 'desc' },
+        select: { id: true }
+    });
+
+    return card?.id || null;
+}
+
+/**
  * REL-601: Get fuel cards assigned to a specific driver
  * @param driverId - Driver ID (references Driver table)
- * @returns List of fuel cards
+ * @returns List of fuel cards with real balance from ledger
  */
 export async function getFuelCardsForDriver(organizationId: string, driverIdOrEmployeeId: string) {
     // Resolve Driver ID: could be passed directly or via Employee ID
@@ -309,7 +385,7 @@ export async function getFuelCardsForDriver(organizationId: string, driverIdOrEm
         targetDriverId = driverByEmployee.id;
     }
 
-    return prisma.fuelCard.findMany({
+    const cards = await prisma.fuelCard.findMany({
         where: {
             organizationId,
             assignedToDriverId: targetDriverId,
@@ -319,11 +395,19 @@ export async function getFuelCardsForDriver(organizationId: string, driverIdOrEm
             id: true,
             cardNumber: true,
             provider: true,
-            balanceLiters: true,
+            balanceLiters: true, // Will be overwritten with real balance
             isActive: true // FUEL-CARD-AUTO-001
         },
         orderBy: { cardNumber: 'asc' }
     });
+
+    // Calculate real balance from ledger for each card
+    const cardsWithRealBalance = await Promise.all(cards.map(async (card) => {
+        const realBalance = await calculateRealBalance(organizationId, card.id);
+        return { ...card, balanceLiters: realBalance };
+    }));
+
+    return cardsWithRealBalance;
 }
 
 /**

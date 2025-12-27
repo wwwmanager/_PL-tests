@@ -51,11 +51,19 @@ export async function createOrganization(req: Request, res: Response, next: Next
             return res.status(401).json({ error: 'Unauthorized' });
         }
 
+        // Sanitize input: remove id (auto-generated), fix empty DateTime fields
+        const { id, stockLockedAt, ...rest } = req.body;
+
         // name is required in Prisma schema, populate from shortName if not provided
-        const data = {
-            ...req.body,
-            name: req.body.name || req.body.shortName || 'Unnamed Organization',
+        const data: any = {
+            ...rest,
+            name: rest.name || rest.shortName || 'Unnamed Organization',
         };
+
+        // Only set stockLockedAt if it's a valid non-empty string
+        if (stockLockedAt && typeof stockLockedAt === 'string' && stockLockedAt.trim() !== '') {
+            data.stockLockedAt = new Date(stockLockedAt);
+        }
 
         const organization = await prisma.organization.create({
             data
@@ -75,11 +83,27 @@ export async function updateOrganization(req: Request, res: Response, next: Next
 
         const { id } = req.params;
 
+        // Sanitize input: remove id from body (use URL param), fix empty DateTime fields
+        const { id: bodyId, stockLockedAt, ...rest } = req.body;
+
         // If shortName is updated but name is not provided, update name too
-        const data = { ...req.body };
-        if (req.body.shortName && !req.body.name) {
-            data.name = req.body.shortName;
+        const data: any = { ...rest };
+        if (rest.shortName && !rest.name) {
+            data.name = rest.shortName;
         }
+
+        // Only set stockLockedAt if it's a valid non-empty string; 
+        // empty string means don't change it (use undefined to skip update)
+        if (stockLockedAt !== undefined) {
+            if (stockLockedAt && typeof stockLockedAt === 'string' && stockLockedAt.trim() !== '') {
+                data.stockLockedAt = new Date(stockLockedAt);
+            } else if (stockLockedAt === null) {
+                // Explicitly set to null if client wants to clear it
+                data.stockLockedAt = null;
+            }
+            // Empty string = skip update
+        }
+
         const organization = await prisma.organization.update({
             where: { id },
             data

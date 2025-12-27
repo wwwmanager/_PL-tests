@@ -1286,3 +1286,79 @@ export const transferOrganizationData = async (req: Request, res: Response) => {
         });
     }
 };
+
+/**
+ * P0-4: STOCK-PERIOD-LOCK — Lock stock period for an organization
+ */
+export const lockStockPeriod = async (req: Request, res: Response) => {
+    const { organizationId, lockedAt } = req.body;
+    const userId = (req as any).user?.userId;
+
+    if (!organizationId || !lockedAt) {
+        return res.status(400).json({ success: false, message: 'organizationId and lockedAt are required' });
+    }
+
+    try {
+        const date = new Date(lockedAt);
+        if (isNaN(date.getTime())) {
+            return res.status(400).json({ success: false, message: 'Invalid lockedAt date' });
+        }
+
+        const org = await prisma.organization.update({
+            where: { id: organizationId },
+            data: { stockLockedAt: date }
+        });
+
+        await prisma.auditLog.create({
+            data: {
+                organizationId,
+                userId,
+                actionType: 'UPDATE',
+                entityType: 'Organization',
+                entityId: organizationId,
+                description: `Stock period locked at ${date.toISOString()}`,
+                newValue: { stockLockedAt: date }
+            }
+        });
+
+        res.json({ success: true, data: org });
+    } catch (error: any) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+/**
+ * P0-4: STOCK-PERIOD-LOCK — Unlock stock period for an organization
+ */
+export const unlockStockPeriod = async (req: Request, res: Response) => {
+    const { organizationId } = req.body;
+    const userId = (req as any).user?.userId;
+
+    if (!organizationId) {
+        return res.status(400).json({ success: false, message: 'organizationId is required' });
+    }
+
+    try {
+        const org = await prisma.organization.update({
+            where: { id: organizationId },
+            data: { stockLockedAt: null }
+        });
+
+        await prisma.auditLog.create({
+            data: {
+                organizationId,
+                userId,
+                actionType: 'UPDATE',
+                entityType: 'Organization',
+                entityId: organizationId,
+                description: 'Stock period unlocked',
+                newValue: { stockLockedAt: null }
+            }
+        });
+
+        res.json({ success: true, data: org });
+    } catch (error: any) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+

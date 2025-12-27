@@ -12,7 +12,7 @@ import { getNextBlankForDriver, useBlankForWaybill, getAvailableBlanksForDriver 
 import { isWinterDate } from '../../services/dateUtils';
 import { generateId } from '../../services/api/core';
 // Stock API facade
-import { getAvailableFuelExpenses, updateStockTransaction, getStockTransactions, getGarageStockItems, getNextWaybillNumber, getFuelCardsForDriver } from '../../services/stockApi';
+import { getAvailableFuelExpenses, updateStockTransaction, getStockTransactions, getGarageStockItems, getNextWaybillNumber, getFuelCardsForDriver, getFuelCardDraftReserve } from '../../services/stockApi';
 import { getVehicles } from '../../services/vehicleApiFacade';
 import { getEmployees } from '../../services/employeeApiFacade';
 import { listDrivers, DriverListItem } from '../../services/driverApi';
@@ -165,6 +165,7 @@ export const WaybillDetail: React.FC<WaybillDetailProps> = ({ waybill, isPrefill
   const [initialLinkedTxId, setInitialLinkedTxId] = useState<string | null>(null);
 
   const [fuelCardBalance, setFuelCardBalance] = useState<number | null>(null);
+  const [fuelCardReserve, setFuelCardReserve] = useState<number>(0);
   const [fuelCardInfo, setFuelCardInfo] = useState<{ cardNumber: string; provider?: string } | null>(null); // FUEL-CARD-AUTO-001
   const [fuelFilledError, setFuelFilledError] = useState<string | null>(null);
 
@@ -283,6 +284,8 @@ export const WaybillDetail: React.FC<WaybillDetailProps> = ({ waybill, isPrefill
           driverId: waybill.driverId,
           odometerStart: Math.round(waybill.odometerEnd ?? 0),
           fuelAtStart: waybill.fuelAtEnd ?? 0,
+          // WB-ORG-PREFILL: Use organization from source waybill or current user
+          organizationId: waybill.organizationId || (currentUser as any)?.organizationId || '',
           // P0-C: Routes NOT auto-copied (user can add manually)
         };
       } else {
@@ -312,7 +315,11 @@ export const WaybillDetail: React.FC<WaybillDetailProps> = ({ waybill, isPrefill
               : (sourceWaybill.date ? `${sourceWaybill.date.split('T')[0]}T18:00` : ''),
           };
         } else {
-          formDataToSet = getEmptyWaybill();
+          // WB-ORG-PREFILL: Prefill organization from current user for new waybills
+          formDataToSet = {
+            ...getEmptyWaybill(),
+            organizationId: (currentUser as any)?.organizationId || '',
+          };
         }
       }
 
@@ -333,6 +340,10 @@ export const WaybillDetail: React.FC<WaybillDetailProps> = ({ waybill, isPrefill
             const activeCard = cards.find(c => c.isActive !== false) || cards[0];
             if (activeCard) {
               setFuelCardBalance(Number(activeCard.balanceLiters) || 0);
+
+              const currentId = sourceWaybill && 'id' in sourceWaybill ? sourceWaybill.id : undefined;
+              getFuelCardDraftReserve(activeCard.id, currentId).then(res => setFuelCardReserve(res.reserved));
+
               // Also update fuelCardInfo if it's not already set from sourceWaybill
               if (!sourceWaybill || !('fuelCard' in sourceWaybill) || !sourceWaybill.fuelCard) {
                 setFuelCardInfo({
@@ -342,9 +353,13 @@ export const WaybillDetail: React.FC<WaybillDetailProps> = ({ waybill, isPrefill
               }
             } else {
               setFuelCardBalance(null);
+              setFuelCardReserve(0);
             }
           })
-          .catch(() => setFuelCardBalance(null));
+          .catch(() => {
+            setFuelCardBalance(null);
+            setFuelCardReserve(0);
+          });
       }
 
       // FUEL-CARD-AUTO-001: Set initial card info if available in sourceWaybill
@@ -636,15 +651,19 @@ export const WaybillDetail: React.FC<WaybillDetailProps> = ({ waybill, isPrefill
                 provider: activeCard.provider
               });
               setFuelCardBalance(Number(activeCard.balanceLiters) || 0);
+              const currentId = formData && 'id' in formData ? (formData as any).id : undefined;
+              getFuelCardDraftReserve(activeCard.id, currentId).then(res => setFuelCardReserve(res.reserved));
             } else {
               setFuelCardInfo(null);
               setFuelCardBalance(null);
+              setFuelCardReserve(0);
             }
           })
           .catch(err => {
             console.error('[FUEL-CARD-DEBUG] Error:', err);
             setFuelCardInfo(null);
             setFuelCardBalance(null);
+            setFuelCardReserve(0);
           });
       } else {
         setFuelCardBalance(null);
@@ -812,20 +831,36 @@ export const WaybillDetail: React.FC<WaybillDetailProps> = ({ waybill, isPrefill
   };
 
   const isRouteDateValid = (routeDate?: string): boolean => {
+    // Skip validation for single-day mode or empty route date
     if (!routeDate || dayMode === 'single') return true;
 
+    // Skip validation if waybill date range is not set
+    if (!formData.validFrom || !formData.validTo) return true;
+
     try {
-      const rDate = new Date(routeDate);
-      const sDate = new Date(formData.validFrom.split('T')[0]);
-      const eDate = new Date(formData.validTo.split('T')[0]);
+      // Parse dates - input type="date" gives YYYY-MM-DD format
+      const routeDateStr = routeDate.split('T')[0];  // Handle if datetime string passed
+      const validFromStr = formData.validFrom.split('T')[0];
+      const validToStr = formData.validTo.split('T')[0];
 
-      rDate.setHours(0, 0, 0, 0);
-      sDate.setHours(0, 0, 0, 0);
-      eDate.setHours(0, 0, 0, 0);
+      const rDate = new Date(routeDateStr + 'T00:00:00');
+      const sDate = new Date(validFromStr + 'T00:00:00');
+      const eDate = new Date(validToStr + 'T00:00:00');
 
-      return rDate >= sDate && rDate <= eDate;
-    } catch {
-      return false;
+      // Check for invalid dates
+      if (isNaN(rDate.getTime()) || isNaN(sDate.getTime()) || isNaN(eDate.getTime())) {
+        console.warn('[isRouteDateValid] Invalid date detected:', { routeDateStr, validFromStr, validToStr });
+        return true; // Allow if parsing fails - don't block user
+      }
+
+      const isValid = rDate >= sDate && rDate <= eDate;
+      if (!isValid) {
+        console.log('[isRouteDateValid] Date out of range:', { route: routeDateStr, from: validFromStr, to: validToStr });
+      }
+      return isValid;
+    } catch (e) {
+      console.error('[isRouteDateValid] Error:', e);
+      return true; // Allow on error - don't block user
     }
   };
 
@@ -860,11 +895,26 @@ export const WaybillDetail: React.FC<WaybillDetailProps> = ({ waybill, isPrefill
     return map;
   }, [savedRoutes]);
 
-  const handleRouteChance = (id: string, field: keyof Route, value: string | number | boolean) => {
-    if (field === 'date' && typeof value === 'string' && !isRouteDateValid(value)) {
-      showToast(`Дата маршрута выходит за пределы диапазона путевого листа.`, 'error');
-      return;
+  // WB-ROUTE-DATE-FIX: Validate date on blur and BLOCK invalid dates
+  const handleRouteDateBlur = useCallback((id: string, value: string) => {
+    if (!value || value.length !== 10) return;  // Only validate complete dates
+
+    if (!isRouteDateValid(value)) {
+      const validStartDate = formData.validFrom?.split('T')[0] || '';
+      showToast(`Дата маршрута должна быть в пределах действия ПЛ (${validStartDate} - ${formData.validTo?.split('T')[0]}). Дата сброшена.`, 'error');
+
+      // Reset the date to validFrom
+      setFormData(prev => ({
+        ...prev,
+        routes: prev.routes.map(r =>
+          r.id === id ? { ...r, date: validStartDate } : r
+        )
+      }));
     }
+  }, [formData.validFrom, formData.validTo, showToast]);
+
+  const handleRouteChance = (id: string, field: keyof Route, value: string | number | boolean) => {
+    // No date validation here - moved to onBlur handler
 
     setFormData(prev => {
       let changed = false;
@@ -1650,6 +1700,11 @@ export const WaybillDetail: React.FC<WaybillDetailProps> = ({ waybill, isPrefill
                   {fuelCardBalance != null && (
                     <div className="text-gray-500 dark:text-gray-400">
                       Доступно на карте: {fuelCardBalance.toFixed(2)} л
+                      {fuelCardReserve > 0 && (
+                        <span className="ml-2 text-orange-600 dark:text-orange-400 font-medium">
+                          (Резерв в черновиках: {fuelCardReserve.toFixed(2)} л)
+                        </span>
+                      )}
                     </div>
                   )}
                 </div>
@@ -1846,6 +1901,7 @@ export const WaybillDetail: React.FC<WaybillDetailProps> = ({ waybill, isPrefill
               selectedVehicle={selectedVehicle}
               onChange={handleRouteChance}
               onRemove={handleRemoveRoute}
+              onDateBlur={handleRouteDateBlur}
             />
             ))}
           </div>

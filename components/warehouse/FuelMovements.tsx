@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { getStockMovements, getStockItems, getStockLocations, deleteStockMovement } from '../../services/api/stockApi';
-import { StockMovementV2, GarageStockItem, StockLocation } from '../../types';
+import { getOrganizations } from '../../services/organizationApi';
+import { StockMovementV2, GarageStockItem, StockLocation, Organization } from '../../types';
 import { useToast } from '../../hooks/useToast';
 import { PlusIcon, TrashIcon } from '../Icons';
 import { RequireCapability } from '../../services/auth';
@@ -8,10 +9,21 @@ import MovementCreateModal from './MovementCreateModal';
 import ConfirmationModal from '../shared/ConfirmationModal';
 import DataTable from '../shared/DataTable';
 
+const getTypeLabel = (type: string) => {
+    switch (type) {
+        case 'INCOME': return { label: 'Приход', color: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' };
+        case 'EXPENSE': return { label: 'Расход', color: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' };
+        case 'TRANSFER': return { label: 'Перемещение', color: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' };
+        case 'ADJUSTMENT': return { label: 'Коррект.', color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' };
+        default: return { label: type, color: 'bg-gray-100 text-gray-800' };
+    }
+};
+
 const FuelMovements: React.FC = () => {
     const [movements, setMovements] = useState<StockMovementV2[]>([]);
     const [items, setItems] = useState<GarageStockItem[]>([]);
     const [locations, setLocations] = useState<StockLocation[]>([]);
+    const [organizations, setOrganizations] = useState<Organization[]>([]);
     const [loading, setLoading] = useState(false);
     const [total, setTotal] = useState(0);
     const [page, setPage] = useState(1);
@@ -19,6 +31,59 @@ const FuelMovements: React.FC = () => {
     const [movementToDelete, setMovementToDelete] = useState<StockMovementV2 | null>(null);
     const [editMovement, setEditMovement] = useState<StockMovementV2 | null>(null);
     const limit = 20;
+
+    const enrichedMovements = useMemo(() => {
+        return movements.map(m => {
+            const typeInfo = getTypeLabel(m.movementType);
+
+            let fromLabel = '-';
+            let toLabel = '-';
+
+            if (m.movementType === 'TRANSFER') {
+                fromLabel = m.fromStockLocationName || 'Не указано';
+                toLabel = m.toStockLocationName || 'Не указано';
+            } else if (m.movementType === 'INCOME') {
+                // For INCOME, documentId stores the supplier organization ID
+                const supplier = organizations.find(o => o.id === m.documentId);
+                fromLabel = supplier ? (supplier.shortName || supplier.fullName) : (m.documentId ? `Поставщик ID: ${m.documentId.slice(0, 8)}` : '-');
+                toLabel = m.stockLocationName || 'Не указано';
+            } else if (m.movementType === 'EXPENSE') {
+                fromLabel = m.stockLocationName || 'Не указано';
+                // For EXPENSE, documentId can store the recipient organization ID
+                const recipient = organizations.find(o => o.id === m.documentId);
+                toLabel = recipient ? (recipient.shortName || recipient.fullName) : (m.documentId ? `Получатель ID: ${m.documentId.slice(0, 8)}` : '-');
+            } else if (m.movementType === 'ADJUSTMENT') {
+                if (Number(m.quantity) > 0) {
+                    // Income adjustment
+                    const source = organizations.find(o => o.id === m.documentId);
+                    fromLabel = source ? (source.shortName || source.fullName) : '-';
+                    toLabel = m.stockLocationName || 'Не указано';
+                } else {
+                    // Expense adjustment
+                    fromLabel = m.stockLocationName || 'Не указано';
+                    const recipient = organizations.find(o => o.id === m.documentId);
+                    toLabel = recipient ? (recipient.shortName || recipient.fullName) : '-';
+                }
+            }
+
+            let documentDisplay = '';
+            if (m.documentType === 'STORNO') {
+                documentDisplay = `Сторно: ${m.comment || 'Корректировка'}`;
+            } else if (m.comment) {
+                documentDisplay = m.comment;
+            } else if (m.documentType) {
+                documentDisplay = `${m.documentType}: ${m.documentId || ''}`;
+            }
+
+            return {
+                ...m,
+                translatedType: typeInfo.label,
+                fromLabel,
+                toLabel,
+                documentDisplay
+            };
+        });
+    }, [movements, organizations]);
 
     const [filters, setFilters] = useState({
         from: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
@@ -34,15 +99,17 @@ const FuelMovements: React.FC = () => {
     const loadData = useCallback(async () => {
         setLoading(true);
         try {
-            const [movementsRes, itemsData, locationsData] = await Promise.all([
+            const [movementsRes, itemsData, locationsData, orgsData] = await Promise.all([
                 getStockMovements({ ...filters, page, limit }),
                 getStockItems(true),
                 getStockLocations(),
+                getOrganizations(),
             ]);
             setMovements(movementsRes.data);
             setTotal(movementsRes.meta.total);
             setItems(itemsData);
             setLocations(locationsData);
+            setOrganizations(orgsData);
         } catch (err: any) {
             showToast('Ошибка загрузки данных: ' + err.message, 'error');
         } finally {
@@ -80,15 +147,7 @@ const FuelMovements: React.FC = () => {
         }
     };
 
-    const getTypeLabel = (type: string) => {
-        switch (type) {
-            case 'INCOME': return { label: 'Приход', color: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' };
-            case 'EXPENSE': return { label: 'Расход', color: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' };
-            case 'TRANSFER': return { label: 'Перемещение', color: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' };
-            case 'ADJUSTMENT': return { label: 'Коррект.', color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' };
-            default: return { label: type, color: 'bg-gray-100 text-gray-800' };
-        }
-    };
+
 
     const columns = [
         {
@@ -98,14 +157,14 @@ const FuelMovements: React.FC = () => {
             render: (row: StockMovementV2) => new Date(row.occurredAt).toLocaleString('ru-RU', { dateStyle: 'short', timeStyle: 'short' })
         },
         {
-            key: 'movementType',
+            key: 'translatedType',
             label: 'Тип',
             sortable: true,
-            render: (row: StockMovementV2) => {
+            render: (row: any) => {
                 const type = getTypeLabel(row.movementType);
                 return (
                     <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${type.color}`}>
-                        {type.label}
+                        {row.translatedType}
                     </span>
                 );
             }
@@ -127,30 +186,24 @@ const FuelMovements: React.FC = () => {
             )
         },
         {
-            key: 'location',
-            label: 'Локация',
-            render: (row: StockMovementV2) => (
-                <div className="text-sm text-gray-600 dark:text-gray-300">
-                    {row.movementType === 'TRANSFER' ? (
-                        <div className="flex flex-col">
-                            <span className="text-xs text-gray-400 italic font-normal">из:</span>
-                            <span>{row.fromStockLocationName}</span>
-                            <span className="text-xs text-gray-400 italic font-normal">в:</span>
-                            <span>{row.toStockLocationName}</span>
-                        </div>
-                    ) : (
-                        row.stockLocationName
-                    )}
-                </div>
-            )
+            key: 'fromLabel',
+            label: 'Поставщик / Откуда',
+            sortable: true,
+            render: (row: any) => <span className="text-gray-600 dark:text-gray-400">{row.fromLabel}</span>
         },
         {
-            key: 'document',
-            label: 'Основание / Коммент.',
-            render: (row: StockMovementV2) => (
+            key: 'toLabel',
+            label: 'Получатель / Куда',
+            sortable: true,
+            render: (row: any) => <span className="text-gray-600 dark:text-gray-400">{row.toLabel}</span>
+        },
+        {
+            key: 'documentDisplay',
+            label: 'Документ',
+            sortable: true,
+            render: (row: any) => (
                 <div className="flex flex-col text-sm text-gray-500 dark:text-gray-400">
-                    {row.documentType && <span className="font-medium text-gray-600 dark:text-gray-300">{row.documentType}: {row.documentId}</span>}
-                    {row.comment && <span className="italic">"{row.comment}"</span>}
+                    <span className="font-medium text-gray-600 dark:text-gray-300">{row.documentDisplay}</span>
                     {row.externalRef && <span className="text-[10px] text-gray-400">ID: {row.externalRef}</span>}
                 </div>
             )
@@ -291,7 +344,7 @@ const FuelMovements: React.FC = () => {
                 ) : (
                     <DataTable
                         columns={columns}
-                        data={movements}
+                        data={enrichedMovements}
                         keyField="id"
                         emptyMessage={Object.values(filters).some(v => v !== '') ? 'По вашему запросу ничего не найдено' : 'Движений еще нет'}
                         searchable={true}

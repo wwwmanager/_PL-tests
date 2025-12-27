@@ -1,5 +1,5 @@
 import { PrismaClient, StockMovementType, Prisma, AuditActionType } from '@prisma/client';
-import { BadRequestError, NotFoundError } from '../utils/errors';
+import { BadRequestError, NotFoundError, ConflictError } from '../utils/errors';
 
 const prisma = new PrismaClient();
 
@@ -46,6 +46,30 @@ async function acquireLocationLocks(
     const sortedIds = [...locationIds].sort();
     for (const locationId of sortedIds) {
         await acquireLocationLock(tx, locationId, stockItemId);
+    }
+}
+
+/**
+ * P0-4: STOCK-PERIOD-LOCK — Check if the period is locked for this organization
+ * @param tx - Transaction client
+ * @param organizationId - Organization ID
+ * @param occurredAt - Date of the movement
+ */
+async function checkPeriodLock(
+    tx: Prisma.TransactionClient,
+    organizationId: string,
+    occurredAt: Date
+): Promise<void> {
+    const org = await tx.organization.findUnique({
+        where: { id: organizationId },
+        select: { stockLockedAt: true }
+    });
+
+    if (org?.stockLockedAt && occurredAt <= org.stockLockedAt) {
+        throw new ConflictError(
+            `Период складского учёта закрыт до ${org.stockLockedAt.toLocaleString()}. ` +
+            `Нельзя создавать или изменять движения в закрытом периоде.`
+        );
     }
 }
 
@@ -276,12 +300,15 @@ export async function createTransfer(params: CreateTransferParams) {
         // BE-005: Acquire locks on both locations in deterministic order
         await acquireLocationLocks(tx, [fromLocationId, toLocationId], stockItemId);
 
+        // P0-4: Period lock check
+        await checkPeriodLock(tx, organizationId, occurredAt);
+
         // Check balance with lock held
         const sourceBalance = await getBalanceAtTx(tx, fromLocationId, stockItemId, occurredAt);
 
         if (sourceBalance < quantity) {
             throw new BadRequestError(
-                `Недостаточно топлива на локации-источнике. Требуется: ${quantity}, доступно: ${sourceBalance}`
+                `Недостаточно топлива на локации-источнике (Loc: ${fromLocationId}, StockItem: ${stockItemId}). Требуется: ${quantity}, доступно: ${sourceBalance} на дату ${occurredAt.toISOString()}`
             );
         }
 
@@ -386,6 +413,9 @@ export async function createAdjustment(params: CreateAdjustmentParams) {
                 );
             }
 
+            // P0-4: Period lock check
+            await checkPeriodLock(tx, organizationId, occurredAt);
+
             // Create ADJUSTMENT movement
             return tx.stockMovement.create({
                 data: {
@@ -406,22 +436,26 @@ export async function createAdjustment(params: CreateAdjustmentParams) {
         });
     }
 
-    // Positive adjustment doesn't need locking
-    return prisma.stockMovement.create({
-        data: {
-            organizationId,
-            stockItemId,
-            stockLocationId,
-            movementType: StockMovementType.ADJUSTMENT,
-            quantity,
-            occurredAt,
-            occurredSeq,
-            documentType,
-            documentId,
-            externalRef,
-            comment,
-            createdByUserId: userId,
-        },
+    // Positive adjustment doesn't need balance-locking but MUST check period lock
+    return prisma.$transaction(async (tx) => {
+        await checkPeriodLock(tx, organizationId, occurredAt);
+
+        return tx.stockMovement.create({
+            data: {
+                organizationId,
+                stockItemId,
+                stockLocationId,
+                movementType: StockMovementType.ADJUSTMENT,
+                quantity,
+                occurredAt,
+                occurredSeq,
+                documentType,
+                documentId,
+                externalRef,
+                comment,
+                createdByUserId: userId,
+            },
+        });
     });
 }
 
@@ -534,7 +568,7 @@ export async function createExpenseMovement(
             const balance = await getBalanceAtTx(tx, stockLocationId, stockItemId, effectiveOccurredAt);
             if (balance < quantity) {
                 throw new BadRequestError(
-                    `Недостаточно топлива на локации. Требуется: ${quantity}, доступно: ${balance}`
+                    `Недостаточно топлива на локации (Loc: ${stockLocationId}, StockItem: ${stockItemId}). Требуется: ${quantity}, доступно: ${balance} на дату ${effectiveOccurredAt.toISOString()}`
                 );
             }
 
@@ -560,25 +594,32 @@ export async function createExpenseMovement(
     const hasEnough = await checkStockAvailability(organizationId, stockItemId, warehouseId, quantity);
     if (!hasEnough) {
         const currentBalance = await getStockBalance(organizationId, stockItemId, warehouseId);
-        throw new BadRequestError(
-            `Недостаточно топлива на складе. Требуется: ${quantity}, доступно: ${currentBalance}`
-        );
+        if (currentBalance < quantity) {
+            throw new BadRequestError(
+                `Недостаточно топлива на складе (Loc: ${stockLocationId}, StockItem: ${stockItemId}). Требуется: ${quantity}, доступно: ${currentBalance} на дату ${occurredAt ? occurredAt.toISOString() : 'CURRENT'}`
+            );
+        }
     }
 
-    return prisma.stockMovement.create({
-        data: {
-            organizationId,
-            stockItemId,
-            warehouseId,
-            stockLocationId,
-            movementType: StockMovementType.EXPENSE,
-            quantity,
-            occurredAt: effectiveOccurredAt,
-            documentType,
-            documentId,
-            comment,
-            createdByUserId: userId,
-        },
+    return prisma.$transaction(async (tx) => {
+        // P0-4: Period lock check
+        await checkPeriodLock(tx, organizationId, effectiveOccurredAt);
+
+        return tx.stockMovement.create({
+            data: {
+                organizationId,
+                stockItemId,
+                warehouseId,
+                stockLocationId,
+                movementType: StockMovementType.EXPENSE,
+                quantity,
+                occurredAt: effectiveOccurredAt,
+                documentType,
+                documentId,
+                comment,
+                createdByUserId: userId,
+            },
+        });
     });
 }
 
@@ -597,20 +638,26 @@ export async function createIncomeMovement(
     stockLocationId?: string,
     occurredAt?: Date
 ) {
-    return prisma.stockMovement.create({
-        data: {
-            organizationId,
-            stockItemId,
-            warehouseId,
-            stockLocationId,
-            movementType: StockMovementType.INCOME,
-            quantity,
-            occurredAt: occurredAt || new Date(),
-            documentType,
-            documentId,
-            comment,
-            createdByUserId: userId,
-        },
+    const effectiveOccurredAt = occurredAt || new Date();
+    return prisma.$transaction(async (tx) => {
+        // P0-4: Period lock check
+        await checkPeriodLock(tx, organizationId, effectiveOccurredAt);
+
+        return tx.stockMovement.create({
+            data: {
+                organizationId,
+                stockItemId,
+                warehouseId,
+                stockLocationId,
+                movementType: StockMovementType.INCOME,
+                quantity,
+                occurredAt: effectiveOccurredAt,
+                documentType,
+                documentId,
+                comment,
+                createdByUserId: userId,
+            },
+        });
     });
 }
 
@@ -691,6 +738,12 @@ export async function updateStockMovement(params: UpdateMovementParams) {
         await acquireLocationLocks(tx, locksToAcquire, original.stockItemId);
         if (updates.stockItemId && updates.stockItemId !== original.stockItemId) {
             await acquireLocationLocks(tx, locksToAcquire, updates.stockItemId);
+        }
+
+        // P0-4: Period lock check (check BOTH original and new date)
+        await checkPeriodLock(tx, organizationId, original.occurredAt);
+        if (updates.occurredAt && updates.occurredAt.getTime() !== original.occurredAt.getTime()) {
+            await checkPeriodLock(tx, organizationId, updates.occurredAt);
         }
 
         // --- REVERT OLD MOVEMENT EFFECT ---
@@ -1058,11 +1111,8 @@ export async function voidStockMovement(params: VoidMovementParams) {
             throw new BadRequestError('Movement is already voided');
         }
 
-        // 4. TODO PR3: Period lock check
-        // const org = await tx.organization.findUnique({ where: { id: organizationId }, select: { stockLockedAt: true } });
-        // if (org?.stockLockedAt && movement.occurredAt <= org.stockLockedAt) {
-        //     throw new ConflictError('Period is locked. Cannot void movements before ' + org.stockLockedAt);
-        // }
+        // 4. P0-4: Period lock check
+        await checkPeriodLock(tx, organizationId, movement.occurredAt);
 
         // 5. Guard: Future non-negative check (STOCK-VOID-CHECK-003)
         // For TRANSFER: check toLocation (loses quantity when voided)

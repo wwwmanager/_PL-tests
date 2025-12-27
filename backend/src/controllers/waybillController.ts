@@ -124,13 +124,13 @@ export async function changeWaybillStatus(req: Request, res: Response, next: Nex
         const userRole = req.user!.role;
         const { id } = req.params;
 
-        const { status } = req.body;
+        const { status, reason } = req.body;
 
         // WB-701: Check for override permission
         // Admin and dispatcher can override norm, others cannot
         const hasOverridePermission = ['admin', 'dispatcher'].includes(userRole);
 
-        const waybill = await waybillService.changeWaybillStatus(req.user as any, id, status, userId, hasOverridePermission);
+        const waybill = await waybillService.changeWaybillStatus(req.user as any, id, status, userId, hasOverridePermission, reason);
         res.json(waybill);
     } catch (err) {
         next(err);

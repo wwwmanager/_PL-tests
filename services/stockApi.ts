@@ -213,6 +213,22 @@ export interface FuelCardInfo {
 }
 
 /**
+ * Get reserved fuel amount in DRAFT waybills
+ */
+export async function getFuelCardDraftReserve(fuelCardId: string, excludeWaybillId?: string): Promise<{ reserved: number; count: number }> {
+    try {
+        const params = new URLSearchParams();
+        if (excludeWaybillId) params.append('excludeWaybillId', excludeWaybillId);
+
+        const response = await httpClient.get<{ data: { reserved: number; count: number } }>(`/fuel-cards/${fuelCardId}/reserve?${params.toString()}`);
+        return response.data || { reserved: 0, count: 0 };
+    } catch (e) {
+        console.error('[stockApi] getFuelCardDraftReserve error', e);
+        return { reserved: 0, count: 0 };
+    }
+}
+
+/**
  * Get available fuel expenses for a driver
  */
 export async function getAvailableFuelExpenses(

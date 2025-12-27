@@ -5,6 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 
 import { Organization, OrganizationStatus } from '../../types';
 import { getOrganizations, addOrganization, updateOrganization, deleteOrganization } from '../../services/organizationApi';
+import { lockStockPeriod, unlockStockPeriod } from '../../services/adminApi';
 import { validation } from '../../services/faker'; // Валидация все еще нужна для схемы
 import { PencilIcon, TrashIcon, PlusIcon, ArrowUpIcon, ArrowDownIcon, ArchiveBoxIcon, ArrowUpTrayIcon } from '../Icons';
 import useTable from '../../hooks/useTable';
@@ -62,6 +63,7 @@ const organizationSchema = z.object({
 
     medicalLicenseNumber: z.string().nullish(),
     medicalLicenseIssueDate: z.string().nullish(),
+    stockLockedAt: z.string().nullish(),
 });
 
 type OrganizationFormData = z.infer<typeof organizationSchema>;
@@ -72,7 +74,8 @@ const defaultValues: OrganizationFormData = {
     registrationDate: '', contactPerson: '', phone: '', email: '',
     bankAccount: '', correspondentAccount: '', bankName: '', bankBik: '',
     accountCurrency: '', paymentPurpose: '', group: '', notes: '',
-    medicalLicenseIssueDate: '', medicalLicenseNumber: ''
+    medicalLicenseIssueDate: '', medicalLicenseNumber: '',
+    stockLockedAt: ''
 };
 
 
@@ -82,6 +85,7 @@ const OrganizationManagement = () => {
     const [isLoading, setIsLoading] = useState(true);
     const [showArchived, setShowArchived] = useState(false);
     const [actionModal, setActionModal] = useState<{ isOpen: boolean; type?: 'delete' | 'archive' | 'unarchive'; item?: Organization }>({ isOpen: false });
+    const [lockDate, setLockDate] = useState<string>('');
     const { showToast } = useToast();
 
     const {
@@ -104,6 +108,7 @@ const OrganizationManagement = () => {
     const watchedGroup = watch("group");
     const currentId = watch("id");
     const currentShortName = watch("shortName");
+    const currentStockLockedAt = watch("stockLockedAt");
 
     const COLLAPSED_SECTIONS_KEY = 'orgManagement_collapsedSections';
     const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>(() => {
@@ -155,7 +160,39 @@ const OrganizationManagement = () => {
 
     const handleEdit = (item: Organization) => {
         reset(item);
+        setLockDate('');
         setIsModalOpen(true);
+    };
+
+    const handleLockPeriod = async () => {
+        if (!currentId || !lockDate) return;
+        try {
+            await lockStockPeriod(currentId, new Date(lockDate).toISOString());
+            showToast("Период заблокирован");
+            fetchData();
+            // Update local state to show change immediately in modal
+            const updatedOrg = organizations.find(o => o.id === currentId);
+            if (updatedOrg) {
+                reset({ ...updatedOrg, stockLockedAt: new Date(lockDate).toISOString() });
+            }
+        } catch (error) {
+            showToast("Не удалось заблокировать период", "error");
+        }
+    };
+
+    const handleUnlockPeriod = async () => {
+        if (!currentId) return;
+        try {
+            await unlockStockPeriod(currentId);
+            showToast("Период разблокирован");
+            fetchData();
+            const updatedOrg = organizations.find(o => o.id === currentId);
+            if (updatedOrg) {
+                reset({ ...updatedOrg, stockLockedAt: undefined });
+            }
+        } catch (error) {
+            showToast("Не удалось разблокировать период", "error");
+        }
     };
 
     const handleCancel = useCallback(() => {
@@ -266,6 +303,53 @@ const OrganizationManagement = () => {
                             <FormField label="БИК" error={errors.bankBik?.message}><FormInput {...register("bankBik")} /></FormField>
                         </div>
                     </CollapsibleSection>
+
+                    {currentId && (
+                        <CollapsibleSection title="Управление периодом (Stock Period Lock)" isCollapsed={collapsedSections.periodLock || false} onToggle={() => toggleSection('periodLock')}>
+                            <div className="space-y-4">
+                                <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600">
+                                    <div>
+                                        <p className="text-sm font-medium text-gray-900 dark:text-white">
+                                            {currentStockLockedAt
+                                                ? `Период закрыт до: ${new Date(currentStockLockedAt).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}`
+                                                : 'Период открыт'}
+                                        </p>
+                                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                                            Закрытие периода запрещает создание и изменение движений в закрытом периоде.
+                                        </p>
+                                    </div>
+                                    <div className="flex gap-2">
+                                        {currentStockLockedAt ? (
+                                            <button
+                                                type="button"
+                                                onClick={handleUnlockPeriod}
+                                                className="px-3 py-1 text-xs font-semibold text-green-700 bg-green-100 rounded hover:bg-green-200"
+                                            >
+                                                Открыть период
+                                            </button>
+                                        ) : (
+                                            <div className="flex gap-2 items-center">
+                                                <input
+                                                    type="date"
+                                                    className="text-xs p-1 rounded border border-gray-300 dark:bg-gray-600 dark:text-white"
+                                                    onChange={(e) => setLockDate(e.target.value)}
+                                                    value={lockDate}
+                                                />
+                                                <button
+                                                    type="button"
+                                                    onClick={handleLockPeriod}
+                                                    disabled={!lockDate}
+                                                    className="px-3 py-1 text-xs font-semibold text-red-700 bg-red-100 rounded hover:bg-red-200 disabled:opacity-50"
+                                                >
+                                                    Закрыть до
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        </CollapsibleSection>
+                    )}
                 </form>
             </Modal>
 
