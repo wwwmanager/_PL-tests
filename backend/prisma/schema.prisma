@@ -144,6 +144,11 @@ model Organization {
   stockLockedAt DateTime? @db.Timestamp(6) // P0-4: STOCK-PERIOD-LOCK
   isOwn         Boolean  @default(false)   // OWN-ORG-001: Собственная организация
 
+  // ORG-HIERARCHY-001: Иерархия организаций (подразделения/филиалы)
+  parentOrganizationId String? @db.Uuid
+  parentOrganization   Organization? @relation("OrgHierarchy", fields: [parentOrganizationId], references: [id], onDelete: SetNull)
+  childOrganizations   Organization[] @relation("OrgHierarchy")
+
   departments    Department[]
   users          User[]
   employees      Employee[]
@@ -160,6 +165,7 @@ model Organization {
   resetRules     FuelCardResetRule[]  // REL-105
 
   @@index([isOwn])
+  @@index([parentOrganizationId])  // ORG-HIERARCHY-001
   @@map("organizations")
 }
 

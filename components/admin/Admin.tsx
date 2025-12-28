@@ -21,6 +21,7 @@ const BlankManagement = lazy(() => import('./BlankManagement'));
 const DataDeletionModal = lazy(() => import('./DataDeletionModal'));
 const DataImportModal = lazy(() => import('./DataImportModal'));
 const DataExportModal = lazy(() => import('./DataExportModal'));
+const ProductionCalendarSettings = lazy(() => import('./ProductionCalendarSettings'));
 
 // ===== Метаданные/совместимость =====
 
@@ -71,7 +72,7 @@ export const KEY_ALIASES: Record<string, string> = {
 };
 
 
-type AdminTab = 'settings' | 'users' | 'roles' | 'blanks' | 'import_audit' | 'business_audit' | 'diag';
+type AdminTab = 'settings' | 'users' | 'roles' | 'blanks' | 'import_audit' | 'business_audit' | 'calendar' | 'diag';
 
 type ExportBundle = {
   meta: {
@@ -1287,6 +1288,8 @@ const Admin: React.FC = () => {
         return <ImportAuditLog />;
       case 'business_audit':
         return <BusinessAuditLog />;
+      case 'calendar':
+        return <ProductionCalendarSettings />;
       case 'diag':
         return <Diagnostics />;
       default:
@@ -1355,6 +1358,7 @@ const Admin: React.FC = () => {
             {can('admin.panel') && <TabButton tab="blanks" label="Бланки ПЛ" />}
             <TabButton tab="import_audit" label="Журнал импорта" />
             {can('audit.business.read') && <TabButton tab="business_audit" label="Бизнес-аудит" />}
+            <TabButton tab="calendar" label="Календарь" />
             {can('admin.panel') && <TabButton tab="diag" label="Диагностика" />}
           </div>
           <button onClick={handleImportClick} disabled={!importPolicy || isImporting} className="flex items-center gap-2 bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md hover:bg-blue-700 transition-colors disabled:opacity-50"><UploadIcon className="h-5 w-5" />{isImporting ? 'Импорт...' : 'Импорт'}</button>

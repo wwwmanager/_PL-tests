@@ -78,6 +78,10 @@ export async function deleteWaybill(id: string): Promise<void> {
     await httpClient.delete(`/waybills/${id}`);
 }
 
+export async function bulkDeleteWaybills(ids: string[]): Promise<{ success: string[]; errors: { id: string; error: string }[] }> {
+    return httpClient.post<{ success: string[]; errors: { id: string; error: string }[] }>('/waybills/bulk-delete', { ids });
+}
+
 export async function getLatestWaybill(): Promise<Waybill | null> {
     const response = await getWaybills({ limit: 1 });
     return response.waybills[0] || null;

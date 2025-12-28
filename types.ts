@@ -336,6 +336,9 @@ export interface Organization {
   storageIds?: string[];
   stockLockedAt?: string;
   isOwn?: boolean;  // OWN-ORG-FE-030: Собственная организация
+  // ORG-HIERARCHY-001: Иерархия организаций
+  parentOrganizationId?: string | null;
+  parentOrganization?: { id: string; shortName: string; inn?: string; } | null;
 }
 
 export type SeasonSettings =

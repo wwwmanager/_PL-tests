@@ -51,13 +51,26 @@ export async function listBlanks(req: Request, res: Response, next: NextFunction
     try {
         // Admin can see all organizations, others only their org
         const orgId = req.user!.role === 'admin' ? undefined : req.user!.organizationId;
+
+        // Parse status - frontend sends lowercase, Prisma uses UPPERCASE
+        let statusFilter: BlankStatus | undefined;
+        if (req.query.status) {
+            const statusStr = (req.query.status as string).toUpperCase();
+            // Handle comma-separated values (frontend may send 'issued' or 'issued,available')
+            const firstStatus = statusStr.split(',')[0] as BlankStatus;
+            if (Object.values(BlankStatus).includes(firstStatus)) {
+                statusFilter = firstStatus;
+            }
+        }
+
         const filters = {
             series: req.query.series as string | undefined,
-            status: req.query.status as BlankStatus | undefined,
+            status: statusFilter,
+            ownerEmployeeId: req.query.ownerEmployeeId as string | undefined,
             page: req.query.page ? Number(req.query.page) : undefined,
             // Support both limit and pageSize (frontend uses pageSize)
             limit: req.query.limit ? Number(req.query.limit) :
-                req.query.pageSize ? Number(req.query.pageSize) : 1000  // Default 1000 for admin panel
+                req.query.pageSize ? Number(req.query.pageSize) : 50  // Default 50 for pagination
         };
 
         const result = await blankService.listBlanks(orgId, filters);

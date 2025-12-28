@@ -281,7 +281,9 @@ const BlankList: React.FC<{ key: number }> = () => {
                 series: filters.series || undefined,
                 number: filters.number ? parseInt(filters.number, 10) : undefined,
                 status: filters.status ? [filters.status as BlankStatus] : undefined,
-                ownerEmployeeId: filters.ownerName ? employees.find(e => e.shortName.toLowerCase().includes(filters.ownerName!.toLowerCase()))?.id : undefined,
+                // Use Driver.id directly (stored in ownerEmployeeId filter)
+                ownerEmployeeId: filters.ownerEmployeeId || undefined,
+                // Note: waybillNumber filter not yet supported by backend
             };
             const { items, total } = await searchBlanks({ ...query, page, pageSize });
             setBlanks(items);
@@ -426,9 +428,9 @@ const BlankList: React.FC<{ key: number }> = () => {
                     <option value="">Все статусы</option>
                     {(Object.keys(BLANK_STATUS_TRANSLATIONS) as BlankStatus[]).map(s => <option key={s} value={s}>{BLANK_STATUS_TRANSLATIONS[s]}</option>)}
                 </FormSelect>
-                <FormSelect value={filters.ownerName || ''} onChange={e => handleFilterChange('ownerName', e.target.value)}>
+                <FormSelect value={filters.ownerEmployeeId || ''} onChange={e => handleFilterChange('ownerEmployeeId', e.target.value)}>
                     <option value="">Все владельцы</option>
-                    {employees.map(e => <option key={e.id} value={e.shortName}>{e.shortName}</option>)}
+                    {employees.map(e => <option key={e.id} value={e.id}>{e.shortName}</option>)}
                 </FormSelect>
                 <FormInput placeholder="Номер ПЛ" value={filters.usedInWaybillId || ''} onChange={e => handleFilterChange('usedInWaybillId', e.target.value)} />
                 <div className="md:col-span-5 flex justify-end">
@@ -501,6 +503,34 @@ const BlankList: React.FC<{ key: number }> = () => {
                     </tbody>
                 </table>
             </div>
+
+            {/* Pagination */}
+            {pagination.total > pagination.pageSize && (
+                <div className="flex items-center justify-between mt-4 px-4 py-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                    <div className="text-sm text-gray-600 dark:text-gray-300">
+                        Показано {Math.min((pagination.page - 1) * pagination.pageSize + 1, pagination.total)} - {Math.min(pagination.page * pagination.pageSize, pagination.total)} из {pagination.total}
+                    </div>
+                    <div className="flex gap-2">
+                        <button
+                            onClick={() => setPagination(p => ({ ...p, page: p.page - 1 }))}
+                            disabled={pagination.page <= 1}
+                            className="px-3 py-1 bg-white dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100 dark:hover:bg-gray-500"
+                        >
+                            ← Назад
+                        </button>
+                        <span className="px-3 py-1 text-sm">
+                            Страница {pagination.page} из {Math.ceil(pagination.total / pagination.pageSize)}
+                        </span>
+                        <button
+                            onClick={() => setPagination(p => ({ ...p, page: p.page + 1 }))}
+                            disabled={pagination.page >= Math.ceil(pagination.total / pagination.pageSize)}
+                            className="px-3 py-1 bg-white dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100 dark:hover:bg-gray-500"
+                        >
+                            Вперёд →
+                        </button>
+                    </div>
+                </div>
+            )}
 
             <ConfirmationModal
                 isOpen={!!spoilModalData}

@@ -5,18 +5,19 @@
 
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { deleteWaybill, getWaybills, updateWaybill, getLatestWaybill } from '../../services/api/waybillApi';
+import { deleteWaybill, getWaybills, updateWaybill, getLatestWaybill, bulkDeleteWaybills } from '../../services/api/waybillApi';
 import { getVehicles } from '../../services/api/vehicleApi';
 import { Waybill, WaybillStatus, Vehicle } from '../../types';
 import { listDrivers, DriverListItem } from '../../services/driverApi';
 import { WAYBILL_STATUS_COLORS, WAYBILL_STATUS_TRANSLATIONS } from '../../constants';
-import { PlusIcon, PencilIcon, TrashIcon, ArrowUpIcon, ArrowDownIcon, StatusCompletedIcon, CalendarDaysIcon } from '../Icons';
+import { PlusIcon, PencilIcon, TrashIcon, ArrowUpIcon, ArrowDownIcon, StatusCompletedIcon, CalendarDaysIcon, DocumentArrowUpIcon } from '../Icons';
 // FIX: Changed import to a named import to resolve module resolution error.
 import { WaybillDetail } from './WaybillDetail';
 import useTable from '../../hooks/useTable';
 import ConfirmationModal from '../shared/ConfirmationModal';
 import { useToast } from '../../hooks/useToast';
 import SeasonSettingsModal from './SeasonSettingsModal';
+import BatchGeneratorModal from './BatchGeneratorModal';
 import { subscribe } from '../../services/bus';
 import { EmptyState, getEmptyStateFromError } from '../common/EmptyState';
 import { HttpError } from '../../services/httpClient';
@@ -55,10 +56,12 @@ const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpene
   });
   const [topLevelFilter, setTopLevelFilter] = useState({ dateFrom: '', dateTo: '', status: '' as WaybillStatus | '' });
   const [selectedWaybillId, setSelectedWaybillId] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isDetailViewOpen, setIsDetailViewOpen] = useState(false);
   const [waybillToPrefill, setWaybillToPrefill] = useState<Waybill | null>(null);
   const [isExtendedView, setIsExtendedView] = useState(true); // Default: extended view ON
   const [isSeasonModalOpen, setIsSeasonModalOpen] = useState(false);
+  const [isBatchModalOpen, setIsBatchModalOpen] = useState(false);
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -260,6 +263,56 @@ const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpene
     }
   };
 
+  // Bulk Delete Helpers
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      const allIds = rows.map(r => r.id);
+      setSelectedIds(new Set(allIds));
+    } else {
+      setSelectedIds(new Set());
+    }
+  };
+
+  const handleSelectRow = (id: string, checked: boolean) => {
+    const newSelected = new Set(selectedIds);
+    if (checked) {
+      newSelected.add(id);
+    } else {
+      newSelected.delete(id);
+    }
+    setSelectedIds(newSelected);
+  };
+
+  const handleBulkDelete = () => {
+    if (selectedIds.size === 0) return;
+
+    const onConfirmBulkDelete = async () => {
+      setIsConfirmationModalOpen(false);
+      try {
+        const result = await bulkDeleteWaybills(Array.from(selectedIds));
+        if (result.errors.length > 0) {
+          showToast(`Удалено: ${result.success.length}. Ошибок: ${result.errors.length}`, 'error');
+          console.error('Errors during bulk delete:', result.errors);
+        } else {
+          showToast(`Удалено путевых листов: ${result.success.length}`, 'info');
+        }
+        setSelectedIds(new Set());
+        fetchData();
+      } catch (error) {
+        showToast('Ошибка массового удаления: ' + (error as Error).message, 'error');
+      }
+    };
+
+    setModalProps({
+      title: 'Массовое удаление',
+      message: `Выбрано элементов: ${selectedIds.size}. Удалить их?`,
+      confirmText: 'Удалить выбранные',
+      confirmButtonClass: 'bg-red-600 hover:bg-red-700 focus:ring-red-500',
+      onConfirm: onConfirmBulkDelete,
+    } as any);
+    setIsConfirmationModalOpen(true);
+  };
+
   // P0-5: Parent-level navigation guard
   const [pendingClose, setPendingClose] = useState(false);
   const [canCloseCallback, setCanCloseCallback] = useState<(() => void) | null>(null);
@@ -324,10 +377,22 @@ const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpene
         isOpen={isSeasonModalOpen}
         onClose={() => setIsSeasonModalOpen(false)}
       />
+      {isBatchModalOpen && (
+        <BatchGeneratorModal
+          onClose={() => setIsBatchModalOpen(false)}
+          onSuccess={() => { setIsBatchModalOpen(false); fetchData(); }}
+        />
+      )}
       <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6">
         <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
           <h2 className="text-2xl font-bold text-gray-800 dark:text-white">Путевые листы</h2>
           <div className="flex items-center gap-4 flex-wrap">
+            {selectedIds.size > 0 && (
+              <button onClick={handleBulkDelete} className="flex items-center gap-2 bg-red-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md hover:bg-red-700 transition-colors">
+                <TrashIcon className="h-5 w-5" />
+                Удалить ({selectedIds.size})
+              </button>
+            )}
             <label className="flex items-center text-sm font-medium text-gray-700 dark:text-gray-200">
               <input type="checkbox" checked={isExtendedView} onChange={e => setIsExtendedView(e.target.checked)} className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
               <span className="ml-2">Расширенный журнал</span>
@@ -335,6 +400,10 @@ const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpene
             <button onClick={() => setIsSeasonModalOpen(true)} className="flex items-center gap-2 bg-gray-500 text-white font-semibold py-2 px-4 rounded-lg shadow-md hover:bg-gray-600 transition-colors">
               <CalendarDaysIcon className="h-5 w-5" />
               Настроить сезоны
+            </button>
+            <button onClick={() => setIsBatchModalOpen(true)} className="flex items-center gap-2 bg-purple-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md hover:bg-purple-700 transition-colors">
+              <DocumentArrowUpIcon className="h-5 w-5" />
+              Пакетная генерация
             </button>
             <button onClick={handleCreateNew} className="flex items-center gap-2 bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md hover:bg-blue-700 transition-colors">
               <PlusIcon className="h-5 w-5" />
@@ -375,7 +444,15 @@ const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpene
             <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
               <tr>
                 <th scope="col" className="p-4">
-                  <span className="sr-only">Отбор</span>
+                  <div className="flex items-center">
+                    <input
+                      type="checkbox"
+                      className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 dark:focus:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+                      checked={rows.length > 0 && selectedIds.size === rows.length}
+                      onChange={(e) => handleSelectAll(e.target.checked)}
+                    />
+                    <label className="sr-only">Выбрать все</label>
+                  </div>
                 </th>
                 {columns.map(col => (
                   <th key={col.key as string} scope="col" className="px-6 py-3 cursor-pointer" onClick={() => handleSort(col.key as any)}>
@@ -420,7 +497,16 @@ const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpene
                   const colors = WAYBILL_STATUS_COLORS[w.status];
                   return (
                     <tr key={w.id} className={'bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-600 border-b dark:border-gray-700'}>
-                      <td className="w-4 p-4"></td>
+                      <td className="w-4 p-4">
+                        <div className="flex items-center">
+                          <input
+                            type="checkbox"
+                            className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 dark:focus:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+                            checked={selectedIds.has(w.id)}
+                            onChange={(e) => handleSelectRow(w.id, e.target.checked)}
+                          />
+                        </div>
+                      </td>
                       {isExtendedView ? (
                         <>
                           <td className="px-6 py-4">{w.rowNumber}</td>
@@ -430,8 +516,8 @@ const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpene
                           <td className="px-6 py-4">{w.odometerStart}</td>
                           <td className="px-6 py-4">{w.odometerEnd ?? '—'}</td>
                           <td className="px-6 py-4">{w.mileage}</td>
-                          <td className="px-6 py-4">{w.fuelAtStart ?? '—'}</td>
-                          <td className="px-6 py-4">{w.fuelAtEnd ?? '—'}</td>
+                          <td className={`px-6 py-4 ${Number(w.fuelAtStart) < 0 ? 'text-red-600' : ''}`}>{w.fuelAtStart ?? '—'}</td>
+                          <td className={`px-6 py-4 ${Number(w.fuelAtEnd) < 0 ? 'text-red-600' : ''}`}>{w.fuelAtEnd ?? '—'}</td>
                           <td className="px-6 py-4">
                             <span className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium ${colors?.bg} ${colors?.text}`}>
                               {getStatusIcon(w.status)}

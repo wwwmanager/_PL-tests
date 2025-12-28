@@ -24,8 +24,17 @@ export async function getEmployees(filters: EmployeeFilters = {}) {
 
     const where: Prisma.EmployeeWhereInput = {};
 
+    // ORG-HIERARCHY: Include employees from this org AND all child orgs
     if (organizationId) {
-        where.organizationId = organizationId;
+        // Get all child organizations (one level deep + user's own org)
+        const childOrgs = await prisma.organization.findMany({
+            where: { parentOrganizationId: organizationId },
+            select: { id: true }
+        });
+        const orgIds = [organizationId, ...childOrgs.map(o => o.id)];
+
+        where.organizationId = { in: orgIds };
+        console.log(`📊 [employeeService] Hierarchical org filter: ${orgIds.length} orgs`);
     }
 
     if (departmentId) {

@@ -564,6 +564,9 @@ export async function createExpenseMovement(
             // BE-005: Acquire lock on location
             await acquireLocationLock(tx, stockLocationId, stockItemId);
 
+            // P0-4: Period lock check — must be inside transaction
+            await checkPeriodLock(tx, organizationId, effectiveOccurredAt);
+
             // Check balance with lock held
             const balance = await getBalanceAtTx(tx, stockLocationId, stockItemId, effectiveOccurredAt);
             if (balance < quantity) {

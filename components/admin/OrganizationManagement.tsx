@@ -24,17 +24,22 @@ const organizationSchema = z.object({
     fullName: z.string().nullish(),
     shortName: z.string().min(1, "Краткое наименование обязательно"),
     address: z.string().nullish(),
-    inn: z.string().min(1, "ИНН обязателен").superRefine((val, ctx) => {
-        const error = validation.inn(val || '');
-        if (error) ctx.addIssue({ code: z.ZodIssueCode.custom, message: error });
+    // ORG-HIERARCHY-001: INN/OGRN optional when parentOrganizationId is set
+    inn: z.string().nullish().superRefine((val, ctx) => {
+        if (val) {
+            const error = validation.inn(val);
+            if (error) ctx.addIssue({ code: z.ZodIssueCode.custom, message: error });
+        }
     }),
     kpp: z.string().nullish().superRefine((val, ctx) => {
         const error = validation.kpp(val || '');
         if (error) ctx.addIssue({ code: z.ZodIssueCode.custom, message: error });
     }),
-    ogrn: z.string().min(1, "ОГРН обязателен").superRefine((val, ctx) => {
-        const error = validation.ogrn(val || '');
-        if (error) ctx.addIssue({ code: z.ZodIssueCode.custom, message: error });
+    ogrn: z.string().nullish().superRefine((val, ctx) => {
+        if (val) {
+            const error = validation.ogrn(val);
+            if (error) ctx.addIssue({ code: z.ZodIssueCode.custom, message: error });
+        }
     }),
     registrationDate: z.string().nullish(),
     contactPerson: z.string().nullish(),
@@ -65,6 +70,7 @@ const organizationSchema = z.object({
     medicalLicenseIssueDate: z.string().nullish(),
     stockLockedAt: z.string().nullish(),
     isOwn: z.boolean().optional(),  // OWN-ORG-FE-030
+    parentOrganizationId: z.string().nullish(),  // ORG-HIERARCHY-001
 });
 
 type OrganizationFormData = z.infer<typeof organizationSchema>;
@@ -77,7 +83,8 @@ const defaultValues: OrganizationFormData = {
     accountCurrency: '', paymentPurpose: '', group: '', notes: '',
     medicalLicenseIssueDate: '', medicalLicenseNumber: '',
     stockLockedAt: '',
-    isOwn: false  // OWN-ORG-FE-030
+    isOwn: false,  // OWN-ORG-FE-030
+    parentOrganizationId: null,  // ORG-HIERARCHY-001
 };
 
 
@@ -283,23 +290,42 @@ const OrganizationManagement = () => {
                             <FormField label="Полное наименование" required={requiredProps.fullName}><FormInput {...register("fullName")} /></FormField>
                             <FormField label="Группа" required={requiredProps.group}><FormSelect {...register("group")}><option value="">Без группы</option><option value="Перевозчик">Перевозчик</option><option value="Заказчик">Заказчик</option><option value="Филиал">Филиал</option><option value="Мед. учреждение">Мед. учреждение</option></FormSelect></FormField>
                             <FormField label="Статус" required={requiredProps.status}><FormSelect {...register("status")}>{Object.values(OrganizationStatus).map(s => <option key={s} value={s}>{ORGANIZATION_STATUS_TRANSLATIONS[s]}</option>)}</FormSelect></FormField>
+                            {/* ORG-HIERARCHY-001: Головная организация */}
+                            <FormField label="Головная организация">
+                                <FormSelect {...register("parentOrganizationId")}>
+                                    <option value="">— Нет (головная) —</option>
+                                    {organizations
+                                        .filter(o => o.id !== currentId && !o.parentOrganizationId) // Only head orgs, exclude self
+                                        .map(o => <option key={o.id} value={o.id}>{o.shortName}</option>)}
+                                </FormSelect>
+                            </FormField>
                             <div className="md:col-span-2"><FormField label="Юридический адрес"><FormInput {...register("address")} /></FormField></div>
                             {/* OWN-ORG-FE-030: Checkbox for Own Organization */}
-                            <div className="md:col-span-2">
-                                <label className="flex items-center gap-2 cursor-pointer">
-                                    <input
-                                        type="checkbox"
-                                        {...register("isOwn")}
-                                        className="h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                                    />
-                                    <span className="text-sm font-medium text-gray-900 dark:text-white">
-                                        Собственная организация
-                                    </span>
-                                    <span className="text-xs text-gray-500">
-                                        (только одна организация может быть собственной)
-                                    </span>
-                                </label>
-                            </div>
+                            {(() => {
+                                // OWN-ORG-UX-031: Disable checkbox if another org is already marked as own
+                                const existingOwnOrg = organizations.find(o => o.isOwn && o.id !== currentId);
+                                const isDisabled = !!existingOwnOrg;
+                                return (
+                                    <div className="md:col-span-2">
+                                        <label className={`flex items-center gap-2 ${isDisabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}>
+                                            <input
+                                                type="checkbox"
+                                                {...register("isOwn")}
+                                                disabled={isDisabled}
+                                                className="h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 disabled:opacity-50"
+                                            />
+                                            <span className="text-sm font-medium text-gray-900 dark:text-white">
+                                                Собственная организация
+                                            </span>
+                                            <span className="text-xs text-gray-500">
+                                                {isDisabled
+                                                    ? `(уже выбрана: ${existingOwnOrg?.shortName})`
+                                                    : '(только одна организация может быть собственной)'}
+                                            </span>
+                                        </label>
+                                    </div>
+                                );
+                            })()}
                         </div>
                     </CollapsibleSection>
                     {watchedGroup === 'Мед. учреждение' && (

@@ -101,6 +101,57 @@
 
 ---
 
+## 🚀 ACTIVE TASKS (STATUS-REVIEW-001)
+
+### [x] P0-4 — STOCK-PERIOD-LOCK-001 — Закрытие/открытие периода ✅ **100% COMPLETE**
+
+**Реализовано:**
+- [x] Schema: `Organization.stockLockedAt DateTime?` — строка 144
+- [x] Функция `checkPeriodLock()` — stockService.ts строки 52-74
+- [x] Admin endpoints `lock/unlock` — adminController.ts строки 1357-1427
+- [x] Audit log на lock/unlock — включено в контроллеры
+- [x] Интеграция в `createTransfer()` — строка 304
+- [x] Интеграция в `createAdjustment()` — строки 414, 437
+- [x] Интеграция в `createIncomeMovement()` — строка 644
+- [x] Интеграция в `voidStockMovement()` — строка 1116
+
+**Gap (FIXED ✅):**
+- [x] Интеграция в `createExpenseMovement()` stockLocationId branch — **FIXED!** (строка ~567)
+
+**Acceptance:**
+- [ ] Нельзя создать движение с `occurredAt <= stockLockedAt` (409)
+- [ ] Admin может lock/unlock период
+- [ ] Все lock/unlock записываются в audit log
+
+---
+
+### [ ] P2-1 — STOCK-RBAC-PERMS-001 — Permission-based access control
+
+**Permissions для создания:**
+- [ ] `stock.movement.void` — void manual movements
+- [ ] `stock.period.lock` — закрытие периода
+- [ ] `stock.period.unlock` — открытие периода
+- [ ] `stock.movement.update` — редактирование manual (только comment/externalRef)
+
+**Роли:**
+- [ ] Admin: все permissions ✅
+- [ ] Accountant: `stock.movement.void`, `stock.movement.update` ✅
+- [ ] Dispatcher: нет ❌
+- [ ] Driver: нет ❌
+
+**Файлы:**
+- [ ] Seed script для permissions
+- [ ] `adminRoutes.ts` — заменить `requireRole` на `requirePermission`
+- [ ] `stockRoutes.ts` — добавить `requirePermission` для void
+
+**Acceptance:**
+- [ ] Нельзя void без прав (403)
+- [ ] Нельзя lock/unlock без прав (403)
+
+---
+
+---
+
 ### [x] P0-2 — STOCK-DELETE-BLOCK — Запретить DELETE движений ✅
 
 **Файлы:**

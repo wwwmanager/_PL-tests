@@ -79,7 +79,16 @@ function normalizeFuelTypeData(data: any) {
 
 export async function listVehicles(organizationId: string, departmentId?: string | null) {
     console.log(`📊 [vehicleService] Listing vehicles for org: ${organizationId}, dept: ${departmentId || 'ALL'}`);
-    const where: any = { organizationId };
+
+    // ORG-HIERARCHY: Include vehicles from this org AND all child orgs
+    const childOrgs = await prisma.organization.findMany({
+        where: { parentOrganizationId: organizationId },
+        select: { id: true }
+    });
+    const orgIds = [organizationId, ...childOrgs.map(o => o.id)];
+    console.log(`📊 [vehicleService] Hierarchical org filter: ${orgIds.length} orgs`);
+
+    const where: any = { organizationId: { in: orgIds } };
 
     if (departmentId) {
         where.departmentId = departmentId;
@@ -217,8 +226,11 @@ export async function createVehicle(organizationId: string, data: any) {
 export async function updateVehicle(organizationId: string, id: string, data: any) {
     logToDebugFile(`UPDATE input for ${id}: ${JSON.stringify(data, null, 2)}`);
 
+    // Note: We don't filter by organizationId when looking up the vehicle
+    // because the vehicle may have been moved to a sub-organization
+    // The user's permission to edit should be checked at the controller level
     const vehicle = await prisma.vehicle.findFirst({
-        where: { id, organizationId },
+        where: { id },
         include: { stockLocation: true }, // Include to check if it exists
     });
 

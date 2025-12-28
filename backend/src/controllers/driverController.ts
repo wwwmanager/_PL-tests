@@ -20,10 +20,17 @@ export async function listDrivers(req: Request, res: Response, next: NextFunctio
         const organizationId = req.user.organizationId;
         const departmentId = req.query.departmentId as string | undefined;
 
+        // ORG-HIERARCHY: Include drivers from this org AND all child orgs
+        const childOrgs = await prisma.organization.findMany({
+            where: { parentOrganizationId: organizationId },
+            select: { id: true }
+        });
+        const orgIds = [organizationId, ...childOrgs.map(o => o.id)];
+
         const drivers = await prisma.driver.findMany({
             where: {
                 employee: {
-                    organizationId: organizationId,
+                    organizationId: { in: orgIds },
                     ...(departmentId ? { departmentId } : {}),
                 },
             },

@@ -123,7 +123,7 @@ export async function materializeBatch(organizationId: string | undefined, batch
     };
 }
 
-export async function listBlanks(organizationId: string | undefined, filters: { series?: string; status?: BlankStatus; page?: number; limit?: number }) {
+export async function listBlanks(organizationId: string | undefined, filters: { series?: string; status?: BlankStatus; ownerEmployeeId?: string; page?: number; limit?: number }) {
     const page = filters.page || 1;
     const limit = filters.limit || 50;
     const skip = (page - 1) * limit;
@@ -131,7 +131,9 @@ export async function listBlanks(organizationId: string | undefined, filters: { 
     const where = {
         ...(organizationId ? { organizationId } : {}),  // Admin sees all orgs
         series: filters.series ? { contains: filters.series } : undefined,
-        status: filters.status
+        status: filters.status,
+        // ownerEmployeeId is actually Driver.id (stored as issuedToDriverId)
+        ...(filters.ownerEmployeeId ? { issuedToDriverId: filters.ownerEmployeeId } : {})
     };
 
     const [total, rawItems] = await Promise.all([
@@ -313,12 +315,13 @@ function buildBlankRanges(blanks: { series: string | null; number: number }[]): 
 export async function getDriverSummary(organizationId: string, employeeId: string): Promise<DriverBlankSummary> {
     console.log(`📊 [blankService] Fetching summary for employeeId: ${employeeId} in org: ${organizationId}`);
 
-    // First find the Driver record by employeeId and check organization
+    // Find the Driver record by employeeId
+    // Note: We don't filter by organizationId here because:
+    // 1. Driver may have been moved to a sub-organization
+    // 2. Blanks are linked to Driver.id, not organization
+    // 3. Parent org should see blanks for drivers in child orgs
     const driver = await prisma.driver.findFirst({
-        where: {
-            employeeId,
-            employee: { organizationId }
-        }
+        where: { employeeId }
     });
 
     if (!driver) {
@@ -367,9 +370,12 @@ export async function getAvailableBlanksForDriver(organizationId: string, driver
 }>> {
     console.log(`🎫[blankService] getAvailableBlanksForDriver called for driverId: ${driverId} in org: ${organizationId} `);
 
+    // Note: We don't filter by organizationId here because:
+    // 1. Blanks are already bound to a specific driver (issuedToDriverId)
+    // 2. Driver may be in a sub-organization but blanks issued from head org
+    // 3. The blank's own organizationId determines where it was created
     const blanks = await prisma.blank.findMany({
         where: {
-            organizationId,
             issuedToDriverId: driverId,
             status: BlankStatus.ISSUED  // Only ISSUED, not RESERVED or USED
         },
@@ -510,10 +516,12 @@ export async function reserveSpecificBlank(
 
         // Find blank with lock - NOTE: removed departmentId filter as it's too restrictive
         // Blanks issued to a driver should be usable regardless of department
+        // Find blank with lock
+        // Note: Removed organizationId filter to support cross-org usage
+        // If it's issued to the driver, it's valid regardless of org
         const blank = await tx.blank.findFirst({
             where: {
                 id: blankId,
-                organizationId,
                 OR: [
                     { status: BlankStatus.AVAILABLE },
                     { status: BlankStatus.ISSUED, issuedToDriverId: driverId }
@@ -574,7 +582,7 @@ export async function releaseBlank(
         const blank = await tx.blank.findFirst({
             where: {
                 id: blankId,
-                organizationId,
+                // organizationId, // WB-FIX: allow releasing blanks from sub-orgs (owner has access via hierarchy implicit or role)
                 status: { in: [BlankStatus.RESERVED, BlankStatus.USED] }  // UX: Accept both RESERVED and USED
             }
         });

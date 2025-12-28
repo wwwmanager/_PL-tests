@@ -1,162 +1,464 @@
+import { parseAndPreviewRouteFile, RouteSegment } from './routeParserService';
+import { isWorkingDayStandard, getHolidayName, getWorkingWeekRange, calendarApi } from './productionCalendarService';
+import { Waybill, WaybillStatus, Vehicle, Employee, SeasonSettings, CalendarEvent } from '../types';
+import { addWaybill } from './api/waybillApi';
+import { getAvailableBlanksForDriver } from './blankApi';
+import { calculateDistance, WaybillCalculationMethod } from './waybillCalculations';
+import { isWinterDate } from './dateUtils';
 
-import { Route, Vehicle, SeasonSettings, Employee } from '../types';
-import { addWaybill } from './waybillApi';
-import { getBlanks, useBlankForWaybill } from './blankApi';
-import { isWorkingDayStandard, getHolidayName } from './productionCalendarService';
-import { calculateStats, calculateDistance } from './waybillCalculations';
-import { RouteSegment, RouteParsers } from './routeParserService'; // Assuming this exists from previous info
-
-// Grouping types
-export type GroupingPeriod = 'day' | '2days' | 'week' | 'month';
-
-export interface RouteGroup {
-    period: string; // Display name
-    dates: string[]; // ISO dates included
+export interface BatchPreviewItem {
+    dateStr: string; // yyyy-mm-dd
+    dateObj: Date;
+    dayOfWeek: string;
+    isWorking: boolean;
+    holidayName?: string;
     routes: RouteSegment[];
-    totalDist: number;
-    workingDays: string[]; // Dates that are working days
+    totalDistance: number;
+    warnings: string[];
+    fuelFilled?: number;
 }
 
-/**
- * Groups raw segments into waybill candidates.
- */
-export const groupRoutes = (
-    segments: RouteSegment[],
-    period: GroupingPeriod,
-    seasonSettings: SeasonSettings | null,  // Passed for future use if needed
-    events?: any[] // Calendar events
-): RouteGroup[] => {
-    // 1. Sort segments by date
-    const sorted = [...segments].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-    if (sorted.length === 0) return [];
+export type GroupingDuration = 'day' | '2days' | 'week' | 'month';
 
-    const groups: RouteGroup[] = [];
-    let currentRoutes: RouteSegment[] = [];
-    let currentDates: Set<string> = new Set();
+export interface BatchConfig {
+    driverId: string;
+    vehicleId: string;
+    organizationId: string;
+    dispatcherId: string;
+    controllerId: string;
+    createEmptyDays: boolean;
+    groupingDuration: GroupingDuration;
+    calculationMethod: WaybillCalculationMethod;
+}
 
-    // Helper to start new group
-    const flush = () => {
-        if (currentRoutes.length > 0) {
-            const dateList = Array.from(currentDates).sort();
-            const working = dateList.filter(d => isWorkingDayStandard(new Date(d), events));
+const normalizeDate = (dateStr: string): string => {
+    if (!dateStr) return '';
+    const parts = dateStr.split('.');
+    if (parts.length === 3) {
+        return `${parts[2]}-${parts[1]}-${parts[0]}`;
+    }
+    return dateStr;
+};
 
-            groups.push({
-                period: dateList.length > 1 ? `${dateList[0]} - ${dateList[dateList.length - 1]}` : dateList[0],
-                dates: dateList,
-                routes: [...currentRoutes],
-                totalDist: calculateDistance(currentRoutes as any), // Cast compatibility
-                workingDays: working
+const timeToMinutes = (time: string | undefined): number | null => {
+    if (!time) return null;
+    const [h, m] = time.split(':').map(Number);
+    if (isNaN(h) || isNaN(m)) return null;
+    return h * 60 + m;
+};
+
+const minutesToTime = (totalMinutes: number): string => {
+    const h = Math.floor(totalMinutes / 60);
+    const m = totalMinutes % 60;
+    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+};
+
+const toLocalISO = (date: Date): string => {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+};
+
+export const generateBatchPreview = async (
+    file: File,
+    periodStart?: string,
+    periodEnd?: string,
+    calendarEvents?: CalendarEvent[]
+): Promise<BatchPreviewItem[]> => {
+    const buffer = await file.arrayBuffer();
+
+    const { routeSegments } = await parseAndPreviewRouteFile(buffer, file.name, file.type, {
+        autoRemoveEmpty: true
+    });
+
+    const segmentsByDate = new Map<string, RouteSegment[]>();
+    const normalizedDates: string[] = [];
+
+    routeSegments.forEach(seg => {
+        if (seg.date) {
+            const isoDate = normalizeDate(seg.date);
+
+            if (!segmentsByDate.has(isoDate)) {
+                segmentsByDate.set(isoDate, []);
+                normalizedDates.push(isoDate);
+            }
+            segmentsByDate.get(isoDate)!.push(seg);
+        }
+    });
+
+    let start: Date;
+    let end: Date;
+
+    if (periodStart && periodEnd) {
+        start = new Date(periodStart);
+        end = new Date(periodEnd);
+    } else {
+        normalizedDates.sort();
+        if (normalizedDates.length > 0) {
+            start = new Date(normalizedDates[0]);
+            end = new Date(normalizedDates[normalizedDates.length - 1]);
+        } else {
+            start = new Date();
+            end = new Date();
+        }
+    }
+
+    const current = new Date(start);
+    current.setHours(0, 0, 0, 0);
+    const endDate = new Date(end);
+    endDate.setHours(0, 0, 0, 0);
+
+    const items: BatchPreviewItem[] = [];
+
+    while (current <= endDate) {
+        const dateKey = toLocalISO(current);
+
+        const routes = segmentsByDate.get(dateKey) || [];
+        const dist = calculateDistance(routes as any[]);
+
+        const isStandardWorking = isWorkingDayStandard(current, calendarEvents);
+        const holiday = getHolidayName(current, calendarEvents);
+
+        const isWorking = isStandardWorking || routes.length > 0;
+
+        const warnings: string[] = [];
+        if (!isStandardWorking && routes.length > 0) {
+            warnings.push('Поездки в выходной/праздник');
+        }
+
+        items.push({
+            dateStr: dateKey,
+            dateObj: new Date(current),
+            dayOfWeek: current.toLocaleDateString('ru-RU', { weekday: 'short' }),
+            isWorking,
+            holidayName: holiday,
+            routes,
+            totalDistance: dist,
+            warnings,
+            fuelFilled: 0
+        });
+
+        current.setDate(current.getDate() + 1);
+    }
+
+    return items;
+};
+
+const calculateGroupConsumption = (group: BatchPreviewItem[], vehicle: Vehicle, seasonSettings: SeasonSettings | null) => {
+    let totalDist = 0;
+    let totalConsumption = 0;
+
+    for (const item of group) {
+        const itemDist = Number(item.totalDistance) || 0;  // Ensure numeric
+        totalDist += itemDist;
+        const isWinter = isWinterDate(item.dateStr, seasonSettings);
+        const rate = isWinter ? vehicle.fuelConsumptionRates?.winterRate : vehicle.fuelConsumptionRates?.summerRate;
+        totalConsumption += (itemDist / 100) * (rate || 10);
+    }
+    return { distance: totalDist, consumption: totalConsumption };
+};
+
+const getISOWeek = (date: Date) => {
+    const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+    const dayNum = d.getUTCDay() || 7;
+    d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+    const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+    return Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+};
+
+const createWaybillFromGroup = async (
+    group: BatchPreviewItem[],
+    config: BatchConfig,
+    vehicle: Vehicle,
+    blank: { id: string; series: string; number: number } | undefined,
+    startOdo: number,
+    startFuel: number,
+    actorId?: string,
+    fuelFilledSum: number = 0,
+    seasonSettings?: SeasonSettings,
+    calendarEvents?: CalendarEvent[]
+) => {
+    const first = group[0];
+    const last = group[group.length - 1];
+
+    let validFromStr = first.dateStr;
+    let validToStr = last.dateStr;
+
+    if (config.groupingDuration === 'week') {
+        const { start, end } = getWorkingWeekRange(first.dateObj, calendarEvents);
+
+        let finalStart = start;
+        let finalEnd = end;
+
+        if (seasonSettings) {
+            const targetSeasonIsWinter = isWinterDate(first.dateStr, seasonSettings);
+
+            const startStr = toLocalISO(finalStart);
+            if (isWinterDate(startStr, seasonSettings) !== targetSeasonIsWinter) {
+                let d = new Date(finalStart);
+                while (d < finalEnd) {
+                    const dStr = toLocalISO(d);
+                    if (isWinterDate(dStr, seasonSettings) === targetSeasonIsWinter) {
+                        finalStart = d;
+                        break;
+                    }
+                    d.setDate(d.getDate() + 1);
+                }
+            }
+
+            const endStr = toLocalISO(finalEnd);
+            if (isWinterDate(endStr, seasonSettings) !== targetSeasonIsWinter) {
+                let d = new Date(finalEnd);
+                while (d > finalStart) {
+                    const dStr = toLocalISO(d);
+                    if (isWinterDate(dStr, seasonSettings) === targetSeasonIsWinter) {
+                        finalEnd = d;
+                        break;
+                    }
+                    d.setDate(d.getDate() - 1);
+                }
+            }
+        }
+
+        validFromStr = toLocalISO(finalStart);
+        validToStr = toLocalISO(finalEnd);
+    }
+
+    const { distance, consumption } = calculateGroupConsumption(group, vehicle, seasonSettings || null);
+    const endOdo = Number(startOdo) + Number(distance);
+    const endFuel = startFuel + fuelFilledSum - consumption;
+
+    const waybillRoutes = [];
+    let minMinutes = 24 * 60;
+    let maxMinutes = 0;
+    let hasTimes = false;
+
+    for (const item of group) {
+        for (const r of item.routes) {
+            if ((r as any).departureTime) {
+                const mins = timeToMinutes((r as any).departureTime);
+                if (mins !== null) {
+                    if (mins < minMinutes) minMinutes = mins;
+                    hasTimes = true;
+                }
+            }
+            if ((r as any).arrivalTime) {
+                const mins = timeToMinutes((r as any).arrivalTime);
+                if (mins !== null) {
+                    if (mins > maxMinutes) maxMinutes = mins;
+                    hasTimes = true;
+                }
+            }
+
+            waybillRoutes.push({
+                id: r.id,
+                fromPoint: r.from,
+                toPoint: r.to,
+                distanceKm: r.distanceKm,
+                isCityDriving: false,
+                isWarming: false,
+                date: item.dateStr,
+                legOrder: waybillRoutes.length + 1,
             });
         }
-        currentRoutes = [];
-        currentDates = new Set();
+    }
+
+    const startTimeStr = hasTimes ? minutesToTime(minMinutes) : '08:00';
+    const endTimeStr = hasTimes ? minutesToTime(maxMinutes) : '17:00';
+
+    const payload: any = {
+        blankId: blank?.id,
+        date: validFromStr,
+        validFrom: `${validFromStr}T${startTimeStr}:00Z`,
+        validTo: `${validToStr}T${endTimeStr}:00Z`,
+        vehicleId: config.vehicleId,
+        driverId: config.driverId,
+        organizationId: config.organizationId,
+        dispatcherId: config.dispatcherId,
+        controllerId: config.controllerId,
+        status: WaybillStatus.DRAFT,
+        odometerStart: Math.round(startOdo),
+        odometerEnd: Math.round(endOdo),
+        fuelAtStart: Math.round(startFuel * 100) / 100,
+        fuelAtEnd: Math.round(endFuel * 100) / 100,
+        fuelPlanned: Math.round(consumption * 100) / 100,
+        fuelFilled: fuelFilledSum,
+        routes: waybillRoutes,
+        notes: 'Пакетная генерация',
+        calculationMethod: config.calculationMethod,
+        // WB-BATCH-001: Pass stockItemId to trigger mapLegacyFuelFields in backend controller
+        stockItemId: vehicle.fuelStockItemId || undefined,
     };
 
-    // Logic for 'day' (simplest)
-    if (period === 'day') {
-        let lastDate = sorted[0].date;
-        for (const seg of sorted) {
-            if (seg.date !== lastDate) {
-                flush();
-                lastDate = seg.date;
-            }
-            currentRoutes.push(seg);
-            currentDates.add(seg.date);
-        }
-        flush();
-        return groups;
-    }
+    const wb = await addWaybill(payload);
 
-    // Logic for 'week', 'month' etc requires more complex date math.
-    // For now assuming 'day' is primary use case, or simplified grouping.
-    // If 'week' is needed, we need to track week numbers.
-    // Implementing simpler version: grouping strictly by period rule
+    // Note: Backend already reserves blank when blankId is provided in waybill creation
+    // No need to call useBlankForWaybill separately
 
-    // ... Additional grouping logic would go here porting from legacy if needed.
-    // Since legacy file wasn't fully read (truncated in my internal memory/not fully analyzed for all logic),
-    // I will stick to 'day' grouping as MVP and 'custom' grouping logic can be added later or copied if I read legacy file again.
-    // But basic 'day' grouping covers 90% use case.
-
-    // Let's implement generic grouping by iterating
-
-    // Fallback to day for now to ensure correctness
-    let lastDate = sorted[0].date;
-    for (const seg of sorted) {
-        if (seg.date !== lastDate) {
-            flush();
-            lastDate = seg.date;
-        }
-        currentRoutes.push(seg);
-        currentDates.add(seg.date);
-    }
-    flush();
-
-    return groups;
+    return wb;
 };
 
-export const createWaybillFromGroup = async (
-    group: RouteGroup,
+export const saveBatchWaybills = async (
+    items: BatchPreviewItem[],
+    config: BatchConfig,
     vehicle: Vehicle,
     driver: Employee,
-    organizationId: string,
-    seasonSettings: SeasonSettings,
-    actorId?: string // User ID creating it
-) => {
-    // 1. Prepare Payload
-    // Determine date: normally the last working day or just first date
-    const date = group.workingDays.length > 0 ? group.workingDays[group.workingDays.length - 1] : group.dates[group.dates.length - 1];
+    onProgress: (current: number, total: number) => void,
+    actorId?: string,
+    calendarEvents?: CalendarEvent[],
+    seasonSettings?: SeasonSettings
+): Promise<void> => {
 
-    // Calculate details (fuel etc)
-    const stats = calculateStats(group.routes as any, vehicle, seasonSettings, date, 'multi', 'by_total');
+    let runningOdometer = Number(vehicle.mileage) || 0;
+    let runningFuel = Number(vehicle.currentFuel) || 0;
 
-    // Create Routes Payload
-    const waybillRoutes = group.routes.map((r, index) => ({
-        legOrder: index + 1,
-        fromPoint: r.from,
-        toPoint: r.to,
-        distanceKm: r.distanceKm,
-        plannedTime: '00:00', // Default
-        comment: '',
-    }));
+    // Get available blanks for this driver (uses Driver.id, status=ISSUED)
+    const availableBlanks = await getAvailableBlanksForDriver(config.driverId);
+    console.log(`[BatchWaybill] Available blanks for driver ${config.driverId}: ${availableBlanks.length}`);
 
-    // Waybill Payload
-    const payload = {
-        organizationId,
-        number: "AUTO", // Backend should generate or we query next
-        date,
-        vehicleId: vehicle.id,
-        driverId: driver.id,
-        status: 'Draft', // Create as Draft first
-        odometerStart: vehicle.mileage, // or from last waybill
-        odometerEnd: vehicle.mileage + stats.distance,
-        routes: waybillRoutes,
-        fuelConsumptions: [], // To be filled if needed
-        validFrom: date,
-        validTo: date,
-        driverId_proxy: driver.id // Legacy internal
-    };
+    const validItems = items
+        .filter(i => i.isWorking)
+        .sort((a, b) => a.dateObj.getTime() - b.dateObj.getTime());
 
-    // Call API
-    // Note: addWaybill in frontend seems to take (payload, options).
-    // payload should match Waybill type but partial. 
-    // Types might need checking.
+    if (validItems.length === 0) return;
 
-    try {
-        const wb = await addWaybill(payload as any); // Cast to any to bypass strict type check for now
+    // Pre-calculate number of groups (waybills) that will be created
+    // This is an estimate based on grouping logic
+    let estimatedGroups = 0;
+    let tempGroup: BatchPreviewItem[] = [];
+    for (const item of validItems) {
+        if (item.routes.length === 0 && !config.createEmptyDays) continue;
 
-        // 2. Handle Blank (Optional)
-        // If we want to assign a blank immediately
-        // const blanks = await getBlanks();
-        // ... selection logic ...
+        if (tempGroup.length === 0) {
+            tempGroup.push(item);
+        } else {
+            // Check if new group needed (simplified check)
+            const lastItem = tempGroup[tempGroup.length - 1];
+            const needNewGroup =
+                (config.groupingDuration === 'day') ||
+                (config.groupingDuration === 'week' && getISOWeek(item.dateObj) !== getISOWeek(lastItem.dateObj)) ||
+                (config.groupingDuration === 'month' && item.dateObj.getMonth() !== lastItem.dateObj.getMonth());
 
-        return wb;
-    } catch (e) {
-        console.error("Failed to create waybill", e);
-        throw e;
+            if (needNewGroup && tempGroup.length > 0) {
+                estimatedGroups++;
+                tempGroup = [];
+            }
+            tempGroup.push(item);
+        }
     }
-};
+    if (tempGroup.length > 0) estimatedGroups++;
 
-export const batchWaybillService = {
-    groupRoutes,
-    createWaybillFromGroup
+    console.log(`[BatchWaybill] Estimated waybills to create: ${estimatedGroups}, blanks available: ${availableBlanks.length}`);
+
+    // Validate blank count before starting
+    if (availableBlanks.length < estimatedGroups) {
+        throw new Error(
+            `Недостаточно бланков для генерации. ` +
+            `Требуется: ${estimatedGroups}, доступно: ${availableBlanks.length}. ` +
+            `Выдайте дополнительные бланки водителю.`
+        );
+    }
+
+    let blankIndex = 0;
+    let currentGroup: BatchPreviewItem[] = [];
+    let processedGroups = 0;
+    const estimateTotal = validItems.length;
+
+    for (let i = 0; i < validItems.length; i++) {
+        const item = validItems[i];
+
+        if (item.routes.length === 0 && !config.createEmptyDays) {
+            continue;
+        }
+
+        let startNewGroup = false;
+
+        if (currentGroup.length === 0) {
+            startNewGroup = false;
+        } else {
+            const firstInGroup = currentGroup[0];
+            const prevInGroup = currentGroup[currentGroup.length - 1];
+            const diffTime = item.dateObj.getTime() - firstInGroup.dateObj.getTime();
+
+            if (item.dateObj.getMonth() !== firstInGroup.dateObj.getMonth()) {
+                startNewGroup = true;
+            }
+            else if (item.dateObj.getFullYear() !== firstInGroup.dateObj.getFullYear()) {
+                startNewGroup = true;
+            }
+            else {
+                const wasWinter = isWinterDate(prevInGroup.dateStr, seasonSettings || null);
+                const isWinter = isWinterDate(item.dateStr, seasonSettings || null);
+
+                if (wasWinter !== isWinter) {
+                    startNewGroup = true;
+                } else {
+                    if (config.groupingDuration === 'day') {
+                        startNewGroup = true;
+                    } else if (config.groupingDuration === '2days') {
+                        const gapDays = diffTime / (1000 * 60 * 60 * 24);
+                        if (currentGroup.length >= 2 || gapDays > 1.5) {
+                            startNewGroup = true;
+                        }
+                    } else if (config.groupingDuration === 'week') {
+                        const currentWeek = getISOWeek(item.dateObj);
+                        const firstWeek = getISOWeek(firstInGroup.dateObj);
+                        if (currentWeek !== firstWeek) {
+                            startNewGroup = true;
+                        }
+                    }
+                }
+            }
+        }
+
+        if (startNewGroup && currentGroup.length > 0) {
+            const groupFuelFilled = currentGroup.reduce((sum, it) => sum + (it.fuelFilled || 0), 0);
+
+            await createWaybillFromGroup(
+                currentGroup,
+                config,
+                vehicle,
+                availableBlanks[blankIndex],
+                runningOdometer,
+                runningFuel,
+                actorId,
+                groupFuelFilled,
+                seasonSettings,
+                calendarEvents
+            );
+
+            const groupDist = currentGroup.reduce((sum, it) => sum + (Number(it.totalDistance) || 0), 0);
+            const { consumption } = calculateGroupConsumption(currentGroup, vehicle, seasonSettings || null);
+
+            runningOdometer += groupDist;
+            runningFuel = runningFuel + groupFuelFilled - consumption;
+
+            if (availableBlanks[blankIndex]) blankIndex++;
+            processedGroups++;
+            onProgress(i, estimateTotal);
+            currentGroup = [];
+        }
+
+        currentGroup.push(item);
+    }
+
+    if (currentGroup.length > 0) {
+        const groupFuelFilled = currentGroup.reduce((sum, it) => sum + (it.fuelFilled || 0), 0);
+
+        await createWaybillFromGroup(
+            currentGroup,
+            config,
+            vehicle,
+            availableBlanks[blankIndex],
+            runningOdometer,
+            runningFuel,
+            actorId,
+            groupFuelFilled,
+            seasonSettings,
+            calendarEvents
+        );
+        processedGroups++;
+        onProgress(estimateTotal, estimateTotal);
+    }
 };

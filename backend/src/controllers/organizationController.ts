@@ -36,7 +36,13 @@ export async function listOrganizations(req: Request, res: Response, next: NextF
         }
 
         const organizations = await prisma.organization.findMany({
-            orderBy: { name: 'asc' }
+            orderBy: { name: 'asc' },
+            // ORG-HIERARCHY-001: Include parent org for hierarchy display
+            include: {
+                parentOrganization: {
+                    select: { id: true, shortName: true, inn: true }
+                }
+            }
         });
 
         res.json({ data: organizations });

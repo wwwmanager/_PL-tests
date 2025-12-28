@@ -23,6 +23,7 @@ export const employeeSchema = z.object({
     isActive: z.boolean().optional().default(true),
 
     // Relations
+    organizationId: z.string().uuid().optional().nullable(),  // Allow explicit org assignment (e.g., sub-orgs)
     departmentId: z.string().uuid().optional().nullable(),
     dispatcherId: z.string().uuid().optional().nullable(),
     controllerId: z.string().uuid().optional().nullable(),

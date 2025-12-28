@@ -91,6 +91,9 @@ function sanitizeVehiclePayload(data: Record<string, unknown>): Record<string, u
         // ОТПРАВЛЯЕМ ГАРАНТИРОВАННО СИНХРОНИЗИРОВАННУЮ ПАРУ
         isActive: calculatedIsActive,
         status: finalStatus,
+
+        // Organization assignment (for sub-org transfers)
+        organizationId: toNullIfEmpty(data.organizationId),
     };
 }
 

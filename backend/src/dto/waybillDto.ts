@@ -11,10 +11,10 @@ import { z } from 'zod';
 export const fuelLineSchema = z.object({
     stockItemId: z.string().uuid(),
     fuelTypeId: z.string().uuid().optional().nullable(),
-    fuelStart: z.number().min(0).optional().nullable(),
+    fuelStart: z.number().optional().nullable(),
     fuelReceived: z.number().min(0).optional().nullable(),
     fuelConsumed: z.number().min(0).optional().nullable(),
-    fuelEnd: z.number().min(0).optional().nullable(),
+    fuelEnd: z.number().optional().nullable(),
     fuelPlanned: z.number().min(0).optional().nullable(),
     comment: z.string().optional().nullable(),
 });
@@ -38,9 +38,9 @@ export const routeSchema = z.object({
  * These will be mapped to fuelLines[0]
  */
 const legacyFuelFieldsSchema = z.object({
-    fuelAtStart: z.number().min(0).optional().nullable(),
+    fuelAtStart: z.number().optional().nullable(),
     fuelFilled: z.number().min(0).optional().nullable(),
-    fuelAtEnd: z.number().min(0).optional().nullable(),
+    fuelAtEnd: z.number().optional().nullable(),
     fuelPlanned: z.number().min(0).optional().nullable(),
     fuelConsumed: z.number().min(0).optional().nullable(),
     stockItemId: z.string().uuid().optional().nullable(), // For legacy single-fuel mode
@@ -52,10 +52,10 @@ const legacyFuelFieldsSchema = z.object({
  */
 export const fuelObjectSchema = z.object({
     stockItemId: z.string().uuid().optional().nullable(),
-    fuelStart: z.number().min(0).optional().nullable(),
+    fuelStart: z.number().optional().nullable(),
     fuelReceived: z.number().min(0).optional().nullable(),
     fuelConsumed: z.number().min(0).optional().nullable(),
-    fuelEnd: z.number().min(0).optional().nullable(),
+    fuelEnd: z.number().optional().nullable(),
     fuelPlanned: z.number().min(0).optional().nullable(),
     sourceType: z.enum(['MANUAL', 'GAS_STATION', 'FUEL_CARD']).optional().nullable(),
     refueledAt: z.string().datetime().optional().nullable(),

@@ -166,8 +166,23 @@ export async function listWaybills(
         }
     });
 
+    // WB-LIST-070: Map data to include flattened fuel fields for UI
+    const mappedData = data.map(wb => {
+        // Calculate totals from fuel lines (defaults to 0 if no lines)
+        const fuelAtStart = wb.fuelLines.reduce((sum, line) => sum + Number(line.fuelStart || 0), 0);
+        const fuelAtEnd = wb.fuelLines.reduce((sum, line) => sum + Number(line.fuelEnd || 0), 0);
+
+        return {
+            ...wb,
+            // Return null if there are no fuel lines, otherwise return the calculated value
+            // (even if it is 0, because 0 is a valid fuel amount)
+            fuelAtStart: wb.fuelLines.length > 0 ? fuelAtStart : null,
+            fuelAtEnd: wb.fuelLines.length > 0 ? fuelAtEnd : null
+        };
+    });
+
     return {
-        data,
+        data: mappedData,
         pagination: {
             total,
             page,
@@ -281,15 +296,18 @@ export async function createWaybill(userInfo: UserInfo, input: CreateWaybillInpu
         }
     }
 
-    // Verify vehicle and driver exist and belong to organization
+    // Verify vehicle and driver exist
+    // Note: We don't filter by organizationId because:
+    // 1. Vehicle/driver may be in a sub-organization
+    // 2. Parent org should be able to create waybills for sub-org vehicles
     const vehicle = await prisma.vehicle.findFirst({
-        where: { id: input.vehicleId, organizationId }
+        where: { id: input.vehicleId }
     });
     if (!vehicle) throw new BadRequestError('Транспортное средство не найдено');
 
     // REL-701: Strict Driver.id enforcement. No more fallback to employeeId.
     const driver = await prisma.driver.findFirst({
-        where: { id: targetDriverId, employee: { organizationId } }
+        where: { id: targetDriverId }
     });
 
     if (!driver) throw new BadRequestError('Водитель не найден (неверный ID водителя)');
@@ -403,9 +421,20 @@ export async function createWaybill(userInfo: UserInfo, input: CreateWaybillInpu
         if (!input.fuel.stockItemId) {
             // If we have some fuel data but no stock item - throw or ignore? 
             // Plan says "stockItemId required if fuel is not empty".
-            // Let's check if it strictly has meaningful data.
-            if (input.fuel.fuelStart || input.fuel.fuelReceived || input.fuel.fuelEnd) {
-                throw new BadRequestError('Не указан тип топлива (stockItemId)', 'FUEL_TYPE_REQUIRED');
+            // Use vehicle.fuelStockItemId as fallback if available
+            if (!input.fuel.stockItemId) {
+                if (vehicle.fuelStockItemId) {
+                    input.fuel.stockItemId = vehicle.fuelStockItemId;
+                    console.log(`[WB-1005] Auto-filled stockItemId from Vehicle: ${vehicle.fuelStockItemId}`);
+                } else if (input.fuel.fuelStart || input.fuel.fuelReceived || input.fuel.fuelEnd) {
+                    // Try legacy field (deprecated but might exist)
+                    // @ts-ignore
+                    if (vehicle.fuelTypeId || vehicle.fuelType) {
+                        // We can't use fuelTypeId for stockItemId directly, so we still fail if no stockItem
+                        throw new BadRequestError('Не указан тип топлива (stockItemId) и у ТС не задан тип по умолчанию', 'FUEL_TYPE_REQUIRED');
+                    }
+                    throw new BadRequestError('Не указан тип топлива (stockItemId)', 'FUEL_TYPE_REQUIRED');
+                }
             }
         } else {
             // Add flattened fuel as a line if not already present in calculated (which usually comes from method calc)
@@ -413,11 +442,12 @@ export async function createWaybill(userInfo: UserInfo, input: CreateWaybillInpu
             // If method=BOILER/MIXED, we might have calc lines. 
             // If method=DIRECT or user manual input, we prioritize input.fuel?
             // User plan B3: "upsert aggregate... if fuel is not empty -> create".
-            // Since this is CREATE, we just add to create payload.
+            // Since this is CREATE, we just add to create payload. NOTE: check logic for fallthrough
 
             // Overwrite or append? Usually flattened fuel is the MAIN fuel.
             // If calculatedFuelLines exists (from boiler), it might already have entries.
             // Let's assume input.fuel is the primary source of truth for the first tank.
+            // If we successfully set stockItemId above, we proceed.
 
             const newFuelLine = {
                 stockItemId: input.fuel.stockItemId,
@@ -587,18 +617,29 @@ export async function updateWaybill(userInfo: UserInfo, id: string, data: Partia
 
     // WB-FIX-PL-001: Handle flattened fuel input in update (same as create)
     if (data.fuel && !data.fuelLines) {
-        // If we have fuel lines existing, we might update the first one or replace?
-        // Logic: construct a fuel line from flattened data and use it.
-        const fl: FuelLineInput = {
-            stockItemId: data.fuel.stockItemId!,
-            fuelStart: data.fuel.fuelStart ?? undefined,
-            fuelReceived: data.fuel.fuelReceived ?? undefined,
-            fuelConsumed: data.fuel.fuelConsumed ?? undefined,
-            fuelEnd: data.fuel.fuelEnd ?? undefined,
-            fuelPlanned: data.fuel.fuelPlanned ?? undefined,
-        };
-        // If stockItemId is present, use it.
-        if (fl.stockItemId) {
+        let targetStockItemId = data.fuel.stockItemId;
+
+        // Fallback: if missing stockItemId, try to find it from vehicle
+        if (!targetStockItemId) {
+            let defaultStockItemId = null;
+            if (data.vehicleId && data.vehicleId !== waybill.vehicleId) {
+                const newVehicle = await prisma.vehicle.findUnique({ where: { id: data.vehicleId } });
+                defaultStockItemId = newVehicle?.fuelStockItemId;
+            } else {
+                defaultStockItemId = waybill.vehicle.fuelStockItemId;
+            }
+            targetStockItemId = defaultStockItemId || null;
+        }
+
+        if (targetStockItemId) {
+            const fl: FuelLineInput = {
+                stockItemId: targetStockItemId,
+                fuelStart: data.fuel.fuelStart ?? undefined,
+                fuelReceived: data.fuel.fuelReceived ?? undefined,
+                fuelConsumed: data.fuel.fuelConsumed ?? undefined,
+                fuelEnd: data.fuel.fuelEnd ?? undefined,
+                fuelPlanned: data.fuel.fuelPlanned ?? undefined,
+            };
             calculatedFuelLines = [fl];
         }
     }
@@ -862,6 +903,26 @@ export async function deleteWaybill(userInfo: UserInfo, id: string) {
     }
 
     return prisma.waybill.delete({ where: { id } });
+}
+
+export async function bulkDeleteWaybills(userInfo: UserInfo, ids: string[]) {
+    console.log(`[WB-DEL-BULK] Deleting ${ids.length} waybills for user ${userInfo.id}`);
+    const results = {
+        success: [] as string[],
+        errors: [] as { id: string; error: string }[]
+    };
+
+    for (const id of ids) {
+        try {
+            await deleteWaybill(userInfo, id);
+            results.success.push(id);
+        } catch (err: any) {
+            console.error(`[WB-DEL-BULK] Failed to delete waybill ${id}:`, err);
+            results.errors.push({ id, error: err.message || 'Unknown error' });
+        }
+    }
+
+    return results;
 }
 
 export async function changeWaybillStatus(
@@ -1288,8 +1349,9 @@ export async function getWaybillPrefillData(
     const organizationId = userInfo.organizationId;
 
     // 1. Get Vehicle with Department Defaults
+    // Note: We don't filter by organizationId to support sub-org vehicles
     const vehicle = await prisma.vehicle.findFirst({
-        where: { id: vehicleId, organizationId },
+        where: { id: vehicleId },
         include: {
             department: {
                 include: {

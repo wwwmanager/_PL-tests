@@ -19,12 +19,13 @@ export interface EmployeesResponse {
 
 /**
  * Allowed fields for Employee create/update
- * Filters out: organizationId (from JWT), blankBatches (computed), id, createdAt, updatedAt, relations
+ * Note: organizationId now allowed for explicit sub-organization assignment
  */
 const ALLOWED_EMPLOYEE_FIELDS = [
     'fullName', 'shortName', 'position', 'phone', 'email', 'address', 'dateOfBirth',
     'personnelNumber', 'snils', 'notes',
     'employeeType', 'status', 'isActive',
+    'organizationId',  // Allow explicit organization assignment (e.g., for sub-orgs)
     'departmentId', 'dispatcherId', 'controllerId', 'medicalInstitutionId',
     'documentNumber', 'documentExpiry', 'licenseCategory',
     'driverCardType', 'driverCardNumber', 'driverCardStartDate', 'driverCardExpiryDate',

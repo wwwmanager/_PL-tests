@@ -117,6 +117,22 @@ export async function deleteWaybill(req: Request, res: Response, next: NextFunct
     }
 }
 
+export async function bulkDeleteWaybills(req: Request, res: Response, next: NextFunction) {
+    try {
+        const orgId = req.user!.organizationId;
+        const { ids } = req.body;
+
+        if (!Array.isArray(ids) || ids.length === 0) {
+            throw new BadRequestError('Не переданы ID для удаления');
+        }
+
+        const result = await waybillService.bulkDeleteWaybills(req.user as any, ids);
+        res.json(result);
+    } catch (err) {
+        next(err);
+    }
+}
+
 export async function changeWaybillStatus(req: Request, res: Response, next: NextFunction) {
     try {
         const orgId = req.user!.organizationId;
