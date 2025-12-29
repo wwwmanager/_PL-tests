@@ -11,6 +11,7 @@ old
 node_modules
 dist
 dist-ssr
+Innovations
 *.local
 
 # Editor directories and files

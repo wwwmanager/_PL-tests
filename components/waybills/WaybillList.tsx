@@ -10,7 +10,7 @@ import { getVehicles } from '../../services/api/vehicleApi';
 import { Waybill, WaybillStatus, Vehicle } from '../../types';
 import { listDrivers, DriverListItem } from '../../services/driverApi';
 import { WAYBILL_STATUS_COLORS, WAYBILL_STATUS_TRANSLATIONS } from '../../constants';
-import { PlusIcon, PencilIcon, TrashIcon, ArrowUpIcon, ArrowDownIcon, StatusCompletedIcon, CalendarDaysIcon, DocumentArrowUpIcon } from '../Icons';
+import { PlusIcon, PencilIcon, TrashIcon, ArrowUpIcon, ArrowDownIcon, StatusCompletedIcon, CalendarDaysIcon, DocumentArrowUpIcon, ClipboardCheckIcon } from '../Icons';
 // FIX: Changed import to a named import to resolve module resolution error.
 import { WaybillDetail } from './WaybillDetail';
 import useTable from '../../hooks/useTable';
@@ -18,6 +18,7 @@ import ConfirmationModal from '../shared/ConfirmationModal';
 import { useToast } from '../../hooks/useToast';
 import SeasonSettingsModal from './SeasonSettingsModal';
 import BatchGeneratorModal from './BatchGeneratorModal';
+import WaybillCheckModal from './WaybillCheckModal';
 import { subscribe } from '../../services/bus';
 import { EmptyState, getEmptyStateFromError } from '../common/EmptyState';
 import { HttpError } from '../../services/httpClient';
@@ -62,6 +63,7 @@ const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpene
   const [isExtendedView, setIsExtendedView] = useState(true); // Default: extended view ON
   const [isSeasonModalOpen, setIsSeasonModalOpen] = useState(false);
   const [isBatchModalOpen, setIsBatchModalOpen] = useState(false);
+  const [isCheckModalOpen, setIsCheckModalOpen] = useState(false);
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -383,6 +385,13 @@ const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpene
           onSuccess={() => { setIsBatchModalOpen(false); fetchData(); }}
         />
       )}
+      {isCheckModalOpen && (
+        <WaybillCheckModal
+          isOpen={isCheckModalOpen}
+          onClose={() => setIsCheckModalOpen(false)}
+          onOpenWaybill={(id) => { setIsCheckModalOpen(false); handleEdit({ id } as any); }}
+        />
+      )}
       <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6">
         <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
           <h2 className="text-2xl font-bold text-gray-800 dark:text-white">Путевые листы</h2>
@@ -400,6 +409,10 @@ const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpene
             <button onClick={() => setIsSeasonModalOpen(true)} className="flex items-center gap-2 bg-gray-500 text-white font-semibold py-2 px-4 rounded-lg shadow-md hover:bg-gray-600 transition-colors">
               <CalendarDaysIcon className="h-5 w-5" />
               Настроить сезоны
+            </button>
+            <button onClick={() => setIsCheckModalOpen(true)} className="flex items-center gap-2 bg-teal-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md hover:bg-teal-700 transition-colors">
+              <ClipboardCheckIcon className="h-5 w-5" />
+              Проверка ПЛ
             </button>
             <button onClick={() => setIsBatchModalOpen(true)} className="flex items-center gap-2 bg-purple-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md hover:bg-purple-700 transition-colors">
               <DocumentArrowUpIcon className="h-5 w-5" />

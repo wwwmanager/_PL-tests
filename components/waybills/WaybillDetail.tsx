@@ -1398,13 +1398,25 @@ export const WaybillDetail: React.FC<WaybillDetailProps> = ({ waybill, isPrefill
   };
 
   const handleReturnToDraft = async (comment: string) => {
-    // This is a conceptual action, might not be a direct status change
-    // For now, we add a comment and keep it in draft
-    const updatedWaybillData = { ...formData, reviewerComment: comment, status: WaybillStatus.DRAFT };
-    setFormData(updatedWaybillData);
-    await handleSave(true); // Save the comment
-    setIsCorrectionModalOpen(false);
-    showToast('Комментарий добавлен, ПЛ возвращен в черновики.', 'info');
+    if (!('id' in formData && formData.id)) {
+      showToast('Сначала сохраните путевой лист.', 'error');
+      return;
+    }
+
+    try {
+      const updatedWaybill = await changeWaybillStatus(formData.id, 'draft', {
+        userId: currentUser?.id,
+        appMode: appSettings?.appMode || 'driver',
+        reason: comment.trim(),
+      });
+      setFormData(updatedWaybill as Waybill);
+      setInitialFormData(JSON.parse(JSON.stringify(updatedWaybill)));
+      showToast('Путевой лист возвращен на доработку.', 'success');
+      setIsCorrectionModalOpen(false);
+      onClose();
+    } catch (e) {
+      showToast((e as Error).message, 'error');
+    }
   };
 
   const handleConfirmCorrection = async (reason: string) => {
@@ -1533,10 +1545,7 @@ export const WaybillDetail: React.FC<WaybillDetailProps> = ({ waybill, isPrefill
         <CorrectionModal
           isOpen={isCorrectionModalOpen}
           onClose={() => setIsCorrectionModalOpen(false)}
-          onSubmit={async () => {
-            // Refresh logic usually handled by parent list or onClose triggers
-            if (onClose) onClose();
-          }}
+          onSubmit={handleReturnToDraft}
         />
       )}
 

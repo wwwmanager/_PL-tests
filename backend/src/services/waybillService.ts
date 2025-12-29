@@ -724,7 +724,7 @@ export async function updateWaybill(userInfo: UserInfo, id: string, data: Partia
     }
 
     // Use transaction for consistency
-    return await prisma.$transaction(async (tx) => {
+    const txResult = await prisma.$transaction(async (tx) => {
         // Replace fuel lines if provided
         if (calculatedFuelLines !== undefined) {
             await tx.waybillFuel.deleteMany({ where: { waybillId: id } });
@@ -816,23 +816,192 @@ export async function updateWaybill(userInfo: UserInfo, id: string, data: Partia
         }
 
         return {
-            ...updated,
-            fuel: {
-                stockItemId: fuelAgg?.stockItemId || null,
-                fuelStart: fuelAgg?.fuelStart != null ? Number(fuelAgg.fuelStart) : null,
-                fuelReceived: fuelAgg?.fuelReceived != null ? Number(fuelAgg.fuelReceived) : null,
-                fuelConsumed: fuelAgg?.fuelConsumed != null ? Number(fuelAgg.fuelConsumed) : null,
-                fuelEnd: fuelAgg?.fuelEnd != null ? Number(fuelAgg.fuelEnd) : null,
-                fuelPlanned: fuelAgg?.fuelPlanned != null ? Number(fuelAgg.fuelPlanned) : null,
-                refueledAt: fuelAgg?.refueledAt ? fuelAgg.refueledAt.toISOString?.() ?? fuelAgg.refueledAt : null,
-                sourceType: fuelAgg?.sourceType || null,
-                comment: fuelAgg?.comment || null,
-            }
+            waybillData: {
+                ...updated,
+                fuel: {
+                    stockItemId: fuelAgg?.stockItemId || null,
+                    fuelStart: fuelAgg?.fuelStart != null ? Number(fuelAgg.fuelStart) : null,
+                    fuelReceived: fuelAgg?.fuelReceived != null ? Number(fuelAgg.fuelReceived) : null,
+                    fuelConsumed: fuelAgg?.fuelConsumed != null ? Number(fuelAgg.fuelConsumed) : null,
+                    fuelEnd: fuelAgg?.fuelEnd != null ? Number(fuelAgg.fuelEnd) : null,
+                    fuelPlanned: fuelAgg?.fuelPlanned != null ? Number(fuelAgg.fuelPlanned) : null,
+                    refueledAt: fuelAgg?.refueledAt ? fuelAgg.refueledAt.toISOString?.() ?? fuelAgg.refueledAt : null,
+                    sourceType: fuelAgg?.sourceType || null,
+                    comment: fuelAgg?.comment || null,
+                }
+            },
+            fuelAgg,
+            updatedDate: updated.date
         };
     });
+
+    // WB-CASCADE-001: Cascade recalculation for DRAFT waybills
+    let cascadeResult = { updatedCount: 0, waybillIds: [] as string[] };
+
+    if (waybill.status === WaybillStatus.DRAFT) {
+        const finalOdometerEnd = Number(txResult.waybillData.odometerEnd || 0);
+        const finalFuelEnd = txResult.fuelAgg?.fuelEnd != null
+            ? Number(txResult.fuelAgg.fuelEnd)
+            : 0;
+
+        cascadeResult = await recalculateDraftChain(
+            organizationId,
+            waybill.vehicleId,
+            txResult.updatedDate,
+            finalOdometerEnd,
+            finalFuelEnd,
+            id
+        );
+    }
+
+    return {
+        ...txResult.waybillData,
+        cascadeUpdated: cascadeResult.updatedCount
+    };
 }
 
+
+// WB-CASCADE-001: Cascade recalculation of subsequent DRAFT waybills
+export async function recalculateDraftChain(
+    organizationId: string,
+    vehicleId: string,
+    afterDate: Date,
+    previousOdometerEnd: number,
+    previousFuelEnd: number,
+    excludeWaybillId?: string
+): Promise<{ updatedCount: number; waybillIds: string[] }> {
+    // Get vehicle for fuel consumption rates
+    const vehicle = await prisma.vehicle.findUnique({
+        where: { id: vehicleId }
+    });
+
+    if (!vehicle) {
+        console.log('[WB-CASCADE] Vehicle not found, skipping cascade');
+        return { updatedCount: 0, waybillIds: [] };
+    }
+
+    // Find all DRAFT waybills for this vehicle after the given date
+    const subsequentDrafts = await prisma.waybill.findMany({
+        where: {
+            organizationId,
+            vehicleId,
+            status: WaybillStatus.DRAFT,
+            date: { gt: afterDate },
+            ...(excludeWaybillId && { id: { not: excludeWaybillId } })
+        },
+        orderBy: [
+            { date: 'asc' },
+            { createdAt: 'asc' }
+        ],
+        include: {
+            fuelLines: true,
+            routes: true
+        }
+    });
+
+    if (subsequentDrafts.length === 0) {
+        console.log('[WB-CASCADE] No subsequent drafts to update');
+        return { updatedCount: 0, waybillIds: [] };
+    }
+
+    console.log(`[WB-CASCADE] Found ${subsequentDrafts.length} subsequent DRAFT waybills to recalculate`);
+
+    // Get season settings once
+    const seasonSettings = await getSeasonSettings();
+
+    const updatedIds: string[] = [];
+    let currentOdometerEnd = previousOdometerEnd;
+    let currentFuelEnd = previousFuelEnd;
+
+    for (const draft of subsequentDrafts) {
+        const oldOdometerStart = Number(draft.odometerStart || 0);
+        const draftOdometerEnd = Number(draft.odometerEnd || 0);
+        const oldFuelStart = draft.fuelLines[0]?.fuelStart ? Number(draft.fuelLines[0].fuelStart) : 0;
+
+        // Calculate new values
+        const newOdometerStart = currentOdometerEnd;
+        const newFuelStart = currentFuelEnd;
+
+        // Calculate distance for this draft
+        const draftDistance = draftOdometerEnd > newOdometerStart
+            ? draftOdometerEnd - newOdometerStart
+            : 0;
+
+        // Calculate fuelConsumed based on consumption rate
+        let fuelConsumed = 0;
+        if (vehicle.fuelConsumptionRates && draftDistance > 0) {
+            const isWinter = isWinterDate(draft.date.toISOString(), seasonSettings);
+            const rates = vehicle.fuelConsumptionRates as FuelConsumptionRates;
+            const baseRate = isWinter
+                ? (rates.winterRate ?? rates.summerRate ?? 0)
+                : (rates.summerRate ?? rates.winterRate ?? 0);
+
+            // Check for city driving modifier
+            let cityModifier = 1;
+            if (draft.isCityDriving && rates.cityIncreasePercent) {
+                cityModifier = 1 + (rates.cityIncreasePercent / 100);
+            }
+
+            // Calculate consumption: distance * rate / 100 * modifiers
+            fuelConsumed = (draftDistance * baseRate / 100) * cityModifier;
+        } else {
+            // Fallback: use existing fuelConsumed or calculate from old values
+            const existingConsumed = draft.fuelLines[0]?.fuelConsumed
+                ? Number(draft.fuelLines[0].fuelConsumed)
+                : 0;
+            fuelConsumed = existingConsumed > 0 ? existingConsumed : 0;
+        }
+
+        // Get fuelReceived (refueling)
+        const fuelReceived = draft.fuelLines[0]?.fuelReceived
+            ? Number(draft.fuelLines[0].fuelReceived)
+            : 0;
+
+        // Calculate fuelEnd
+        const newFuelEnd = newFuelStart + fuelReceived - fuelConsumed;
+
+        // Check if update is needed
+        if (oldOdometerStart !== newOdometerStart ||
+            oldFuelStart !== newFuelStart ||
+            (draft.fuelLines[0] && Number(draft.fuelLines[0].fuelEnd || 0) !== newFuelEnd)) {
+
+            // Update waybill odometerStart
+            await prisma.waybill.update({
+                where: { id: draft.id },
+                data: { odometerStart: newOdometerStart }
+            });
+
+            // Update fuel line (if exists)
+            if (draft.fuelLines.length > 0) {
+                await prisma.waybillFuel.update({
+                    where: { id: draft.fuelLines[0].id },
+                    data: {
+                        fuelStart: newFuelStart,
+                        fuelConsumed: fuelConsumed,
+                        fuelEnd: newFuelEnd
+                    }
+                });
+            }
+
+            updatedIds.push(draft.id);
+            console.log(`[WB-CASCADE] Updated draft ${draft.number}: ` +
+                `odometer ${oldOdometerStart} → ${newOdometerStart}, ` +
+                `fuel ${oldFuelStart.toFixed(2)} → ${newFuelStart.toFixed(2)}, ` +
+                `consumed ${fuelConsumed.toFixed(2)}, end ${newFuelEnd.toFixed(2)}`);
+        }
+
+        // Propagate to next iteration
+        currentOdometerEnd = draftOdometerEnd;
+        currentFuelEnd = newFuelEnd;
+    }
+
+    console.log(`[WB-CASCADE] Completed. Updated ${updatedIds.length} drafts: ${updatedIds.join(', ')}`);
+    return { updatedCount: updatedIds.length, waybillIds: updatedIds };
+}
+
+
 export async function deleteWaybill(userInfo: UserInfo, id: string) {
+
     const organizationId = userInfo.organizationId;
     // WB-906: Restriction for driver role
     const where: any = { id, organizationId };
@@ -965,7 +1134,7 @@ export async function changeWaybillStatus(
     // State machine validation (aligned with schema.prisma)
     const allowedTransitions: Record<WaybillStatus, WaybillStatus[]> = {
         [WaybillStatus.DRAFT]: [WaybillStatus.SUBMITTED, WaybillStatus.CANCELLED],
-        [WaybillStatus.SUBMITTED]: [WaybillStatus.POSTED, WaybillStatus.CANCELLED],
+        [WaybillStatus.SUBMITTED]: [WaybillStatus.POSTED, WaybillStatus.CANCELLED, WaybillStatus.DRAFT], // UX: Allow return for rework
         [WaybillStatus.POSTED]: [WaybillStatus.DRAFT], // UX: Allow correction (return to draft)
         [WaybillStatus.CANCELLED]: [], // final state
     };
