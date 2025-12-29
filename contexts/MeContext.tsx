@@ -1,7 +1,7 @@
 // REL-001: Me Context Provider
 // Provides user context across the app for debugging "empty lists" issues
 
-import React, { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import React, { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from "react";
 import { getMe, type MeResponse } from "../services/api/meApi";
 
 type MeState =
@@ -10,34 +10,40 @@ type MeState =
     | { status: "error"; error: string }
     | { status: "ready"; me: MeResponse };
 
-const MeContext = createContext<MeState>({ status: "loading" });
+type MeContextValue = MeState & {
+    refetch: () => Promise<void>;
+};
+
+const MeContext = createContext<MeContextValue>({ status: "loading", refetch: async () => { } });
 
 export function MeProvider({ children }: { children: ReactNode }) {
     const [state, setState] = useState<MeState>({ status: "loading" });
 
-    useEffect(() => {
-        let cancelled = false;
-
-        (async () => {
-            try {
-                const me = await getMe();
-                if (!cancelled) setState({ status: "ready", me });
-            } catch (e: any) {
-                const status = e?.response?.status || e?.statusCode;
-                if (status === 401) {
-                    if (!cancelled) setState({ status: "unauthenticated" });
-                } else {
-                    if (!cancelled) setState({ status: "error", error: e?.message ?? "Ошибка загрузки /me" });
-                }
+    const fetchMe = useCallback(async () => {
+        setState({ status: "loading" });
+        try {
+            const me = await getMe();
+            setState({ status: "ready", me });
+        } catch (e: any) {
+            const status = e?.response?.status || e?.statusCode;
+            if (status === 401) {
+                setState({ status: "unauthenticated" });
+            } else {
+                setState({ status: "error", error: e?.message ?? "Ошибка загрузки /me" });
             }
-        })();
-
-        return () => {
-            cancelled = true;
-        };
+        }
     }, []);
 
-    return <MeContext.Provider value={state}>{children}</MeContext.Provider>;
+    useEffect(() => {
+        fetchMe();
+    }, [fetchMe]);
+
+    const value: MeContextValue = {
+        ...state,
+        refetch: fetchMe,
+    };
+
+    return <MeContext.Provider value={value}>{children}</MeContext.Provider>;
 }
 
 export function useMe() {

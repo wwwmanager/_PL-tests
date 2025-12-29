@@ -82,6 +82,22 @@ export async function bulkDeleteWaybills(ids: string[]): Promise<{ success: stri
     return httpClient.post<{ success: string[]; errors: { id: string; error: string }[] }>('/waybills/bulk-delete', { ids });
 }
 
+/**
+ * WB-BULK-POST: Bulk change status for multiple waybills
+ */
+export interface BulkStatusResult {
+    success: number;
+    failed: { id: string; number: string; error: string }[];
+}
+
+export async function bulkChangeWaybillStatus(
+    ids: string[],
+    status: string,
+    reason?: string
+): Promise<BulkStatusResult> {
+    return httpClient.patch<BulkStatusResult>('/waybills/bulk-status', { ids, status, reason });
+}
+
 export async function getLatestWaybill(): Promise<Waybill | null> {
     const response = await getWaybills({ limit: 1 });
     return response.waybills[0] || null;

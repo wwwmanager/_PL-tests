@@ -7,7 +7,7 @@ import { userApi } from '../../services/userApi';
 import { transferUser, TransferUserResponse } from '../../services/adminApi';
 import { getOrganizations } from '../../services/organizationApi';
 import { useAuth } from '../../services/auth';
-import { PencilIcon, TrashIcon, PlusIcon } from '../Icons';
+import { PencilIcon, TrashIcon, PlusIcon, ArrowsRightLeftIcon } from '../Icons';
 import Modal from '../shared/Modal';
 import ConfirmationModal from '../shared/ConfirmationModal';
 import { useToast } from '../../hooks/useToast';
@@ -179,9 +179,7 @@ const UserManagement: React.FC = () => {
                             <td className="p-2 flex gap-1">
                                 <button onClick={() => handleEdit(user)} className="p-1" title="Редактировать"><PencilIcon className="h-5 w-5 text-blue-500" /></button>
                                 <button onClick={() => openTransferModal(user)} className="p-1" title="Перенести в другую организацию">
-                                    <svg className="h-5 w-5 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-                                    </svg>
+                                    <ArrowsRightLeftIcon className="h-5 w-5 text-green-500" />
                                 </button>
                                 <button onClick={() => setDeleteModal(user)} className="p-1" title="Удалить"><TrashIcon className="h-5 w-5 text-red-500" /></button>
                             </td>

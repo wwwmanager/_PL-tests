@@ -133,6 +133,36 @@ export async function bulkDeleteWaybills(req: Request, res: Response, next: Next
     }
 }
 
+/**
+ * WB-BULK-POST: Bulk change status for multiple waybills
+ */
+export async function bulkChangeWaybillStatus(req: Request, res: Response, next: NextFunction) {
+    try {
+        const userId = req.user!.id;
+        const { ids, status, reason } = req.body;
+
+        if (!Array.isArray(ids) || ids.length === 0) {
+            throw new BadRequestError('Не переданы ID путевых листов');
+        }
+
+        if (!status) {
+            throw new BadRequestError('Не указан целевой статус');
+        }
+
+        const result = await waybillService.bulkChangeWaybillStatus(
+            req.user as any,
+            ids,
+            status,
+            userId,
+            reason
+        );
+
+        res.json(result);
+    } catch (err) {
+        next(err);
+    }
+}
+
 export async function changeWaybillStatus(req: Request, res: Response, next: NextFunction) {
     try {
         const orgId = req.user!.organizationId;

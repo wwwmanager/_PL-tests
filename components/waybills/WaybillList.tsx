@@ -5,12 +5,14 @@
 
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { deleteWaybill, getWaybills, updateWaybill, getLatestWaybill, bulkDeleteWaybills } from '../../services/api/waybillApi';
+import { deleteWaybill, getWaybills, updateWaybill, getLatestWaybill, bulkDeleteWaybills, bulkChangeWaybillStatus } from '../../services/api/waybillApi';
 import { getVehicles } from '../../services/api/vehicleApi';
 import { Waybill, WaybillStatus, Vehicle } from '../../types';
 import { listDrivers, DriverListItem } from '../../services/driverApi';
 import { WAYBILL_STATUS_COLORS, WAYBILL_STATUS_TRANSLATIONS } from '../../constants';
-import { PlusIcon, PencilIcon, TrashIcon, ArrowUpIcon, ArrowDownIcon, StatusCompletedIcon, CalendarDaysIcon, DocumentArrowUpIcon, ClipboardCheckIcon } from '../Icons';
+import { PlusIcon, PencilIcon, TrashIcon, ArrowUpIcon, ArrowDownIcon, StatusCompletedIcon, CalendarDaysIcon, DocumentArrowUpIcon, ClipboardCheckIcon, FunnelIcon, CheckCircleIcon } from '../Icons';
+import { Button } from '../shared/Button';
+import { WaybillStatusBadge } from '../shared/StatusBadges';
 // FIX: Changed import to a named import to resolve module resolution error.
 import { WaybillDetail } from './WaybillDetail';
 import useTable from '../../hooks/useTable';
@@ -174,6 +176,7 @@ const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpene
         { key: 'odometerEnd', label: 'Пробег Конечный' },
         { key: 'mileage', label: 'Пробег по ПЛ' },
         { key: 'fuelAtStart', label: 'Топливо (выезд)' },
+        { key: 'fuelReceived', label: 'Заправлено' },
         { key: 'fuelAtEnd', label: 'Топливо (возврат)' },
         { key: 'status', label: 'Статус' },
       ];
@@ -203,6 +206,7 @@ const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpene
         vehicle: vehicle ? `${vehicle.brand} ${vehicle.registrationNumber}` : w.vehicleId,
         // WB-REG-001: Use fuelLines data if available
         fuelAtStart: firstFuel?.fuelStart ?? w.fuelAtStart,
+        fuelReceived: firstFuel?.fuelReceived ?? (w as any).fuelReceived ?? 0,
         fuelAtEnd: firstFuel?.fuelEnd ?? w.fuelAtEnd,
       };
     });
@@ -315,6 +319,201 @@ const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpene
     setIsConfirmationModalOpen(true);
   };
 
+  // WB-BULK-POST: Bulk posting/submitting handler
+  // In Central mode: DRAFT → SUBMITTED (send for review)
+  // In Local mode: DRAFT → POSTED (direct posting)
+  const isCentralMode = appSettings?.appMode === 'central';
+  const targetStatus = isCentralMode ? WaybillStatus.SUBMITTED : WaybillStatus.POSTED;
+  const actionLabel = isCentralMode ? 'Отправить на проверку' : 'Провести';
+
+  const handleBulkPost = () => {
+    if (selectedIds.size === 0) return;
+
+    // Check if all selected waybills are DRAFT
+    const selectedWaybills = rows.filter(w => selectedIds.has(w.id));
+    const nonDraftWaybills = selectedWaybills.filter(w => w.status !== WaybillStatus.DRAFT);
+
+    if (nonDraftWaybills.length > 0) {
+      showToast(`Для ${isCentralMode ? 'отправки' : 'проведения'} выберите только черновики. Найдено не-черновиков: ${nonDraftWaybills.length}`, 'error');
+      return;
+    }
+
+    const onConfirmBulkPost = async () => {
+      setIsConfirmationModalOpen(false);
+      try {
+        const result = await bulkChangeWaybillStatus(
+          Array.from(selectedIds),
+          targetStatus
+        );
+
+        if (result.failed.length > 0) {
+          const firstError = result.failed[0];
+          const errorDetail = firstError ? `${firstError.number}: ${firstError.error}` : '';
+          showToast(`${isCentralMode ? 'Отправлено' : 'Проведено'}: ${result.success}. Ошибок: ${result.failed.length}. ${errorDetail}`, 'error');
+          console.error('Errors during bulk post:', result.failed);
+        } else {
+          showToast(`${isCentralMode ? 'Отправлено на проверку' : 'Проведено путевых листов'}: ${result.success}`, 'success');
+        }
+        setSelectedIds(new Set());
+        fetchData();
+      } catch (error) {
+        showToast(`Ошибка ${isCentralMode ? 'массовой отправки' : 'массового проведения'}: ` + (error as Error).message, 'error');
+      }
+    };
+
+    setModalProps({
+      title: isCentralMode ? 'Массовая отправка на проверку' : 'Массовое проведение',
+      message: `Выбрано элементов: ${selectedIds.size}. ${isCentralMode ? 'Отправить на проверку' : 'Провести'}?`,
+      confirmText: isCentralMode ? 'Отправить выбранные' : 'Провести выбранные',
+      confirmButtonClass: isCentralMode ? 'bg-blue-600 hover:bg-blue-700 focus:ring-blue-500' : 'bg-green-600 hover:bg-green-700 focus:ring-green-500',
+      onConfirm: onConfirmBulkPost,
+    } as any);
+    setIsConfirmationModalOpen(true);
+  };
+
+  // WB-BULK-APPROVE: Approve SUBMITTED waybills → POSTED (Central mode only)
+  const handleBulkApprove = () => {
+    if (selectedIds.size === 0) return;
+
+    const selectedWaybills = rows.filter(w => selectedIds.has(w.id));
+    const nonSubmittedWaybills = selectedWaybills.filter(w => w.status !== WaybillStatus.SUBMITTED);
+
+    if (nonSubmittedWaybills.length > 0) {
+      showToast(`Для проведения выберите только отправленные на проверку. Найдено других: ${nonSubmittedWaybills.length}`, 'error');
+      return;
+    }
+
+    const onConfirmBulkApprove = async () => {
+      setIsConfirmationModalOpen(false);
+      try {
+        const result = await bulkChangeWaybillStatus(
+          Array.from(selectedIds),
+          WaybillStatus.POSTED
+        );
+
+        if (result.failed.length > 0) {
+          const firstError = result.failed[0];
+          const errorDetail = firstError ? `${firstError.number}: ${firstError.error}` : '';
+          showToast(`Проведено: ${result.success}. Ошибок: ${result.failed.length}. ${errorDetail}`, 'error');
+          console.error('Errors during bulk approve:', result.failed);
+        } else {
+          showToast(`Проведено путевых листов: ${result.success}`, 'success');
+        }
+        setSelectedIds(new Set());
+        fetchData();
+      } catch (error) {
+        showToast('Ошибка массового проведения: ' + (error as Error).message, 'error');
+      }
+    };
+
+    setModalProps({
+      title: 'Массовое проведение',
+      message: `Выбрано элементов: ${selectedIds.size}. Провести отправленные на проверку?`,
+      confirmText: 'Провести выбранные',
+      confirmButtonClass: 'bg-green-600 hover:bg-green-700 focus:ring-green-500',
+      onConfirm: onConfirmBulkApprove,
+    } as any);
+    setIsConfirmationModalOpen(true);
+  };
+
+  // WB-BULK-CORRECT: Revert POSTED waybills → DRAFT (Корректировка)
+  const handleBulkCorrection = () => {
+    if (selectedIds.size === 0) return;
+
+    const selectedWbs = rows.filter(w => selectedIds.has(w.id));
+    const nonPostedWaybills = selectedWbs.filter(w => w.status !== WaybillStatus.POSTED);
+
+    if (nonPostedWaybills.length > 0) {
+      showToast(`Для корректировки выберите только проведенные ПЛ. Найдено других: ${nonPostedWaybills.length}`, 'error');
+      return;
+    }
+
+    const onConfirmBulkCorrection = async () => {
+      setIsConfirmationModalOpen(false);
+      try {
+        const result = await bulkChangeWaybillStatus(
+          Array.from(selectedIds),
+          WaybillStatus.DRAFT,
+          'Массовая корректировка'
+        );
+
+        if (result.failed.length > 0) {
+          const firstError = result.failed[0];
+          const errorDetail = firstError ? `${firstError.number}: ${firstError.error}` : '';
+          showToast(`Откорректировано: ${result.success}. Ошибок: ${result.failed.length}. ${errorDetail}`, 'error');
+          console.error('Errors during bulk correction:', result.failed);
+        } else {
+          showToast(`Откорректировано путевых листов: ${result.success}`, 'success');
+        }
+        setSelectedIds(new Set());
+        fetchData();
+      } catch (error) {
+        showToast('Ошибка массовой корректировки: ' + (error as Error).message, 'error');
+      }
+    };
+
+    setModalProps({
+      title: 'Массовая корректировка',
+      message: `Выбрано проведенных ПЛ: ${selectedIds.size}. Вернуть в черновик для корректировки?`,
+      confirmText: 'Откорректировать выбранные',
+      confirmButtonClass: 'bg-amber-600 hover:bg-amber-700 focus:ring-amber-500',
+      onConfirm: onConfirmBulkCorrection,
+    } as any);
+    setIsConfirmationModalOpen(true);
+  };
+
+  // WB-BULK-RETURN: Return SUBMITTED waybills → DRAFT (Вернуть на доработку) - Central mode only
+  const handleBulkReturnForRevision = () => {
+    if (selectedIds.size === 0) return;
+
+    const selectedWbs = rows.filter(w => selectedIds.has(w.id));
+    const nonSubmittedWaybills = selectedWbs.filter(w => w.status !== WaybillStatus.SUBMITTED);
+
+    if (nonSubmittedWaybills.length > 0) {
+      showToast(`Для возврата на доработку выберите только отправленные ПЛ. Найдено других: ${nonSubmittedWaybills.length}`, 'error');
+      return;
+    }
+
+    const onConfirmBulkReturn = async () => {
+      setIsConfirmationModalOpen(false);
+      try {
+        const result = await bulkChangeWaybillStatus(
+          Array.from(selectedIds),
+          WaybillStatus.DRAFT,
+          'Возврат на доработку'
+        );
+
+        if (result.failed.length > 0) {
+          const firstError = result.failed[0];
+          const errorDetail = firstError ? `${firstError.number}: ${firstError.error}` : '';
+          showToast(`Возвращено: ${result.success}. Ошибок: ${result.failed.length}. ${errorDetail}`, 'error');
+          console.error('Errors during bulk return:', result.failed);
+        } else {
+          showToast(`Возвращено на доработку: ${result.success}`, 'success');
+        }
+        setSelectedIds(new Set());
+        fetchData();
+      } catch (error) {
+        showToast('Ошибка возврата: ' + (error as Error).message, 'error');
+      }
+    };
+
+    setModalProps({
+      title: 'Вернуть на доработку',
+      message: `Выбрано ПЛ на проверке: ${selectedIds.size}. Вернуть на доработку?`,
+      confirmText: 'Вернуть на доработку',
+      confirmButtonClass: 'bg-orange-500 hover:bg-orange-600 focus:ring-orange-400',
+      onConfirm: onConfirmBulkReturn,
+    } as any);
+    setIsConfirmationModalOpen(true);
+  };
+
+  // Calculate which bulk action buttons to show based on selected statuses
+  const selectedWaybills = useMemo(() => rows.filter(w => selectedIds.has(w.id)), [rows, selectedIds]);
+  const hasSelectedDrafts = selectedWaybills.some(w => w.status === WaybillStatus.DRAFT);
+  const hasSelectedSubmitted = selectedWaybills.some(w => w.status === WaybillStatus.SUBMITTED);
+  const hasSelectedPosted = selectedWaybills.some(w => w.status === WaybillStatus.POSTED);
+
   // P0-5: Parent-level navigation guard
   const [pendingClose, setPendingClose] = useState(false);
   const [canCloseCallback, setCanCloseCallback] = useState<(() => void) | null>(null);
@@ -392,49 +591,83 @@ const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpene
           onOpenWaybill={(id) => { setIsCheckModalOpen(false); handleEdit({ id } as any); }}
         />
       )}
-      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6">
-        <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
-          <h2 className="text-2xl font-bold text-gray-800 dark:text-white">Путевые листы</h2>
-          <div className="flex items-center gap-4 flex-wrap">
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-5">
+        {/* Toolbar */}
+        <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center mb-6 gap-4">
+          <div className="flex items-center gap-3">
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white tracking-tight">Путевые листы</h2>
+            <span className="px-2.5 py-0.5 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 text-xs font-semibold">
+              {totalRecords}
+            </span>
+          </div>
+          <div className="flex items-center gap-3 flex-wrap w-full xl:w-auto">
             {selectedIds.size > 0 && (
-              <button onClick={handleBulkDelete} className="flex items-center gap-2 bg-red-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md hover:bg-red-700 transition-colors">
-                <TrashIcon className="h-5 w-5" />
-                Удалить ({selectedIds.size})
-              </button>
+              <>
+                {/* In Central mode: show 'Отправить' for DRAFT, 'Провести' for SUBMITTED */}
+                {/* In Local mode: show 'Провести' for DRAFT */}
+                {hasSelectedDrafts && (
+                  <Button onClick={handleBulkPost} variant={isCentralMode ? 'primary' : 'success'} size="sm" leftIcon={<CheckCircleIcon className="h-4 w-4" />}>
+                    {actionLabel} ({selectedWaybills.filter(w => w.status === WaybillStatus.DRAFT).length})
+                  </Button>
+                )}
+                {isCentralMode && hasSelectedSubmitted && (
+                  <Button onClick={handleBulkApprove} variant="success" size="sm" leftIcon={<CheckCircleIcon className="h-4 w-4" />}>
+                    Провести ({selectedWaybills.filter(w => w.status === WaybillStatus.SUBMITTED).length})
+                  </Button>
+                )}
+                {isCentralMode && hasSelectedSubmitted && (
+                  <Button onClick={handleBulkReturnForRevision} variant="outline" size="sm" leftIcon={<ArrowDownIcon className="h-4 w-4 rotate-90" />}>
+                    Вернуть ({selectedWaybills.filter(w => w.status === WaybillStatus.SUBMITTED).length})
+                  </Button>
+                )}
+                {hasSelectedPosted && (
+                  <Button onClick={handleBulkCorrection} variant="warning" size="sm" leftIcon={<PencilIcon className="h-4 w-4" />}>
+                    Корректировка ({selectedWaybills.filter(w => w.status === WaybillStatus.POSTED).length})
+                  </Button>
+                )}
+                <Button onClick={handleBulkDelete} variant="danger" size="sm" leftIcon={<TrashIcon className="h-4 w-4" />}>
+                  Удалить ({selectedIds.size})
+                </Button>
+              </>
             )}
-            <label className="flex items-center text-sm font-medium text-gray-700 dark:text-gray-200">
-              <input type="checkbox" checked={isExtendedView} onChange={e => setIsExtendedView(e.target.checked)} className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
-              <span className="ml-2">Расширенный журнал</span>
+            <label className="flex items-center gap-2 text-sm font-medium text-gray-600 dark:text-gray-300 cursor-pointer select-none">
+              <div className="relative inline-block w-9 h-5 align-middle select-none transition duration-200 ease-in">
+                <input type="checkbox" checked={isExtendedView} onChange={e => setIsExtendedView(e.target.checked)} className="toggle-checkbox absolute block w-5 h-5 rounded-full bg-white border-4 appearance-none cursor-pointer border-gray-300 checked:right-0 checked:border-blue-600" />
+                <label className="toggle-label block overflow-hidden h-5 rounded-full bg-gray-300 cursor-pointer"></label>
+              </div>
+              <span>Расширенный</span>
             </label>
-            <button onClick={() => setIsSeasonModalOpen(true)} className="flex items-center gap-2 bg-gray-500 text-white font-semibold py-2 px-4 rounded-lg shadow-md hover:bg-gray-600 transition-colors">
-              <CalendarDaysIcon className="h-5 w-5" />
-              Настроить сезоны
-            </button>
-            <button onClick={() => setIsCheckModalOpen(true)} className="flex items-center gap-2 bg-teal-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md hover:bg-teal-700 transition-colors">
-              <ClipboardCheckIcon className="h-5 w-5" />
-              Проверка ПЛ
-            </button>
-            <button onClick={() => setIsBatchModalOpen(true)} className="flex items-center gap-2 bg-purple-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md hover:bg-purple-700 transition-colors">
-              <DocumentArrowUpIcon className="h-5 w-5" />
-              Пакетная генерация
-            </button>
-            <button onClick={handleCreateNew} className="flex items-center gap-2 bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md hover:bg-blue-700 transition-colors">
-              <PlusIcon className="h-5 w-5" />
+            <div className="hidden xl:block w-px h-6 bg-gray-200 dark:bg-gray-700 mx-1"></div>
+            <Button onClick={() => setIsSeasonModalOpen(true)} variant="ghost" size="sm" leftIcon={<CalendarDaysIcon className="h-4 w-4 text-gray-500" />}>
+              Сезоны
+            </Button>
+            <Button onClick={() => setIsCheckModalOpen(true)} variant="ghost" size="sm" leftIcon={<ClipboardCheckIcon className="h-4 w-4 text-gray-500" />}>
+              Проверка
+            </Button>
+            <Button onClick={() => setIsBatchModalOpen(true)} variant="outline" size="sm" leftIcon={<DocumentArrowUpIcon className="h-4 w-4" />}>
+              Пакетная
+            </Button>
+            <Button onClick={handleCreateNew} variant="primary" size="sm" leftIcon={<PlusIcon className="h-4 w-4" />}>
               Создать новый
-            </button>
+            </Button>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg items-center">
-          <input type="date" value={topLevelFilter.dateFrom} onChange={e => setTopLevelFilter({ ...topLevelFilter, dateFrom: e.target.value })} className="bg-white dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded-md p-2 focus:ring-blue-500 focus:border-blue-500 text-gray-700 dark:text-gray-200" placeholder="Дата с" />
-          <input type="date" value={topLevelFilter.dateTo} onChange={e => setTopLevelFilter({ ...topLevelFilter, dateTo: e.target.value })} className="bg-white dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded-md p-2 focus:ring-blue-500 focus:border-blue-500 text-gray-700 dark:text-gray-200" placeholder="Дата по" />
-          <select value={topLevelFilter.status} onChange={e => setTopLevelFilter({ ...topLevelFilter, status: e.target.value as WaybillStatus })} className="bg-white dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded-md p-2 focus:ring-blue-500 focus:border-blue-500 text-gray-700 dark:text-gray-200">
+        {/* Filter Bar */}
+        <div className="flex flex-wrap gap-3 items-center bg-gray-50 dark:bg-gray-800/50 p-3 rounded-lg border border-gray-200 dark:border-gray-700 mb-6">
+          <div className="flex items-center gap-2 text-gray-500 text-sm font-medium mr-2">
+            <FunnelIcon className="h-4 w-4" /> Фильтры:
+          </div>
+          <input type="date" value={topLevelFilter.dateFrom} onChange={e => setTopLevelFilter({ ...topLevelFilter, dateFrom: e.target.value })} className="p-2 text-sm border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white" placeholder="Дата с" />
+          <span className="text-gray-400 text-sm">–</span>
+          <input type="date" value={topLevelFilter.dateTo} onChange={e => setTopLevelFilter({ ...topLevelFilter, dateTo: e.target.value })} className="p-2 text-sm border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white" placeholder="Дата по" />
+          <select value={topLevelFilter.status} onChange={e => setTopLevelFilter({ ...topLevelFilter, status: e.target.value as WaybillStatus })} className="p-2 text-sm border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white min-w-[120px]">
             <option value="">Все статусы</option>
             {Object.entries(WAYBILL_STATUS_TRANSLATIONS).map(([key, label]) => (
               <option key={key} value={key}>{label}</option>
             ))}
           </select>
-          <select value={selectedVehicleId} onChange={e => setSelectedVehicleId(e.target.value)} className="bg-white dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded-md p-2 focus:ring-blue-500 focus:border-blue-500 text-gray-700 dark:text-gray-200">
+          <select value={selectedVehicleId} onChange={e => setSelectedVehicleId(e.target.value)} className="p-2 text-sm border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white min-w-[120px]">
             <option value="">Все ТС</option>
             {vehicles.map(vehicle => (
               <option key={vehicle.id} value={vehicle.id}>
@@ -442,7 +675,7 @@ const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpene
               </option>
             ))}
           </select>
-          <select value={filters.driverId || ''} onChange={e => handleFilterChange('driverId', e.target.value)} className="bg-white dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded-md p-2 focus:ring-blue-500 focus:border-blue-500 text-gray-700 dark:text-gray-200">
+          <select value={filters.driverId || ''} onChange={e => handleFilterChange('driverId', e.target.value)} className="p-2 text-sm border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white min-w-[120px]">
             <option value="">Все водители</option>
             {drivers.map(driver => (
               <option key={driver.id} value={driver.id}>
@@ -450,6 +683,19 @@ const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpene
               </option>
             ))}
           </select>
+          {/* Reset filters button */}
+          {(topLevelFilter.dateFrom || topLevelFilter.dateTo || topLevelFilter.status || selectedVehicleId || filters.driverId) && (
+            <button
+              onClick={() => {
+                setTopLevelFilter({ dateFrom: '', dateTo: '', status: '' });
+                setSelectedVehicleId('');
+                handleFilterChange('driverId', '');
+              }}
+              className="ml-auto text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 transition-colors"
+            >
+              Сбросить
+            </button>
+          )}
         </div>
 
         <div className="overflow-x-auto">
@@ -530,12 +776,10 @@ const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpene
                           <td className="px-6 py-4">{w.odometerEnd ?? '—'}</td>
                           <td className="px-6 py-4">{w.mileage}</td>
                           <td className={`px-6 py-4 ${Number(w.fuelAtStart) < 0 ? 'text-red-600' : ''}`}>{w.fuelAtStart ?? '—'}</td>
+                          <td className="px-6 py-4 text-green-600 dark:text-green-400 font-medium">{(w as any).fuelReceived > 0 ? `+${(w as any).fuelReceived}` : '—'}</td>
                           <td className={`px-6 py-4 ${Number(w.fuelAtEnd) < 0 ? 'text-red-600' : ''}`}>{w.fuelAtEnd ?? '—'}</td>
                           <td className="px-6 py-4">
-                            <span className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium ${colors?.bg} ${colors?.text}`}>
-                              {getStatusIcon(w.status)}
-                              {WAYBILL_STATUS_TRANSLATIONS[w.status]}
-                            </span>
+                            <WaybillStatusBadge status={w.status} />
                           </td>
                         </>
                       ) : (
@@ -546,10 +790,7 @@ const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpene
                           <td className="px-6 py-4">{w.driver}</td>
                           <td className="px-6 py-4">{w.organizationId}</td>
                           <td className="px-6 py-4">
-                            <span className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium ${colors?.bg} ${colors?.text}`}>
-                              {getStatusIcon(w.status)}
-                              {WAYBILL_STATUS_TRANSLATIONS[w.status]}
-                            </span>
+                            <WaybillStatusBadge status={w.status} />
                           </td>
                         </>
                       )}
@@ -562,30 +803,30 @@ const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpene
           </table>
         </div>
 
-        {/* Pagination Controls */}
-        {totalPages > 1 && (
-          <div className="mt-4 flex items-center justify-between">
-            <div className="text-sm text-gray-700 dark:text-gray-300">
-              Показано {waybills.length} из {totalRecords} записей (страница {currentPage} из {totalPages})
-            </div>
-            <div className="flex gap-2">
-              <button
-                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                disabled={currentPage === 1}
-                className="px-3 py-1 border rounded-md bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-gray-600"
-              >
-                ← Назад
-              </button>
-              <button
-                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                disabled={currentPage === totalPages}
-                className="px-3 py-1 border rounded-md bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-gray-600"
-              >
-                Вперед →
-              </button>
-            </div>
+        {/* Pagination Controls - Innovations Style */}
+        <div className="mt-4 flex items-center justify-between border-t border-gray-200 dark:border-gray-700 pt-4">
+          <div className="text-sm text-gray-500 dark:text-gray-400">
+            Страница <span className="font-semibold text-gray-700 dark:text-gray-200">{currentPage}</span> из <span className="font-semibold text-gray-700 dark:text-gray-200">{totalPages}</span>
+            <span className="mx-2">|</span>
+            Всего: <span className="font-semibold text-gray-700 dark:text-gray-200">{totalRecords}</span>
           </div>
-        )}
+          <div className="flex gap-2">
+            <button
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+              className="px-4 py-1.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
+            >
+              Назад
+            </button>
+            <button
+              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+              className="px-4 py-1.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
+            >
+              Вперед
+            </button>
+          </div>
+        </div>
       </div >
     </>
   );

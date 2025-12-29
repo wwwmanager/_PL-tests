@@ -3,19 +3,23 @@ import { getStockMovements, getStockItems, getStockLocations, deleteStockMovemen
 import { getOrganizations } from '../../services/organizationApi';
 import { StockMovementV2, GarageStockItem, StockLocation, Organization } from '../../types';
 import { useToast } from '../../hooks/useToast';
-import { PlusIcon, TrashIcon } from '../Icons';
+import { PlusIcon, TrashIcon, PencilIcon, FunnelIcon } from '../Icons';
 import { RequireCapability } from '../../services/auth';
 import MovementCreateModal from './MovementCreateModal';
 import ConfirmationModal from '../shared/ConfirmationModal';
 import DataTable from '../shared/DataTable';
+import { Button } from '../shared/Button';
+import { Badge } from '../shared/Badge';
 
-const getTypeLabel = (type: string) => {
+type MovementBadgeVariant = 'success' | 'danger' | 'info' | 'warning' | 'neutral';
+
+const getTypeLabel = (type: string): { label: string; variant: MovementBadgeVariant } => {
     switch (type) {
-        case 'INCOME': return { label: 'Приход', color: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' };
-        case 'EXPENSE': return { label: 'Расход', color: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' };
-        case 'TRANSFER': return { label: 'Перемещение', color: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' };
-        case 'ADJUSTMENT': return { label: 'Коррект.', color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' };
-        default: return { label: type, color: 'bg-gray-100 text-gray-800' };
+        case 'INCOME': return { label: 'Приход', variant: 'success' };
+        case 'EXPENSE': return { label: 'Расход', variant: 'danger' };
+        case 'TRANSFER': return { label: 'Перемещение', variant: 'info' };
+        case 'ADJUSTMENT': return { label: 'Коррект.', variant: 'warning' };
+        default: return { label: type, variant: 'neutral' };
     }
 };
 
@@ -162,11 +166,7 @@ const FuelMovements: React.FC = () => {
             sortable: true,
             render: (row: any) => {
                 const type = getTypeLabel(row.movementType);
-                return (
-                    <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${type.color}`}>
-                        {row.translatedType}
-                    </span>
-                );
+                return <Badge variant={type.variant}>{row.translatedType}</Badge>;
             }
         },
         {
@@ -222,9 +222,7 @@ const FuelMovements: React.FC = () => {
                             className="p-1 text-blue-500 hover:text-blue-700 transition-colors"
                             title="Редактировать"
                         >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                            </svg>
+                            <PencilIcon className="w-4 h-4" />
                         </button>
                         <button
                             onClick={() => setMovementToDelete(row)}
@@ -244,96 +242,103 @@ const FuelMovements: React.FC = () => {
     return (
         <div className="p-4 space-y-4">
             {/* Filters */}
-            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4 bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
-                <div>
-                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">С</label>
-                    <input
-                        type="date"
-                        name="from"
-                        value={filters.from}
-                        onChange={handleFilterChange}
-                        className="w-full text-sm bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:text-white"
-                    />
+            <div className="bg-gray-50 dark:bg-gray-800/50 p-4 rounded-lg border border-gray-200 dark:border-gray-700">
+                <div className="flex items-center gap-2 text-gray-500 text-sm font-medium mb-3">
+                    <FunnelIcon className="h-4 w-4" /> Фильтры
                 </div>
-                <div>
-                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">По</label>
-                    <input
-                        type="date"
-                        name="to"
-                        value={filters.to}
-                        onChange={handleFilterChange}
-                        className="w-full text-sm bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:text-white"
-                    />
-                </div>
-                <div>
-                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Тип</label>
-                    <select
-                        name="movementType"
-                        value={filters.movementType}
-                        onChange={handleFilterChange}
-                        className="w-full text-sm bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:text-white"
-                    >
-                        <option value="">Все типы</option>
-                        <option value="INCOME">Приход</option>
-                        <option value="EXPENSE">Расход</option>
-                        <option value="TRANSFER">Перемещение</option>
-                        <option value="ADJUSTMENT">Корректировка</option>
-                    </select>
-                </div>
-                <div>
-                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Локация</label>
-                    <select
-                        name="locationId"
-                        value={filters.locationId}
-                        onChange={handleFilterChange}
-                        className="w-full text-sm bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:text-white"
-                    >
-                        <option value="">Все локации</option>
-                        {locations.map(loc => (
-                            <option key={loc.id} value={loc.id}>{loc.name}</option>
-                        ))}
-                    </select>
-                </div>
-                <div>
-                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Товар</label>
-                    <select
-                        name="stockItemId"
-                        value={filters.stockItemId}
-                        onChange={handleFilterChange}
-                        className="w-full text-sm bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:text-white"
-                    >
-                        <option value="">Все товары</option>
-                        {items.map(item => (
-                            <option key={item.id} value={item.id}>{item.name}</option>
-                        ))}
-                    </select>
-                </div>
-                <div className="flex items-end">
-                    <input
-                        type="text"
-                        name="search"
-                        value={filters.search}
-                        onChange={handleFilterChange}
-                        placeholder="Поиск по коммент./док..."
-                        className="w-full text-sm bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:text-white"
-                    />
+                <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                    <div>
+                        <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">С</label>
+                        <input
+                            type="date"
+                            name="from"
+                            value={filters.from}
+                            onChange={handleFilterChange}
+                            className="w-full text-sm bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:text-white"
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">По</label>
+                        <input
+                            type="date"
+                            name="to"
+                            value={filters.to}
+                            onChange={handleFilterChange}
+                            className="w-full text-sm bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:text-white"
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Тип</label>
+                        <select
+                            name="movementType"
+                            value={filters.movementType}
+                            onChange={handleFilterChange}
+                            className="w-full text-sm bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:text-white"
+                        >
+                            <option value="">Все типы</option>
+                            <option value="INCOME">Приход</option>
+                            <option value="EXPENSE">Расход</option>
+                            <option value="TRANSFER">Перемещение</option>
+                            <option value="ADJUSTMENT">Корректировка</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Локация</label>
+                        <select
+                            name="locationId"
+                            value={filters.locationId}
+                            onChange={handleFilterChange}
+                            className="w-full text-sm bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:text-white"
+                        >
+                            <option value="">Все локации</option>
+                            {locations.map(loc => (
+                                <option key={loc.id} value={loc.id}>{loc.name}</option>
+                            ))}
+                        </select>
+                    </div>
+                    <div>
+                        <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Товар</label>
+                        <select
+                            name="stockItemId"
+                            value={filters.stockItemId}
+                            onChange={handleFilterChange}
+                            className="w-full text-sm bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:text-white"
+                        >
+                            <option value="">Все товары</option>
+                            {items.map(item => (
+                                <option key={item.id} value={item.id}>{item.name}</option>
+                            ))}
+                        </select>
+                    </div>
+                    <div className="flex items-end">
+                        <input
+                            type="text"
+                            name="search"
+                            value={filters.search}
+                            onChange={handleFilterChange}
+                            placeholder="Поиск по коммент./док..."
+                            className="w-full text-sm bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:text-white"
+                        />
+                    </div>
                 </div>
             </div>
 
             {/* Actions */}
             <div className="flex justify-between items-center">
-                <div className="text-sm text-gray-500 dark:text-gray-400">
-                    Найдено записей: <span className="font-semibold text-gray-800 dark:text-white">{total}</span>
+                <div className="flex items-center gap-3">
+                    <span className="text-sm text-gray-500 dark:text-gray-400">
+                        Найдено записей: <span className="font-semibold text-gray-800 dark:text-white">{total}</span>
+                    </span>
                 </div>
                 <RequireCapability cap="stock.manage">
-                    <button
+                    <Button
                         data-testid="btn-create-movement"
                         onClick={() => setIsCreateModalOpen(true)}
-                        className="flex items-center space-x-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md transition-colors shadow-md"
+                        variant="primary"
+                        leftIcon={<PlusIcon className="w-5 h-5" />}
                     >
-                        <PlusIcon className="w-5 h-5" />
-                        <span>Создать операцию</span>
-                    </button>
+                        Создать операцию
+                    </Button>
                 </RequireCapability>
             </div>
 
@@ -354,21 +359,21 @@ const FuelMovements: React.FC = () => {
 
             {/* Pagination */}
             {totalPages > 1 && (
-                <div className="flex justify-center space-x-2 mt-4">
+                <div className="flex justify-center items-center space-x-2 mt-4">
                     <button
                         onClick={() => setPage(p => Math.max(1, p - 1))}
                         disabled={page === 1 || loading}
-                        className="px-3 py-1 border rounded-md disabled:opacity-50 dark:border-gray-600 dark:text-white"
+                        className="px-3 py-1.5 border rounded-lg disabled:opacity-50 dark:border-gray-600 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
                     >
                         Назад
                     </button>
-                    <span className="px-3 py-1 dark:text-white">
-                        Страница {page} из {totalPages}
+                    <span className="px-3 py-1.5 text-sm text-gray-600 dark:text-gray-300">
+                        Страница <span className="font-semibold">{page}</span> из <span className="font-semibold">{totalPages}</span>
                     </span>
                     <button
                         onClick={() => setPage(p => Math.min(totalPages, p + 1))}
                         disabled={page === totalPages || loading}
-                        className="px-3 py-1 border rounded-md disabled:opacity-50 dark:border-gray-600 dark:text-white"
+                        className="px-3 py-1.5 border rounded-lg disabled:opacity-50 dark:border-gray-600 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
                     >
                         Вперед
                     </button>

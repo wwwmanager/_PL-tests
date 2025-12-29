@@ -4,9 +4,11 @@ import * as Sentry from '@sentry/react';
 import { AuthProvider, useAuth } from './services/auth';
 import { ToastProvider } from './contexts/ToastContext';
 import { MeProvider } from './contexts/MeContext';
+import { ThemeProvider } from './contexts/ThemeContext';
 import { NavigationGuardProvider, useNavigationGuard } from './contexts/NavigationGuardContext';
 import LoadingSpinner from './components/common/LoadingSpinner';
 import { ContextBar } from './components/common/ContextBar';
+import { ThemeToggle } from './components/shared/ThemeToggle';
 import Login from './components/auth/Login';
 
 
@@ -124,8 +126,11 @@ const AppContent: React.FC = () => {
           <h1 className="text-xl font-semibold text-gray-800 dark:text-white">
             Waybill Management {!isDriverMode && <span className="ml-2 text-sm text-blue-600">(Central Mode)</span>}
           </h1>
-          <div className="text-sm text-gray-600">
-            {currentUser.displayName} ({currentUser.role})
+          <div className="flex items-center gap-3">
+            <ThemeToggle />
+            <span className="text-sm text-gray-600 dark:text-gray-300">
+              {currentUser.displayName} ({currentUser.role})
+            </span>
           </div>
         </header>
         {/* REL-001: Context Bar showing organization, department, role */}
@@ -161,17 +166,19 @@ const ErrorFallback: React.FC = () => (
 const App: React.FC = () => {
   return (
     <Sentry.ErrorBoundary fallback={<ErrorFallback />}>
-      <ToastProvider>
-        <AuthProvider>
-          <MeProvider>
-            <NavigationGuardProvider>
-              <Suspense fallback={<LoadingSpinner />}>
-                <AppContent />
-              </Suspense>
-            </NavigationGuardProvider>
-          </MeProvider>
-        </AuthProvider>
-      </ToastProvider>
+      <ThemeProvider>
+        <ToastProvider>
+          <AuthProvider>
+            <MeProvider>
+              <NavigationGuardProvider>
+                <Suspense fallback={<LoadingSpinner />}>
+                  <AppContent />
+                </Suspense>
+              </NavigationGuardProvider>
+            </MeProvider>
+          </AuthProvider>
+        </ToastProvider>
+      </ThemeProvider>
     </Sentry.ErrorBoundary>
   );
 };

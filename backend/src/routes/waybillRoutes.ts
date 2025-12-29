@@ -25,6 +25,9 @@ router.delete('/:id', checkPermission('waybill.delete'), waybillController.delet
 // WB-DEL-005: Bulk delete
 router.post('/bulk-delete', checkPermission('waybill.delete'), waybillController.bulkDeleteWaybills);
 
+// WB-BULK-POST: Bulk change status (post/revert)
+router.patch('/bulk-status', checkPermission('waybill.post'), waybillController.bulkChangeWaybillStatus);
+
 // WB-601: Status-specific permissions (waybill.submit, waybill.post, waybill.cancel)
 router.patch('/:id/status', checkWaybillStatusPermission(), validateDto(changeStatusSchema), waybillController.changeWaybillStatus);
 

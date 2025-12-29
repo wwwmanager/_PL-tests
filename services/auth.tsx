@@ -12,6 +12,7 @@ import { getAppSettings } from './settingsApi';
 import { roleApi } from './roleApi';
 import { subscribe } from './bus';
 import { setSessionExpiredHandler, getSessionExpiredMessage } from './session';
+import { setAccessToken as setHttpClientToken } from './httpClient';
 import { ToastContext } from '../contexts/ToastContext';
 import type { Role, Capability, User, AppSettings } from '../types';
 import { DEFAULT_ROLE_POLICIES, ALL_CAPS } from '../constants';
@@ -240,6 +241,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     if (typeof window !== 'undefined') {
       window.localStorage.setItem(TOKEN_KEY, token);
     }
+    // AUTH-TOKEN-SYNC: Update httpClient's in-memory token cache
+    setHttpClientToken(token);
   }, []);
 
   // Старый dev-метод
@@ -256,6 +259,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     if (typeof window !== 'undefined') {
       window.localStorage.removeItem(TOKEN_KEY);
     }
+    // AUTH-TOKEN-SYNC: Clear httpClient's in-memory token cache
+    setHttpClientToken(null);
   }, [token]);
 
   const logoutAll = useCallback(async () => {

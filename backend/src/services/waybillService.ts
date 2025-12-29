@@ -1094,6 +1094,104 @@ export async function bulkDeleteWaybills(userInfo: UserInfo, ids: string[]) {
     return results;
 }
 
+/**
+ * WB-BULK-POST: Bulk change waybill status (posting/reverting)
+ * Based on Innovations prototype pattern: batch load, in-memory processing, bulk write
+ */
+export async function bulkChangeWaybillStatus(
+    userInfo: UserInfo,
+    ids: string[],
+    status: WaybillStatus,
+    userId: string,
+    reason?: string
+): Promise<{ success: number; failed: { id: string; number: string; error: string }[] }> {
+    console.log(`[WB-BULK-STATUS] Processing ${ids.length} waybills to status ${status}`);
+
+    const results = {
+        success: 0,
+        failed: [] as { id: string; number: string; error: string }[]
+    };
+
+    if (ids.length === 0) return results;
+
+    // 1. Batch load all waybills
+    const waybills = await prisma.waybill.findMany({
+        where: {
+            id: { in: ids },
+            organizationId: userInfo.organizationId
+        },
+        include: {
+            fuelLines: true,
+            blank: true
+        }
+    });
+
+    // Sort by date to process in chronological order
+    waybills.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+    // 2. Process each waybill
+    for (const waybill of waybills) {
+        try {
+            // Skip if already in target status
+            if (waybill.status === status) {
+                console.log(`[WB-BULK-STATUS] Skipping ${waybill.number} - already ${status}`);
+                continue;
+            }
+
+            // Validate: can only post DRAFT or SUBMITTED waybills
+            // (DRAFT → POSTED for Local mode, SUBMITTED → POSTED for Central mode)
+            if (status === WaybillStatus.POSTED &&
+                waybill.status !== WaybillStatus.DRAFT &&
+                waybill.status !== WaybillStatus.SUBMITTED) {
+                results.failed.push({
+                    id: waybill.id,
+                    number: waybill.number,
+                    error: `Можно провести только черновик или отправленный на проверку (текущий статус: ${waybill.status})`
+                });
+                continue;
+            }
+
+            // Validate: can only revert POSTED or SUBMITTED waybills to DRAFT
+            // (POSTED → DRAFT for correction, SUBMITTED → DRAFT for return to revision)
+            if (status === WaybillStatus.DRAFT &&
+                waybill.status !== WaybillStatus.POSTED &&
+                waybill.status !== WaybillStatus.SUBMITTED) {
+                results.failed.push({
+                    id: waybill.id,
+                    number: waybill.number,
+                    error: `Можно вернуть в черновик только проведенный или отправленный ПЛ (текущий статус: ${waybill.status})`
+                });
+                continue;
+            }
+
+            // Use existing changeWaybillStatus which handles all the logic
+            // (blanks, fuel, stock movements, cascade recalc, etc.)
+            await changeWaybillStatus(
+                userInfo,
+                waybill.id,
+                status,
+                userId,
+                false, // hasOverridePermission
+                reason
+            );
+
+            results.success++;
+            console.log(`[WB-BULK-STATUS] ✅ ${waybill.number} → ${status}`);
+
+        } catch (err: any) {
+            console.error(`[WB-BULK-STATUS] ❌ ${waybill.number}:`, err.message);
+            results.failed.push({
+                id: waybill.id,
+                number: waybill.number,
+                error: err.message || 'Unknown error'
+            });
+        }
+    }
+
+    console.log(`[WB-BULK-STATUS] Completed: ${results.success} success, ${results.failed.length} failed`);
+    return results;
+}
+
 export async function changeWaybillStatus(
     userInfo: UserInfo,
     id: string,
@@ -1132,8 +1230,9 @@ export async function changeWaybillStatus(
     if (!waybill) throw new NotFoundError('Путевой лист не найден');
 
     // State machine validation (aligned with schema.prisma)
+    // WB-BULK-POST: Added DRAFT → POSTED for bulk posting
     const allowedTransitions: Record<WaybillStatus, WaybillStatus[]> = {
-        [WaybillStatus.DRAFT]: [WaybillStatus.SUBMITTED, WaybillStatus.CANCELLED],
+        [WaybillStatus.DRAFT]: [WaybillStatus.SUBMITTED, WaybillStatus.POSTED, WaybillStatus.CANCELLED],
         [WaybillStatus.SUBMITTED]: [WaybillStatus.POSTED, WaybillStatus.CANCELLED, WaybillStatus.DRAFT], // UX: Allow return for rework
         [WaybillStatus.POSTED]: [WaybillStatus.DRAFT], // UX: Allow correction (return to draft)
         [WaybillStatus.CANCELLED]: [], // final state
@@ -1440,8 +1539,7 @@ export async function changeWaybillStatus(
                 status,
                 ...(status === WaybillStatus.POSTED && { completedByUserId: userId }),
                 ...(status === WaybillStatus.SUBMITTED && { approvedByUserId: userId }),
-                // REL-304: Store correction reason
-                ...(status === WaybillStatus.DRAFT && reason && { reviewerComment: reason }),
+                // REL-304: Reason stored in audit log, not in waybill table (reviewerComment field doesn't exist)
             },
         });
 

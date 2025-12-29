@@ -2,9 +2,11 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../services/auth';
 import { useToast } from '../../hooks/useToast';
+import { useMe } from '../../contexts/MeContext';
 
 const Login: React.FC = () => {
   const { login } = useAuth();
+  const { refetch: refetchMe } = useMe();
   const { showToast } = useToast();
   const [email, setEmail] = useState('admin'); // для удобства dev
   const [password, setPassword] = useState('123');
@@ -19,6 +21,8 @@ const Login: React.FC = () => {
       // Backend supports login by email OR fullName (username)
       // Do not transform - send as-is
       await login(email, password);
+      // AUTH-REFETCH: Refresh MeContext to update ContextBar after login
+      await refetchMe();
       showToast?.('Успешный вход', 'success');
       // После успешного логина AppContent сам перерисуется (currentUser заполнится)
     } catch (err) {
