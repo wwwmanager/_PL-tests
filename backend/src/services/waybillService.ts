@@ -162,7 +162,8 @@ export async function listWaybills(
                 }
             },
             blank: true, // WB-901
-            fuelLines: true // WB-LIST-070
+            fuelLines: true, // WB-LIST-070
+            routes: true // WB-ROUTES-040: Needed for medical exam calculation
         }
     });
 
@@ -1097,19 +1098,26 @@ export async function bulkDeleteWaybills(userInfo: UserInfo, ids: string[]) {
 /**
  * WB-BULK-POST: Bulk change waybill status (posting/reverting)
  * Based on Innovations prototype pattern: batch load, in-memory processing, bulk write
+ * WB-BULK-SEQ: Added stopOnFirstError to preserve odometer/fuel chain continuity
  */
 export async function bulkChangeWaybillStatus(
     userInfo: UserInfo,
     ids: string[],
     status: WaybillStatus,
     userId: string,
-    reason?: string
-): Promise<{ success: number; failed: { id: string; number: string; error: string }[] }> {
-    console.log(`[WB-BULK-STATUS] Processing ${ids.length} waybills to status ${status}`);
+    reason?: string,
+    stopOnFirstError: boolean = true  // WB-BULK-SEQ: Stop on first error by default for posting
+): Promise<{ success: number; failed: { id: string; number: string; error: string }[]; stoppedDueToError?: boolean; skippedIds?: string[] }> {
+    console.log(`[WB-BULK-STATUS] Processing ${ids.length} waybills to status ${status}, stopOnFirstError=${stopOnFirstError}`);
 
-    const results = {
+    const results: {
+        success: number;
+        failed: { id: string; number: string; error: string }[];
+        stoppedDueToError?: boolean;
+        skippedIds?: string[];
+    } = {
         success: 0,
-        failed: [] as { id: string; number: string; error: string }[]
+        failed: []
     };
 
     if (ids.length === 0) return results;
@@ -1129,8 +1137,19 @@ export async function bulkChangeWaybillStatus(
     // Sort by date to process in chronological order
     waybills.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
+    // WB-BULK-SEQ: Track if we should stop processing
+    let shouldStop = false;
+    const skippedIds: string[] = [];
+
     // 2. Process each waybill
     for (const waybill of waybills) {
+        // WB-BULK-SEQ: If we hit an error and stopOnFirstError is enabled, skip remaining
+        if (shouldStop) {
+            skippedIds.push(waybill.id);
+            console.log(`[WB-BULK-STATUS] ⏭️ Skipping ${waybill.number} due to previous error`);
+            continue;
+        }
+
         try {
             // Skip if already in target status
             if (waybill.status === status) {
@@ -1148,6 +1167,12 @@ export async function bulkChangeWaybillStatus(
                     number: waybill.number,
                     error: `Можно провести только черновик или отправленный на проверку (текущий статус: ${waybill.status})`
                 });
+                // WB-BULK-SEQ: Stop if posting and stopOnFirstError enabled
+                if (stopOnFirstError && status === WaybillStatus.POSTED) {
+                    shouldStop = true;
+                    results.stoppedDueToError = true;
+                    console.log(`[WB-BULK-STATUS] ⛔ Stopping due to validation error in ${waybill.number}`);
+                }
                 continue;
             }
 
@@ -1185,10 +1210,22 @@ export async function bulkChangeWaybillStatus(
                 number: waybill.number,
                 error: err.message || 'Unknown error'
             });
+
+            // WB-BULK-SEQ: Stop processing on first error if enabled and posting
+            if (stopOnFirstError && status === WaybillStatus.POSTED) {
+                shouldStop = true;
+                results.stoppedDueToError = true;
+                console.log(`[WB-BULK-STATUS] ⛔ Stopping due to error in ${waybill.number}`);
+            }
         }
     }
 
-    console.log(`[WB-BULK-STATUS] Completed: ${results.success} success, ${results.failed.length} failed`);
+    // WB-BULK-SEQ: Add skipped IDs to result if any
+    if (skippedIds.length > 0) {
+        results.skippedIds = skippedIds;
+    }
+
+    console.log(`[WB-BULK-STATUS] Completed: ${results.success} success, ${results.failed.length} failed, ${skippedIds.length} skipped`);
     return results;
 }
 
@@ -1567,8 +1604,9 @@ export async function changeWaybillStatus(
             try {
                 await executeStorno(tx, organizationId, 'WAYBILL', id, reason || 'Корректировка ПЛ', userId);
             } catch (err) {
-                if ((err as any).name === 'NotFoundError') {
-                    console.warn('[STORNO] No movements found to storno for posted waybill');
+                // WB-STORNO-FIX: Use statusCode check since custom error classes may not have proper .name  
+                if ((err as any).statusCode === 404) {
+                    console.warn('[STORNO] No movements found to storno for posted waybill - this is OK if no fuel was processed');
                 } else {
                     throw err;
                 }

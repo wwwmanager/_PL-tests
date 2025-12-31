@@ -93,15 +93,26 @@ export function mapBackendWaybillToFront(dto: BackendWaybillDto): FrontWaybill {
         odometerStart: dto.odometerStart ?? 0,
         odometerEnd: dto.odometerEnd ?? undefined,
 
-        routes: (dto.routes ?? []).map((r) => ({
-            id: r.id,
-            from: r.fromPoint ?? '',
-            to: r.toPoint ?? '',
-            distanceKm: Number(r.distanceKm) || 0,
-            isCityDriving: !!r.isCityDriving,
-            isWarming: !!r.isWarming,
-            comment: r.comment ?? undefined,
-        })),
+        routes: (dto.routes ?? []).map((r) => {
+            // WB-ROUTE-DATE-FIX: Convert ISO datetime to YYYY-MM-DD format for HTML date input
+            let routeDate: string | undefined = undefined;
+            if (r.date) {
+                const dateStr = typeof r.date === 'string' ? r.date : String(r.date);
+                // Handle ISO datetime (2024-12-30T00:00:00.000Z) or date-only (2024-12-30)
+                routeDate = dateStr.split('T')[0];
+
+            }
+            return {
+                id: r.id,
+                from: r.fromPoint ?? '',
+                to: r.toPoint ?? '',
+                distanceKm: Number(r.distanceKm) || 0,
+                isCityDriving: !!r.isCityDriving,
+                isWarming: !!r.isWarming,
+                comment: r.comment ?? undefined,
+                date: routeDate, // WB-ROUTE-DATE-FIX: Now in YYYY-MM-DD format
+            };
+        }),
 
         notes: dto.notes ?? undefined,
         fuelCalculationMethod: (dto.fuelCalculationMethod as any) || 'BOILER',
@@ -115,7 +126,7 @@ export function mapBackendWaybillToFront(dto: BackendWaybillDto): FrontWaybill {
 
         // validFrom: use startAt (departure time) if present, else fallback to date
         // DEBUG: trace startAt value
-        ...(() => { console.log('[MAPPER] dto:', dto.number, 'startAt:', dto.startAt, 'date:', dto.date); return {}; })(),
+
         validFrom: dto.startAt ?? dto.date,
         validTo: dto.validTo ?? dto.endAt ?? dto.date,
 
@@ -181,6 +192,7 @@ export function mapFrontWaybillToBackendCreate(waybill: Omit<FrontWaybill, 'id'>
             isCityDriving: !!r.isCityDriving,
             isWarming: !!r.isWarming,
             comment: r.notes ?? r.comment ?? null,
+            date: r.date || null, // WB-ROUTE-DATE-FIX: Pass valid date string, use null instead of undefined
         })),
     };
 }
@@ -251,6 +263,7 @@ export function mapFrontWaybillToBackendUpdate(waybill: FrontWaybill) {
             isCityDriving: !!r.isCityDriving,
             isWarming: !!r.isWarming,
             comment: r.notes ?? r.comment ?? null,
+            date: r.date || null, // WB-ROUTE-DATE-FIX: Pass valid date string, use null instead of undefined
         })),
     };
 }

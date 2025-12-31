@@ -14,7 +14,9 @@ import {
     StockItemUpdateInput
 } from '../../services/stockItemApi';
 import { useToast } from '../../hooks/useToast';
-import { PlusIcon } from '../Icons';
+import { PlusIcon, PencilIcon, ArchiveBoxIcon, FunnelIcon } from '../Icons';
+import { Button } from '../shared/Button';
+import DataTable from '../shared/DataTable';
 
 interface StockItemFormData {
     code: string;
@@ -33,7 +35,6 @@ const CATEGORY_LABELS: Record<StockItemCategory, string> = {
     OTHER: '📋 Прочее',
 };
 
-import DataTable from '../shared/DataTable';
 
 const StockItemList: React.FC = () => {
     const [items, setItems] = useState<StockItem[]>([]);
@@ -218,18 +219,18 @@ const StockItemList: React.FC = () => {
                 <div className="flex justify-center space-x-2">
                     <button
                         onClick={() => openEditModal(row)}
-                        className="text-blue-600 hover:text-blue-800 text-sm"
+                        className="p-1 text-blue-600 hover:text-blue-800 transition-colors"
                         title="Редактировать"
                     >
-                        ✏️
+                        <PencilIcon className="w-4 h-4" />
                     </button>
                     {row.isActive && (
                         <button
                             onClick={() => handleDelete(row)}
-                            className="text-red-600 hover:text-red-800 text-sm"
+                            className="p-1 text-red-600 hover:text-red-800 transition-colors"
                             title="Архивировать"
                         >
-                            🗑️
+                            <ArchiveBoxIcon className="w-4 h-4" />
                         </button>
                     )}
                 </div>
@@ -238,16 +239,18 @@ const StockItemList: React.FC = () => {
     ];
 
     return (
-        <div className="p-4 space-y-4">
+        <div className="p-0 space-y-6">
             {/* Filters */}
-            <div className="grid grid-cols-1 md:grid-cols-5 gap-4 bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
-                <div>
-                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Категория</label>
+            <div className="flex flex-wrap gap-4 items-center bg-gray-50 dark:bg-gray-800/50 p-4 rounded-xl border border-gray-100 dark:border-gray-700">
+                <div className="flex items-center gap-2 text-gray-500 text-sm font-medium mr-2">
+                    <FunnelIcon className="h-4 w-4" /> Фильтры:
+                </div>
+                <div className="min-w-[150px]">
                     <select
                         name="categoryEnum"
                         value={filters.categoryEnum}
                         onChange={handleFilterChange}
-                        className="w-full text-sm bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:text-white"
+                        className="w-full p-2 text-sm border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
                     >
                         <option value="">Все категории</option>
                         {Object.entries(CATEGORY_LABELS).map(([key, label]) => (
@@ -255,49 +258,50 @@ const StockItemList: React.FC = () => {
                         ))}
                     </select>
                 </div>
-                <div>
-                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Статус</label>
+                <div className="min-w-[150px]">
                     <select
                         name="isActive"
                         value={filters.isActive}
                         onChange={handleFilterChange}
-                        className="w-full text-sm bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:text-white"
+                        className="w-full p-2 text-sm border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
                     >
                         <option value="true">Активные</option>
                         <option value="false">Архивные</option>
-                        <option value="">Все</option>
+                        <option value="">Все статусы</option>
                     </select>
                 </div>
-                <div className="md:col-span-2">
-                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Глобальный поиск</label>
+                <div className="flex-1 min-w-[200px]">
                     <input
                         type="text"
                         name="search"
                         value={filters.search}
                         onChange={handleFilterChange}
-                        placeholder="Название или код..."
-                        className="w-full text-sm bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:text-white"
+                        placeholder="Поиск по названию или коду..."
+                        className="w-full p-2 text-sm border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
                     />
                 </div>
-                <div className="flex items-end gap-2">
-                    <button
+                <div className="flex items-center gap-2">
+                    <Button
                         onClick={loadData}
                         disabled={loading}
-                        className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 disabled:opacity-50"
+                        variant="ghost"
+                        size="sm"
                     >
                         Обновить
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                         onClick={openCreateModal}
-                        className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center gap-1"
+                        variant="primary"
+                        size="sm"
+                        leftIcon={<PlusIcon className="w-4 h-4" />}
                     >
-                        <PlusIcon className="w-4 h-4" /> Добавить
-                    </button>
+                        Добавить
+                    </Button>
                 </div>
             </div>
 
             {/* Table */}
-            <div className="bg-white dark:bg-gray-800 border dark:border-gray-700 rounded-lg shadow-sm">
+            <div className="bg-white dark:bg-gray-800 rounded-xl overflow-hidden">
                 {loading ? (
                     <div className="p-12 text-center text-gray-500">Загрузка...</div>
                 ) : (
@@ -306,7 +310,7 @@ const StockItemList: React.FC = () => {
                         data={items}
                         keyField="id"
                         emptyMessage="Номенклатура не найдена"
-                        searchable={true}
+                        searchable={false}
                     />
                 )}
             </div>

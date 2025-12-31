@@ -344,26 +344,56 @@ export const VehicleList: React.FC = () => {
             </Modal>
 
             <div>
-                <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-xl font-semibold text-gray-800 dark:text-white">Справочник: Транспорт</h3>
-                    <button onClick={handleAddNew} className="flex items-center gap-2 bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md hover:bg-blue-700 transition-colors">
-                        <PlusIcon className="h-5 w-5" /> Добавить
-                    </button>
+                <div className="flex justify-between items-center mb-6">
+                    <h2 className="text-xl font-bold text-gray-900 dark:text-white">Транспортные средства</h2>
+                    <div className="flex items-center gap-4">
+                        <label className="flex items-center text-sm text-gray-600 dark:text-gray-300 cursor-pointer select-none">
+                            <input
+                                type="checkbox"
+                                checked={showArchived}
+                                onChange={e => setShowArchived(e.target.checked)}
+                                className="h-4 w-4 rounded border-gray-300 dark:border-gray-500 text-blue-600 focus:ring-blue-500"
+                            />
+                            <span className="ml-2">Показать архивные</span>
+                        </label>
+                        <button
+                            onClick={handleAddNew}
+                            className="flex items-center gap-2 bg-blue-600 text-white font-medium py-2 px-4 rounded-lg shadow-sm hover:bg-blue-700 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                        >
+                            <PlusIcon className="h-5 w-5" /> Добавить
+                        </button>
+                    </div>
                 </div>
-                <label className="flex items-center text-sm text-gray-600 dark:text-gray-300 cursor-pointer my-4">
-                    <input type="checkbox" checked={showArchived} onChange={e => setShowArchived(e.target.checked)} className="h-4 w-4 rounded border-gray-300 dark:border-gray-500 text-blue-600 focus:ring-blue-500" />
-                    <span className="ml-2">Показать архивные</span>
-                </label>
-                <div className="overflow-x-auto">
+
+                <div className="overflow-x-auto border rounded-lg">
                     <table className="w-full text-sm text-left text-gray-500 dark:text-gray-400">
-                        <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
+                        <thead className="text-xs text-gray-500 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400 border-b dark:border-gray-600">
                             <tr>
-                                {columns.map(col => (<th key={col.key} scope="col" className="px-6 py-3 cursor-pointer" onClick={() => handleSort(col.key)}><div className="flex items-center gap-1">{col.label}{sortColumn === col.key && (sortDirection === 'asc' ? <ArrowUpIcon className="h-4 w-4" /> : <ArrowDownIcon className="h-4 w-4" />)}</div></th>))}
-                                <th scope="col" className="px-6 py-3 text-center">Действия</th>
+                                {columns.map(col => (
+                                    <th key={col.key} scope="col" className="px-6 py-3 font-medium cursor-pointer hover:text-gray-700 dark:hover:text-gray-200" onClick={() => handleSort(col.key)}>
+                                        <div className="flex items-center gap-1">
+                                            {col.label}
+                                            {sortColumn === col.key && (
+                                                sortDirection === 'asc' ? <ArrowUpIcon className="h-4 w-4" /> : <ArrowDownIcon className="h-4 w-4" />
+                                            )}
+                                        </div>
+                                    </th>
+                                ))}
+                                <th scope="col" className="px-6 py-3 font-medium text-center">Действия</th>
                             </tr>
-                            <tr>
-                                {columns.map(col => (<th key={`${col.key}-filter`} className="px-2 py-1"><input type="text" value={filters[col.key] || ''} onChange={e => handleFilterChange(col.key, e.target.value)} placeholder={`Поиск...`} className="w-full text-xs p-1 bg-gray-100 dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded" /></th>))}
-                                <th className="px-2 py-1"></th>
+                            <tr className="bg-white dark:bg-gray-800 border-b dark:border-gray-600">
+                                {columns.map(col => (
+                                    <th key={`${col.key}-filter`} className="px-6 py-2">
+                                        <input
+                                            type="text"
+                                            value={filters[col.key] || ''}
+                                            onChange={e => handleFilterChange(col.key, e.target.value)}
+                                            placeholder={`Поиск...`}
+                                            className="w-full text-sm font-normal px-3 py-1.5 bg-white bordered border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400"
+                                        />
+                                    </th>
+                                ))}
+                                <th className="px-6 py-2"></th>
                             </tr>
                         </thead>
                         <tbody>

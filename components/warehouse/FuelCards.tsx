@@ -19,6 +19,9 @@ import {
 import DataTable from '../shared/DataTable';
 import Modal from '../shared/Modal';
 import { useToast } from '../../hooks/useToast';
+import { Button } from '../shared/Button';
+import { Badge } from '../shared/Badge';
+import { PlusIcon, ArrowUturnLeftIcon, BanknotesIcon, UserGroupIcon, TrashIcon } from '../Icons';
 
 // ==================== MANUAL TOP-UP MODAL ====================
 
@@ -722,9 +725,9 @@ const FuelCards: React.FC = () => {
             label: 'Статус',
             sortable: true,
             render: (row: FuelCard) => (
-                <span className={`px-2 py-1 rounded text-xs ${row.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                <Badge variant={row.isActive ? 'success' : 'danger'}>
                     {row.isActive ? 'Активна' : 'Неактивна'}
-                </span>
+                </Badge>
             )
         },
         {
@@ -732,7 +735,7 @@ const FuelCards: React.FC = () => {
             label: 'Баланс (л)',
             sortable: true,
             render: (row: FuelCard) => (
-                <span className={`font-medium ${row.balanceLiters < 100 ? 'text-red-600' : 'text-gray-900'}`}>
+                <span className={`font-bold ${row.balanceLiters < 100 ? 'text-red-600' : 'text-gray-900 dark:text-gray-100'}`}>
                     {Number(row.balanceLiters || 0).toLocaleString('ru-RU', { minimumFractionDigits: 2 })}
                 </span>
             )
@@ -741,34 +744,40 @@ const FuelCards: React.FC = () => {
             key: 'actions',
             label: 'Действия',
             render: (row: FuelCard) => (
-                <div className="flex gap-2">
-                    <button
+                <div className="flex gap-2 justify-center">
+                    <Button
                         onClick={() => handleTopUp(row)}
-                        className="px-3 py-1 bg-green-500 text-white rounded text-sm hover:bg-green-600"
+                        variant="success"
+                        size="sm"
                         title="Пополнить карту"
+                        leftIcon={<BanknotesIcon className="h-3.5 w-3.5" />}
                     >
-                        💳 Пополнить
-                    </button>
-                    <button
+                        Пополнить
+                    </Button>
+                    <Button
                         onClick={() => handleAssign(row)}
-                        className="px-3 py-1 bg-blue-500 text-white rounded text-sm hover:bg-blue-600"
+                        variant="primary"
+                        size="sm"
                         title="Привязать к водителю"
+                        leftIcon={<UserGroupIcon className="h-3.5 w-3.5" />}
                     >
-                        👤 Привязать
-                    </button>
-                    <button
+                        Привязать
+                    </Button>
+                    <Button
                         onClick={() => handleReset(row)}
-                        className="px-3 py-1 bg-orange-500 text-white rounded text-sm hover:bg-orange-600"
+                        variant="warning"
+                        size="sm"
                         title="Обнулить баланс карты"
+                        leftIcon={<ArrowUturnLeftIcon className="h-3.5 w-3.5" />}
                     >
-                        🔄 Обнулить
-                    </button>
+                        Обнулить
+                    </Button>
                     <button
                         onClick={() => setDeleteConfirmCard(row)}
-                        className="px-3 py-1 bg-red-500 text-white rounded text-sm hover:bg-red-600"
+                        className="p-1 text-red-500 hover:text-red-700 transition-colors"
                         title="Удалить карту"
                     >
-                        🗑️
+                        <TrashIcon className="h-4 w-4" />
                     </button>
                 </div>
             )
@@ -776,67 +785,69 @@ const FuelCards: React.FC = () => {
     ];
 
     return (
-        <div className="space-y-4">
-            <div className="flex justify-between items-center">
-                <div className="flex gap-2 ml-auto">
-                    <button
-                        onClick={() => setCreateModalOpen(true)}
-                        className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
-                    >
-                        ➕ Создать карту
-                    </button>
-                    <button
+        <div className="p-0 space-y-6">
+            <div className="flex justify-end items-center">
+                <div className="flex gap-2">
+                    <Button
                         onClick={loadCards}
                         disabled={loading}
-                        className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+                        variant="ghost"
+                        size="sm"
+                        leftIcon={<ArrowUturnLeftIcon className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />}
                     >
-                        {loading ? 'Загрузка...' : 'Обновить'}
-                    </button>
+                        Обновить
+                    </Button>
+                    <Button
+                        onClick={() => setCreateModalOpen(true)}
+                        variant="primary"
+                        size="sm"
+                        leftIcon={<PlusIcon className="h-4 w-4" />}
+                    >
+                        Создать карту
+                    </Button>
                 </div>
             </div>
 
-            <DataTable
-                columns={columns}
-                data={cards}
-                keyField="id"
-                emptyMessage="Нет топливных карт. Нажмите «Создать карту» чтобы добавить."
-                searchable={true}
-            />
+            <div className="bg-white dark:bg-gray-800 rounded-xl overflow-hidden">
+                <DataTable
+                    columns={columns}
+                    data={cards}
+                    keyField="id"
+                    emptyMessage="Топливные карты не найдены"
+                    searchable={false}
+                />
+            </div>
 
             {selectedCard && (
-                <ManualTopUpModal
-                    card={selectedCard}
-                    isOpen={topUpModalOpen}
-                    onClose={() => {
-                        setTopUpModalOpen(false);
-                        setSelectedCard(null);
-                    }}
-                    onSuccess={handleTopUpSuccess}
-                />
-            )}
-
-            {selectedCard && (
-                <AssignDriverModal
-                    card={selectedCard}
-                    isOpen={assignModalOpen}
-                    onClose={() => {
-                        setAssignModalOpen(false);
-                        setSelectedCard(null);
-                    }}
-                    onSuccess={handleAssignSuccess}
-                />
-            )}
-
-            {selectedCard && (
-                <ResetCardModal
-                    card={selectedCard}
-                    isOpen={resetModalOpen}
-                    onClose={() => {
-                        setResetModalOpen(false);
-                        setSelectedCard(null);
-                    }}
-                    onSuccess={loadCards}
-                />
+                <>
+                    <ManualTopUpModal
+                        card={selectedCard}
+                        isOpen={topUpModalOpen}
+                        onClose={() => {
+                            setTopUpModalOpen(false);
+                            setSelectedCard(null);
+                        }}
+                        onSuccess={handleTopUpSuccess}
+                    />
+                    <AssignDriverModal
+                        card={selectedCard}
+                        isOpen={assignModalOpen}
+                        onClose={() => {
+                            setAssignModalOpen(false);
+                            setSelectedCard(null);
+                        }}
+                        onSuccess={handleAssignSuccess}
+                    />
+                    <ResetCardModal
+                        card={selectedCard}
+                        isOpen={resetModalOpen}
+                        onClose={() => {
+                            setResetModalOpen(false);
+                            setSelectedCard(null);
+                        }}
+                        onSuccess={loadCards}
+                    />
+                </>
             )}
 
             <CreateFuelCardModal
@@ -851,19 +862,9 @@ const FuelCards: React.FC = () => {
                     <div className="space-y-4">
                         <p>Вы уверены, что хотите удалить карту <strong>{deleteConfirmCard.cardNumber}</strong>?</p>
                         <p className="text-sm text-gray-500">Это действие нельзя отменить.</p>
-                        <div className="flex justify-end gap-2">
-                            <button
-                                onClick={() => setDeleteConfirmCard(null)}
-                                className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50"
-                            >
-                                Отмена
-                            </button>
-                            <button
-                                onClick={handleDeleteConfirm}
-                                className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
-                            >
-                                Удалить
-                            </button>
+                        <div className="flex justify-end gap-3 pt-4 border-t">
+                            <Button variant="ghost" size="sm" onClick={() => setDeleteConfirmCard(null)}>Отмена</Button>
+                            <Button variant="danger" size="sm" onClick={handleDeleteConfirm}>Удалить</Button>
                         </div>
                     </div>
                 </Modal>

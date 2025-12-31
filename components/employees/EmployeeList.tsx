@@ -595,7 +595,7 @@ const EmployeeList: React.FC = () => {
                                     <td className="px-6 py-4 font-mono">{e.fuelCardBalance?.toFixed(2) ?? '0.00'}</td>
                                     <td className="px-6 py-4">{e.organizationName}</td>
                                     <td className="px-6 py-4">
-                                        <span className={`px - 2 py - 1 text - xs font - semibold rounded - full ${e.status === 'Active' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'} `}>
+                                        <span className={`px-2 py-1 text-xs font-semibold rounded-full ${e.status === 'Active' ? 'bg-teal-600 text-white dark:bg-teal-500' : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'}`}>
                                             {e.status === 'Active' ? 'Активен' : 'Неактивен'}
                                         </span>
                                     </td>

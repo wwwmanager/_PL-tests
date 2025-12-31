@@ -188,6 +188,7 @@ export interface FuelConsumptionRates {
 export enum VehicleStatus {
   ACTIVE = 'Active',
   ARCHIVED = 'Archived',
+  MAINTENANCE = 'Maintenance',  // На обслуживании
 }
 
 export interface MaintenanceRecord {

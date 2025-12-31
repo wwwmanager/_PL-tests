@@ -346,7 +346,19 @@ const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpene
           targetStatus
         );
 
-        if (result.failed.length > 0) {
+        // WB-BULK-SEQ: Check if processing was stopped due to error
+        if (result.stoppedDueToError) {
+          const firstError = result.failed[0];
+          const skippedCount = result.skippedIds?.length || 0;
+          const errorDetail = firstError ? `${firstError.number}: ${firstError.error}` : '';
+          showToast(
+            `⚠️ Обработка остановлена! ${isCentralMode ? 'Отправлено' : 'Проведено'}: ${result.success}. ` +
+            `Ошибка в ${firstError?.number || 'ПЛ'}: ${firstError?.error || 'неизвестная ошибка'}. ` +
+            `Пропущено: ${skippedCount}.`,
+            'error'
+          );
+          console.error('Bulk post stopped due to error:', result);
+        } else if (result.failed.length > 0) {
           const firstError = result.failed[0];
           const errorDetail = firstError ? `${firstError.number}: ${firstError.error}` : '';
           showToast(`${isCentralMode ? 'Отправлено' : 'Проведено'}: ${result.success}. Ошибок: ${result.failed.length}. ${errorDetail}`, 'error');
@@ -391,7 +403,18 @@ const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpene
           WaybillStatus.POSTED
         );
 
-        if (result.failed.length > 0) {
+        // WB-BULK-SEQ: Check if processing was stopped due to error
+        if (result.stoppedDueToError) {
+          const firstError = result.failed[0];
+          const skippedCount = result.skippedIds?.length || 0;
+          showToast(
+            `⚠️ Обработка остановлена! Проведено: ${result.success}. ` +
+            `Ошибка в ${firstError?.number || 'ПЛ'}: ${firstError?.error || 'неизвестная ошибка'}. ` +
+            `Пропущено: ${skippedCount}.`,
+            'error'
+          );
+          console.error('Bulk approve stopped due to error:', result);
+        } else if (result.failed.length > 0) {
           const firstError = result.failed[0];
           const errorDetail = firstError ? `${firstError.number}: ${firstError.error}` : '';
           showToast(`Проведено: ${result.success}. Ошибок: ${result.failed.length}. ${errorDetail}`, 'error');

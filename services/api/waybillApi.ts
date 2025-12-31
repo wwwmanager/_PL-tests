@@ -84,10 +84,13 @@ export async function bulkDeleteWaybills(ids: string[]): Promise<{ success: stri
 
 /**
  * WB-BULK-POST: Bulk change status for multiple waybills
+ * WB-BULK-SEQ: Extended with stoppedDueToError and skippedIds
  */
 export interface BulkStatusResult {
     success: number;
     failed: { id: string; number: string; error: string }[];
+    stoppedDueToError?: boolean;  // WB-BULK-SEQ: Processing was halted due to error
+    skippedIds?: string[];        // WB-BULK-SEQ: IDs that were skipped after error
 }
 
 export async function bulkChangeWaybillStatus(

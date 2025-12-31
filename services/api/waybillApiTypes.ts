@@ -54,6 +54,7 @@ export interface BackendWaybillDto {
         isCityDriving: boolean | null;
         isWarming: boolean | null;
         comment: string | null;
+        date?: string | null; // WB-REPORT-001: Added for medical exam calculation
     }>;
     fuelLines?: Array<{
         id: string;

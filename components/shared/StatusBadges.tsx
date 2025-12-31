@@ -11,7 +11,7 @@ import { WAYBILL_STATUS_TRANSLATIONS, VEHICLE_STATUS_TRANSLATIONS, ORGANIZATION_
 // STATUS → BADGE VARIANT MAPPINGS
 // =============================================================================
 
-type BadgeVariant = 'success' | 'warning' | 'danger' | 'info' | 'neutral' | 'purple';
+type BadgeVariant = 'success' | 'warning' | 'danger' | 'info' | 'neutral' | 'purple' | 'orange';
 
 const WAYBILL_STATUS_VARIANT: Record<WaybillStatus, BadgeVariant> = {
     [WaybillStatus.DRAFT]: 'neutral',
@@ -23,6 +23,7 @@ const WAYBILL_STATUS_VARIANT: Record<WaybillStatus, BadgeVariant> = {
 const VEHICLE_STATUS_VARIANT: Record<VehicleStatus, BadgeVariant> = {
     [VehicleStatus.ACTIVE]: 'success',
     [VehicleStatus.ARCHIVED]: 'purple',
+    [VehicleStatus.MAINTENANCE]: 'orange',  // На обслуживании
 };
 
 const ORGANIZATION_STATUS_VARIANT: Record<OrganizationStatus, BadgeVariant> = {

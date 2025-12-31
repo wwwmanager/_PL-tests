@@ -7,8 +7,24 @@ import { Vehicle, Waybill, WaybillStatus } from '../../types';
 import { useToast } from '../../hooks/useToast';
 import PreTripInspectionReport from './PreTripInspectionReport';
 
-// Utility: Each completed waybill represents 1 pre-trip medical exam
-const getMedicalExamsCount = (waybill: Waybill): number => 1;
+// Utility: Calculate pre-trip medical exams based on unique dates in routes
+const getMedicalExamsCount = (waybill: Waybill): number => {
+    // WB-REPORT-001: Count 1 exam per unique date in routes
+    if (!waybill.routes || waybill.routes.length === 0) {
+        return 1; // Fallback for legacy data or simple waybills
+    }
+
+    const uniqueDates = new Set<string>();
+    waybill.routes.forEach(route => {
+        if (route.date) {
+            // Take date part (YYYY-MM-DD) to ignore time
+            const datePart = new Date(route.date).toISOString().split('T')[0];
+            uniqueDates.add(datePart);
+        }
+    });
+
+    return uniqueDates.size > 0 ? uniqueDates.size : 1;
+};
 
 interface ReportRow {
     type: 'month' | 'quarter' | 'year';

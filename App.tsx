@@ -10,6 +10,8 @@ import LoadingSpinner from './components/common/LoadingSpinner';
 import { ContextBar } from './components/common/ContextBar';
 import { ThemeToggle } from './components/shared/ThemeToggle';
 import Login from './components/auth/Login';
+import { Sidebar } from './components/shared/Sidebar';
+import { MenuIcon } from './components/Icons';
 
 
 const Dashboard = lazy(() => import('./components/dashboard/Dashboard'));
@@ -42,7 +44,13 @@ const AppContent: React.FC = () => {
 
   // UX-DOC-GUARD-004: Safe navigation wrapper that checks for unsaved changes
   const navigateTo = React.useCallback((page: Page) => {
-    requestNavigation(() => setCurrentPage(page));
+    requestNavigation(() => {
+      setCurrentPage(page);
+      // On mobile, close sidebar after navigation
+      if (window.innerWidth < 1024) {
+        setIsSidebarOpen(false);
+      }
+    });
   }, [requestNavigation]);
 
   // Если нет пользователя - показываем Login
@@ -88,54 +96,48 @@ const AppContent: React.FC = () => {
   return (
     <div className="flex h-screen bg-gray-100 dark:bg-gray-900 font-sans">
       {/* Sidebar */}
-      <aside className={`bg-white dark:bg-gray-800 text-gray-800 dark:text-white transition-all duration-300 ease-in-out shadow-xl z-20 ${isSidebarOpen ? 'w-64' : 'w-0'} overflow-hidden`}>
-        <div className="flex items-center justify-center h-20 border-b dark:border-gray-700">
-          <h1 className="text-xl font-bold">Путевые листы</h1>
-        </div>
-        <nav className="mt-4">
-          <ul>
-            <li><button onClick={() => navigateTo('dashboard')} className={`w-full text-left px-6 py-3 hover:bg-gray-100 dark:hover:bg-gray-700 ${currentPage === 'dashboard' ? 'bg-blue-50 dark:bg-blue-900 border-r-4 border-blue-500' : ''}`}>Панель управления</button></li>
-            <li><button onClick={() => navigateTo('waybills')} className={`w-full text-left px-6 py-3 hover:bg-gray-100 dark:hover:bg-gray-700 ${currentPage === 'waybills' ? 'bg-blue-50 dark:bg-blue-900 border-r-4 border-blue-500' : ''}`}>Путевые листы</button></li>
-            <li><button onClick={() => navigateTo('dictionaries')} className={`w-full text-left px-6 py-3 hover:bg-gray-100 dark:hover:bg-gray-700 ${currentPage === 'dictionaries' ? 'bg-blue-50 dark:bg-blue-900 border-r-4 border-blue-500' : ''}`}>Справочники</button></li>
-            <li><button data-testid="nav-reports" onClick={() => navigateTo('reports')} className={`w-full text-left px-6 py-3 hover:bg-gray-100 dark:hover:bg-gray-700 ${currentPage === 'reports' ? 'bg-blue-50 dark:bg-blue-900 border-r-4 border-blue-500' : ''}`}>Отчеты</button></li>
-            <li><button data-testid="nav-warehouse" onClick={() => navigateTo('warehouse')} className={`w-full text-left px-6 py-3 hover:bg-gray-100 dark:hover:bg-gray-700 ${currentPage === 'warehouse' ? 'bg-blue-50 dark:bg-blue-900 border-r-4 border-blue-500' : ''}`}>Склад</button></li>
-            <li><button data-testid="nav-admin" onClick={() => navigateTo('admin')} className={`w-full text-left px-6 py-3 hover:bg-gray-100 dark:hover:bg-gray-700 ${currentPage === 'admin' ? 'bg-blue-50 dark:bg-blue-900 border-r-4 border-blue-500' : ''}`}>Настройки</button></li>
-          </ul>
-        </nav>
-        <div className="p-4 border-t dark:border-gray-700 space-y-2">
-          <button onClick={logout} className="w-full px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600">Выйти</button>
-          <button
-            onClick={() => {
-              if (window.confirm('Это завершит все ваши активные сессии на других устройствах. Текущее устройство тоже будет разлогинено. Продолжить?')) {
-                logoutAll();
-              }
-            }}
-            className="w-full px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 text-xs"
-          >
-            Выйти со всех устройств
-          </button>
-        </div>
-      </aside>
+      <Sidebar
+        isOpen={isSidebarOpen}
+        onClose={() => setIsSidebarOpen(false)}
+        currentPage={currentPage === 'waybill-detail' ? 'waybills' : currentPage} // Highlight waybills when details open
+        onNavigate={(page) => navigateTo(page as Page)}
+      />
+
+      {/* Overlay for mobile */}
+      {isSidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 z-20 lg:hidden"
+          onClick={() => setIsSidebarOpen(false)}
+        ></div>
+      )}
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <header className="flex items-center justify-between p-4 bg-white dark:bg-gray-800 border-b dark:border-gray-700 shadow-md">
-          <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="text-gray-600 dark:text-gray-300 focus:outline-none">
-            {isSidebarOpen ? '✕' : '☰'}
+      <div className={`flex-1 flex flex-col overflow-hidden transition-all duration-300 ${isSidebarOpen ? 'lg:ml-64' : ''}`}>
+        <header className="flex items-center justify-between p-4 bg-white dark:bg-gray-800 border-b dark:border-gray-700 shadow-sm z-10 sticky top-0">
+          <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="text-gray-600 dark:text-gray-300 focus:outline-none p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700">
+            <MenuIcon className="h-6 w-6" />
           </button>
-          <h1 className="text-xl font-semibold text-gray-800 dark:text-white">
-            Waybill Management {!isDriverMode && <span className="ml-2 text-sm text-blue-600">(Central Mode)</span>}
-          </h1>
+          <div className="flex items-center gap-4">
+            <h1 className="text-xl font-semibold text-gray-800 dark:text-white hidden sm:block">
+              Waybill Management {!isDriverMode && <span className="ml-2 text-sm text-blue-600 font-normal">(Central Mode)</span>}
+            </h1>
+          </div>
           <div className="flex items-center gap-3">
             <ThemeToggle />
-            <span className="text-sm text-gray-600 dark:text-gray-300">
-              {currentUser.displayName} ({currentUser.role})
-            </span>
+            <div className="flex flex-col items-end">
+              <span className="text-sm font-medium text-gray-800 dark:text-white">
+                {currentUser.displayName}
+              </span>
+              <span className="text-xs text-gray-500 dark:text-gray-400">
+                {currentUser.role}
+              </span>
+            </div>
+            <button onClick={logout} className="text-sm text-red-500 hover:text-red-700 ml-2">Выйти</button>
           </div>
         </header>
         {/* REL-001: Context Bar showing organization, department, role */}
         <ContextBar />
-        <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-100 dark:bg-gray-900 p-4 sm:p-6 lg:p-8">
+        <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50 dark:bg-gray-900 p-4 sm:p-6 lg:p-8">
 
           <Suspense fallback={<LoadingSpinner />}>
             {renderPage()}

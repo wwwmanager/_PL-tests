@@ -240,94 +240,92 @@ const FuelMovements: React.FC = () => {
     const totalPages = Math.ceil(total / limit);
 
     return (
-        <div className="p-4 space-y-4">
+        <div className="p-0 space-y-6">
             {/* Filters */}
-            <div className="bg-gray-50 dark:bg-gray-800/50 p-4 rounded-lg border border-gray-200 dark:border-gray-700">
-                <div className="flex items-center gap-2 text-gray-500 text-sm font-medium mb-3">
-                    <FunnelIcon className="h-4 w-4" /> Фильтры
+            <div className="flex flex-wrap gap-4 items-end bg-gray-50 dark:bg-gray-800/50 p-4 rounded-xl border border-gray-100 dark:border-gray-700">
+                <div className="flex items-center gap-2 text-gray-500 text-sm font-medium mr-2 self-center">
+                    <FunnelIcon className="h-4 w-4" /> Фильтры:
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
-                    <div>
-                        <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">С</label>
-                        <input
-                            type="date"
-                            name="from"
-                            value={filters.from}
-                            onChange={handleFilterChange}
-                            className="w-full text-sm bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:text-white"
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">По</label>
-                        <input
-                            type="date"
-                            name="to"
-                            value={filters.to}
-                            onChange={handleFilterChange}
-                            className="w-full text-sm bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:text-white"
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Тип</label>
-                        <select
-                            name="movementType"
-                            value={filters.movementType}
-                            onChange={handleFilterChange}
-                            className="w-full text-sm bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:text-white"
-                        >
-                            <option value="">Все типы</option>
-                            <option value="INCOME">Приход</option>
-                            <option value="EXPENSE">Расход</option>
-                            <option value="TRANSFER">Перемещение</option>
-                            <option value="ADJUSTMENT">Корректировка</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Локация</label>
-                        <select
-                            name="locationId"
-                            value={filters.locationId}
-                            onChange={handleFilterChange}
-                            className="w-full text-sm bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:text-white"
-                        >
-                            <option value="">Все локации</option>
-                            {locations.map(loc => (
-                                <option key={loc.id} value={loc.id}>{loc.name}</option>
-                            ))}
-                        </select>
-                    </div>
-                    <div>
-                        <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Товар</label>
-                        <select
-                            name="stockItemId"
-                            value={filters.stockItemId}
-                            onChange={handleFilterChange}
-                            className="w-full text-sm bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:text-white"
-                        >
-                            <option value="">Все товары</option>
-                            {items.map(item => (
-                                <option key={item.id} value={item.id}>{item.name}</option>
-                            ))}
-                        </select>
-                    </div>
-                    <div className="flex items-end">
-                        <input
-                            type="text"
-                            name="search"
-                            value={filters.search}
-                            onChange={handleFilterChange}
-                            placeholder="Поиск по коммент./док..."
-                            className="w-full text-sm bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:text-white"
-                        />
-                    </div>
+                <div className="min-w-[120px]">
+                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">С</label>
+                    <input
+                        type="date"
+                        name="from"
+                        value={filters.from}
+                        onChange={handleFilterChange}
+                        className="w-full text-sm bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:text-white"
+                    />
+                </div>
+                <div className="min-w-[120px]">
+                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">По</label>
+                    <input
+                        type="date"
+                        name="to"
+                        value={filters.to}
+                        onChange={handleFilterChange}
+                        className="w-full text-sm bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:text-white"
+                    />
+                </div>
+                <div className="min-w-[140px]">
+                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Тип</label>
+                    <select
+                        name="movementType"
+                        value={filters.movementType}
+                        onChange={handleFilterChange}
+                        className="w-full text-sm bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:text-white"
+                    >
+                        <option value="">Все типы</option>
+                        <option value="INCOME">Приход</option>
+                        <option value="EXPENSE">Расход</option>
+                        <option value="TRANSFER">Перемещение</option>
+                        <option value="ADJUSTMENT">Корректировка</option>
+                    </select>
+                </div>
+                <div className="min-w-[160px]">
+                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Локация</label>
+                    <select
+                        name="locationId"
+                        value={filters.locationId}
+                        onChange={handleFilterChange}
+                        className="w-full text-sm bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:text-white"
+                    >
+                        <option value="">Все локации</option>
+                        {locations.map(loc => (
+                            <option key={loc.id} value={loc.id}>{loc.name}</option>
+                        ))}
+                    </select>
+                </div>
+                <div className="min-w-[160px]">
+                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Товар</label>
+                    <select
+                        name="stockItemId"
+                        value={filters.stockItemId}
+                        onChange={handleFilterChange}
+                        className="w-full text-sm bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:text-white"
+                    >
+                        <option value="">Все товары</option>
+                        {items.map(item => (
+                            <option key={item.id} value={item.id}>{item.name}</option>
+                        ))}
+                    </select>
+                </div>
+                <div className="flex-1 min-w-[200px]">
+                    <input
+                        type="text"
+                        name="search"
+                        value={filters.search}
+                        onChange={handleFilterChange}
+                        placeholder="Поиск по коммент./док..."
+                        className="w-full text-sm bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:text-white"
+                    />
                 </div>
             </div>
 
-            {/* Actions */}
+            {/* Actions & Stats */}
             <div className="flex justify-between items-center">
                 <div className="flex items-center gap-3">
-                    <span className="text-sm text-gray-500 dark:text-gray-400">
-                        Найдено записей: <span className="font-semibold text-gray-800 dark:text-white">{total}</span>
+                    <span className="px-3 py-1 bg-gray-100 dark:bg-gray-700 rounded-full text-sm text-gray-600 dark:text-gray-300 font-semibold transition-all">
+                        Найдено записей: {total}
                     </span>
                 </div>
                 <RequireCapability cap="stock.manage">
@@ -335,7 +333,8 @@ const FuelMovements: React.FC = () => {
                         data-testid="btn-create-movement"
                         onClick={() => setIsCreateModalOpen(true)}
                         variant="primary"
-                        leftIcon={<PlusIcon className="w-5 h-5" />}
+                        size="sm"
+                        leftIcon={<PlusIcon className="w-4 h-4" />}
                     >
                         Создать операцию
                     </Button>
@@ -343,7 +342,7 @@ const FuelMovements: React.FC = () => {
             </div>
 
             {/* Table */}
-            <div className="bg-white dark:bg-gray-800 border dark:border-gray-700 rounded-lg shadow-sm">
+            <div className="bg-white dark:bg-gray-800 rounded-xl overflow-hidden">
                 {loading ? (
                     <div className="p-12 text-center text-gray-500">Загрузка...</div>
                 ) : (
@@ -352,7 +351,7 @@ const FuelMovements: React.FC = () => {
                         data={enrichedMovements}
                         keyField="id"
                         emptyMessage={Object.values(filters).some(v => v !== '') ? 'По вашему запросу ничего не найдено' : 'Движений еще нет'}
-                        searchable={true}
+                        searchable={false}
                     />
                 )}
             </div>

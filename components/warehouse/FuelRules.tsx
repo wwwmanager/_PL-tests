@@ -13,6 +13,9 @@ import {
 import DataTable from '../shared/DataTable';
 import Modal from '../shared/Modal';
 import { useToast } from '../../hooks/useToast';
+import { Button } from '../shared/Button';
+import { Badge } from '../shared/Badge';
+import { PlusIcon, ArrowUturnLeftIcon, StatusActiveIcon } from '../Icons';
 
 // ==================== CREATE TOPUP RULE MODAL ====================
 
@@ -270,56 +273,72 @@ const FuelRules: React.FC = () => {
     ];
 
     return (
-        <div className="space-y-6">
+        <div className="p-0 space-y-8">
             {/* Top-Up Rules */}
-            <div className="bg-white rounded-lg shadow p-4">
-                <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-lg font-medium">Правила автопополнения</h3>
+            <section className="space-y-4">
+                <div className="flex justify-between items-center">
+                    <div>
+                        <h3 className="text-lg font-bold text-gray-900 dark:text-white">Правила автопополнения</h3>
+                        <p className="text-sm text-gray-500">Автоматическое зачисление ГСМ на карты по расписанию</p>
+                    </div>
                     <div className="flex gap-2">
-                        <button
-                            onClick={() => setCreateRuleModalOpen(true)}
-                            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-                        >
-                            ➕ Создать правило
-                        </button>
-                        <button
+                        <Button
                             onClick={handleRunTopUp}
                             disabled={runningJob}
-                            className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50"
+                            variant="success"
+                            size="sm"
+                            leftIcon={<StatusActiveIcon className="h-4 w-4" />}
                         >
-                            {runningJob ? 'Выполняется...' : '▶ Запустить сейчас'}
-                        </button>
+                            {runningJob ? 'Выполняется...' : 'Запустить сейчас'}
+                        </Button>
+                        <Button
+                            onClick={() => setCreateRuleModalOpen(true)}
+                            variant="primary"
+                            size="sm"
+                            leftIcon={<PlusIcon className="h-4 w-4" />}
+                        >
+                            Создать правило
+                        </Button>
                     </div>
                 </div>
-                <DataTable
-                    columns={topUpColumns}
-                    data={topUpRules}
-                    keyField="id"
-                    emptyMessage="Нет правил автопополнения"
-                    searchable={true}
-                />
-            </div>
+                <div className="bg-white dark:bg-gray-800 rounded-xl overflow-hidden shadow-sm border border-gray-100 dark:border-gray-700">
+                    <DataTable
+                        columns={topUpColumns}
+                        data={topUpRules}
+                        keyField="id"
+                        emptyMessage="Нет правил автопополнения"
+                        searchable={false}
+                    />
+                </div>
+            </section>
 
             {/* Reset Rules */}
-            <div className="bg-white rounded-lg shadow p-4">
-                <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-lg font-medium">Правила обнуления</h3>
-                    <button
+            <section className="space-y-4">
+                <div className="flex justify-between items-center">
+                    <div>
+                        <h3 className="text-lg font-bold text-gray-900 dark:text-white">Правила обнуления</h3>
+                        <p className="text-sm text-gray-500">Автоматический сброс остатков на картах в конце дня/смены</p>
+                    </div>
+                    <Button
                         onClick={handleRunReset}
                         disabled={runningJob}
-                        className="px-4 py-2 bg-orange-600 text-white rounded-md hover:bg-orange-700 disabled:opacity-50"
+                        variant="warning"
+                        size="sm"
+                        leftIcon={<ArrowUturnLeftIcon className="h-4 w-4" />}
                     >
-                        {runningJob ? 'Выполняется...' : '▶ Запустить обнуление'}
-                    </button>
+                        {runningJob ? 'Выполняется...' : 'Запустить обнуление'}
+                    </Button>
                 </div>
-                <DataTable
-                    columns={resetColumns}
-                    data={resetRules}
-                    keyField="id"
-                    emptyMessage="Нет правил обнуления"
-                    searchable={true}
-                />
-            </div>
+                <div className="bg-white dark:bg-gray-800 rounded-xl overflow-hidden shadow-sm border border-gray-100 dark:border-gray-700">
+                    <DataTable
+                        columns={resetColumns}
+                        data={resetRules}
+                        keyField="id"
+                        emptyMessage="Нет правил обнуления"
+                        searchable={false}
+                    />
+                </div>
+            </section>
 
             <CreateTopUpRuleModal
                 isOpen={createRuleModalOpen}

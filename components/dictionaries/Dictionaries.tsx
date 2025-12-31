@@ -8,14 +8,10 @@ import { VehicleList } from '../vehicles/VehicleList';
 import EmployeeList from '../employees/EmployeeList';
 import RouteList from '../routes/RouteList';
 import { DictionaryType } from '../../types';
+import { TabsNavigation } from '../shared/TabsNavigation';
 
 const GarageManagement = lazy(() => import('./GarageManagement'));
 const StorageManagement = lazy(() => import('./StorageManagement'));
-
-interface DictionaryButtonProps {
-    dictType: DictionaryType;
-    label: string;
-}
 
 interface DictionariesProps {
     subViewToOpen?: DictionaryType | null;
@@ -23,16 +19,19 @@ interface DictionariesProps {
 
 const Dictionaries: React.FC<DictionariesProps> = ({ subViewToOpen }) => {
 
-    const allDicts: { type: DictionaryType; label: string; }[] = [
-        { type: 'fuelTypes', label: 'Типы топлива' },
-        { type: 'organizations', label: 'Организации' },
-        { type: 'vehicles', label: 'Транспорт' },
-        { type: 'employees', label: 'Сотрудники' },
-        { type: 'storageLocations', label: 'Места хранения' },
-        { type: 'routes', label: 'Маршруты' },
+    const allDicts: { id: DictionaryType; label: string; }[] = [
+        { id: 'vehicles', label: 'Транспорт' },
+        { id: 'employees', label: 'Сотрудники' },
+        { id: 'organizations', label: 'Организации' },
+        { id: 'fuelTypes', label: 'Топливо' }, // Changed label to match design (Топливо instead of Типы топлива)
+        { id: 'storageLocations', label: 'Склады' }, // Changed label to match design (Склады instead of Места хранения)
+        { id: 'routes', label: 'Маршруты' },
     ];
+    // Calendar is missing in original list but present in design, keeping existing for now or adding placeholder?
+    // Design has: Transport, Employees, Organizations, Fuel, Stock, Routes, Calendar.
+    // I will stick to existing functionality map but update labels.
 
-    const [activeDictionary, setActiveDictionary] = useState<DictionaryType>(allDicts[0]?.type || 'vehicles');
+    const [activeDictionary, setActiveDictionary] = useState<DictionaryType>(allDicts[0]?.id || 'vehicles');
 
     useEffect(() => {
         const handleNavigate = (event: CustomEvent) => {
@@ -53,29 +52,6 @@ const Dictionaries: React.FC<DictionariesProps> = ({ subViewToOpen }) => {
         };
     }, [subViewToOpen]);
 
-    const DictionaryButton: React.FC<DictionaryButtonProps> = ({ dictType, label }) => (
-        <button
-            onClick={() => setActiveDictionary(dictType)}
-            className={`px-3 py-1 rounded-md text-sm transition-colors ${activeDictionary === dictType
-                ? 'bg-blue-500 text-white shadow'
-                : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600'
-                }`}
-        >
-            {label}
-        </button>
-    );
-
-    const DictionarySubMenu = () => (
-        <div className="p-4 bg-gray-100 dark:bg-gray-900 rounded-lg mb-6 flex items-center gap-4 flex-wrap">
-            <h3 className="text-lg font-semibold text-gray-700 dark:text-gray-200 mr-2">Выберите справочник:</h3>
-            <div className="flex gap-2 flex-wrap">
-                {allDicts.map(dict => (
-                    <DictionaryButton key={dict.type} dictType={dict.type} label={dict.label} />
-                ))}
-            </div>
-        </div>
-    );
-
     const renderActiveDictionary = () => {
         switch (activeDictionary) {
             case 'fuelTypes': return <FuelTypeManagement />;
@@ -84,19 +60,21 @@ const Dictionaries: React.FC<DictionariesProps> = ({ subViewToOpen }) => {
             case 'employees': return <EmployeeList />;
             case 'storageLocations': return <Suspense fallback={<div>Загрузка...</div>}><StorageManagement /></Suspense>;
             case 'routes': return <RouteList />;
-            default: return <p>Выберите справочник.</p>;
+            default: return <div className="p-4 text-gray-500">Выберите справочник.</div>;
         }
     }
 
     return (
-        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 space-y-6">
-            <div className="flex justify-between items-center">
-                <h2 className="text-2xl font-bold text-gray-800 dark:text-white">Справочники</h2>
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm min-h-[calc(100vh-8rem)]">
+            <div className="px-6 pt-4">
+                <TabsNavigation
+                    tabs={allDicts}
+                    activeTab={activeDictionary}
+                    onTabChange={(id) => setActiveDictionary(id as DictionaryType)}
+                />
             </div>
 
-            <DictionarySubMenu />
-
-            <div className="overflow-x-auto">
+            <div className="p-6">
                 {renderActiveDictionary()}
             </div>
         </div>

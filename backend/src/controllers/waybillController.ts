@@ -149,12 +149,16 @@ export async function bulkChangeWaybillStatus(req: Request, res: Response, next:
             throw new BadRequestError('Не указан целевой статус');
         }
 
+        // WB-BULK-SEQ: Extract stopOnFirstError from body, default true for posting
+        const stopOnFirstError = req.body.stopOnFirstError ?? true;
+
         const result = await waybillService.bulkChangeWaybillStatus(
             req.user as any,
             ids,
             status,
             userId,
-            reason
+            reason,
+            stopOnFirstError  // WB-BULK-SEQ: Pass to service
         );
 
         res.json(result);

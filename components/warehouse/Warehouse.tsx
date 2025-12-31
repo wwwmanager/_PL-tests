@@ -14,68 +14,40 @@ const Warehouse: React.FC = () => {
 
     return (
         <div className="space-y-6">
-            <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                    <div className="p-2 bg-blue-100 dark:bg-blue-900 rounded-lg">
-                        <CubeIcon className="w-6 h-6 text-blue-600 dark:text-blue-300" />
+            <div className="flex items-center justify-between bg-white dark:bg-gray-800 p-5 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700">
+                <div className="flex items-center space-x-4">
+                    <div className="p-3 bg-blue-50 dark:bg-blue-900/40 rounded-xl transition-all duration-300">
+                        <CubeIcon className="w-8 h-8 text-blue-600 dark:text-blue-400" />
                     </div>
-                    <h1 className="text-2xl font-bold text-gray-800 dark:text-white">Склад</h1>
+                    <div>
+                        <h1 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">Склад</h1>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">Управление номенклатурой и складскими операциями</p>
+                    </div>
                 </div>
             </div>
 
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden">
-                <div className="border-b dark:border-gray-700">
-                    <nav className="flex -mb-px overflow-x-auto">
-                        <button
-                            data-testid="tab-nomenclature"
-                            onClick={() => setActiveTab('nomenclature')}
-                            className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${activeTab === 'nomenclature'
-                                ? 'border-blue-500 text-blue-600 dark:text-blue-400'
-                                : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
-                                }`}
-                        >
-                            Номенклатура
-                        </button>
-                        <button
-                            data-testid="tab-balances"
-                            onClick={() => setActiveTab('balances')}
-                            className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${activeTab === 'balances'
-                                ? 'border-blue-500 text-blue-600 dark:text-blue-400'
-                                : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
-                                }`}
-                        >
-                            Остатки топлива
-                        </button>
-                        <button
-                            data-testid="tab-movements"
-                            onClick={() => setActiveTab('movements')}
-                            className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${activeTab === 'movements'
-                                ? 'border-blue-500 text-blue-600 dark:text-blue-400'
-                                : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
-                                }`}
-                        >
-                            Журнал движений
-                        </button>
-                        <button
-                            data-testid="tab-fuel-cards"
-                            onClick={() => setActiveTab('fuel-cards')}
-                            className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${activeTab === 'fuel-cards'
-                                ? 'border-blue-500 text-blue-600 dark:text-blue-400'
-                                : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
-                                }`}
-                        >
-                            💳 Топливные карты
-                        </button>
-                        <button
-                            data-testid="tab-rules"
-                            onClick={() => setActiveTab('rules')}
-                            className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${activeTab === 'rules'
-                                ? 'border-blue-500 text-blue-600 dark:text-blue-400'
-                                : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
-                                }`}
-                        >
-                            ⚙️ Правила
-                        </button>
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
+                <div className="border-b border-gray-100 dark:border-gray-700">
+                    <nav className="flex px-4 -mb-px overflow-x-auto">
+                        {[
+                            { id: 'nomenclature', label: '📖 Номенклатура' },
+                            { id: 'balances', label: '📊 Остатки' },
+                            { id: 'movements', label: '📝 Движения' },
+                            { id: 'fuel-cards', label: '💳 Топливные карты' },
+                            { id: 'rules', label: '⚙️ Правила' },
+                        ].map((tab) => (
+                            <button
+                                key={tab.id}
+                                data-testid={`tab-${tab.id}`}
+                                onClick={() => setActiveTab(tab.id as Tab)}
+                                className={`px-5 py-4 text-sm font-semibold border-b-2 transition-all duration-200 whitespace-nowrap ${activeTab === tab.id
+                                    ? 'border-blue-600 text-blue-600 dark:text-blue-400 bg-blue-50/50 dark:bg-blue-900/20'
+                                    : 'border-transparent text-gray-500 hover:text-gray-900 dark:hover:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700/50'
+                                    }`}
+                            >
+                                {tab.label}
+                            </button>
+                        ))}
                     </nav>
                 </div>
 

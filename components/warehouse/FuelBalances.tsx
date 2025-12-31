@@ -4,6 +4,8 @@ import { getVehicles } from '../../services/api/vehicleApi';
 import { LocationBalance, GarageStockItem, StockLocation, Vehicle } from '../../types';
 import { useToast } from '../../hooks/useToast';
 import DataTable from '../shared/DataTable';
+import { Button } from '../shared/Button';
+import { FunnelIcon } from '../Icons';
 
 const FuelBalances: React.FC = () => {
     // ... (state declarations remain same)
@@ -160,25 +162,28 @@ const FuelBalances: React.FC = () => {
     ];
 
     return (
-        <div className="p-4 space-y-4">
+        <div className="p-0 space-y-6">
             {/* Filters */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
-                <div>
+            <div className="flex flex-wrap gap-4 items-end bg-gray-50 dark:bg-gray-800/50 p-4 rounded-xl border border-gray-100 dark:border-gray-700">
+                <div className="flex items-center gap-2 text-gray-500 text-sm font-medium mr-2 self-center">
+                    <FunnelIcon className="h-4 w-4" /> Фильтры:
+                </div>
+                <div className="flex-1 min-w-[200px]">
                     <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">На дату/время</label>
                     <input
                         type="datetime-local"
                         value={asOf}
                         onChange={(e) => setAsOf(e.target.value)}
-                        className="w-full text-sm bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:text-white"
+                        className="w-full text-sm bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:text-white"
                     />
                 </div>
-                <div>
+                <div className="min-w-[200px]">
                     <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Товар</label>
                     <select
                         name="stockItemId"
                         value={filters.stockItemId}
                         onChange={handleFilterChange}
-                        className="w-full text-sm bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:text-white"
+                        className="w-full text-sm bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:text-white"
                     >
                         <option value="">Все товары</option>
                         {items.map(item => (
@@ -186,13 +191,13 @@ const FuelBalances: React.FC = () => {
                         ))}
                     </select>
                 </div>
-                <div>
+                <div className="min-w-[200px]">
                     <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Тип локации</label>
                     <select
                         name="locationType"
                         value={filters.locationType}
                         onChange={handleFilterChange}
-                        className="w-full text-sm bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:text-white"
+                        className="w-full text-sm bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:text-white"
                     >
                         <option value="">Все типы</option>
                         <option value="WAREHOUSE">Склады</option>
@@ -200,19 +205,20 @@ const FuelBalances: React.FC = () => {
                         <option value="VEHICLE_TANK">Баки ТС</option>
                     </select>
                 </div>
-                <div className="flex items-end">
-                    <button
+                <div className="flex items-center">
+                    <Button
                         onClick={loadData}
                         disabled={loading}
-                        className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 transition-colors w-full md:w-auto"
+                        variant="primary"
+                        size="sm"
                     >
                         Обновить
-                    </button>
+                    </Button>
                 </div>
             </div>
 
             {/* Table */}
-            <div className="bg-white dark:bg-gray-800 border dark:border-gray-700 rounded-lg shadow-sm">
+            <div className="bg-white dark:bg-gray-800 rounded-xl overflow-hidden">
                 {loading ? (
                     <div className="p-12 text-center text-gray-500">Загрузка...</div>
                 ) : (
@@ -221,7 +227,7 @@ const FuelBalances: React.FC = () => {
                         data={filteredBalances}
                         keyField="locationId" // Assuming unique by locationId here since filtered by single stockItem usually
                         emptyMessage="Нет данных об остатках на выбранную дату"
-                        searchable={true}
+                        searchable={false}
                     />
                 )}
             </div>

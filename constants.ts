@@ -16,23 +16,23 @@ export const WAYBILL_STATUS_COLORS: {
 } = {
   [WaybillStatus.DRAFT]: {
     bg: 'bg-gray-100 dark:bg-gray-700',
-    text: 'text-gray-800 dark:text-gray-200',
-    iconBorder: 'border-gray-500',
+    text: 'text-gray-600 dark:text-gray-300',
+    iconBorder: 'border-gray-400',
   },
   [WaybillStatus.SUBMITTED]: {
-    bg: 'bg-yellow-100 dark:bg-yellow-900',
-    text: 'text-yellow-800 dark:text-yellow-200',
-    iconBorder: 'border-yellow-500',
+    bg: 'bg-amber-100 dark:bg-amber-900/50',
+    text: 'text-amber-800 dark:text-amber-200',
+    iconBorder: 'border-amber-400',
   },
   [WaybillStatus.POSTED]: {
-    bg: 'bg-green-100 dark:bg-green-900',
-    text: 'text-green-800 dark:text-green-200',
-    iconBorder: 'border-green-500',
+    bg: 'bg-teal-600 dark:bg-teal-500',
+    text: 'text-white',
+    iconBorder: 'border-teal-700',
   },
   [WaybillStatus.CANCELLED]: {
-    bg: 'bg-red-100 dark:bg-red-900',
+    bg: 'bg-red-100 dark:bg-red-900/50',
     text: 'text-red-800 dark:text-red-200',
-    iconBorder: 'border-red-500',
+    iconBorder: 'border-red-400',
   },
 };
 
@@ -44,7 +44,7 @@ export const WAYBILL_STATUS_TRANSLATIONS: { [key in WaybillStatus]?: string } = 
 };
 
 export const ORGANIZATION_STATUS_COLORS: { [key in OrganizationStatus]: string } = {
-  [OrganizationStatus.ACTIVE]: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
+  [OrganizationStatus.ACTIVE]: 'bg-teal-600 text-white dark:bg-teal-500',  // UI-DESIGN: Solid teal for Active
   [OrganizationStatus.ARCHIVED]:
     'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200',
   [OrganizationStatus.LIQUIDATED]:
@@ -60,18 +60,20 @@ export const ORGANIZATION_STATUS_TRANSLATIONS: {
 };
 
 export const VEHICLE_STATUS_COLORS: { [key in VehicleStatus]: string } = {
-  [VehicleStatus.ACTIVE]: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
+  [VehicleStatus.ACTIVE]: 'bg-teal-600 text-white dark:bg-teal-500',  // UI-DESIGN: Solid teal for Active
   [VehicleStatus.ARCHIVED]:
     'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200',
+  [VehicleStatus.MAINTENANCE]: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200',
 };
 
 export const VEHICLE_STATUS_TRANSLATIONS: { [key in VehicleStatus]: string } = {
   [VehicleStatus.ACTIVE]: 'Активен',
   [VehicleStatus.ARCHIVED]: 'В архиве',
+  [VehicleStatus.MAINTENANCE]: 'На обслуживании',
 };
 
 export const STORAGE_STATUS_COLORS: { [key in 'active' | 'archived']: string } = {
-  active: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
+  active: 'bg-teal-600 text-white dark:bg-teal-500',  // UI-DESIGN: Solid teal for Active
   archived: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200',
 };
 
@@ -173,9 +175,9 @@ export const BLANK_STATUS_TRANSLATIONS: Record<BlankStatus, string> = {
 
 export const BLANK_STATUS_COLORS: Record<BlankStatus, string> = {
   available: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
-  issued: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
+  issued: 'bg-teal-600 text-white dark:bg-teal-500',  // UI-DESIGN: Solid teal for Issued
   reserved: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200',
-  used: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
+  used: 'bg-teal-600 text-white dark:bg-teal-500',    // UI-DESIGN: Same as Posted
   returned: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200',
   spoiled: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
 };
@@ -245,3 +247,23 @@ export const DEFAULT_ROLE_POLICIES: Record<Role, Capability[]> = {
 export const ALL_CAPS: Capability[] = Array.from(
   new Set(Object.values(DEFAULT_ROLE_POLICIES).flat())
 ) as Capability[];
+
+// --- Business Audit Translations ---
+
+export const BUSINESS_EVENT_CONFIG: Record<string, { label: string; color: string; icon?: 'doc' | 'blank' | 'user' | 'alert' }> = {
+  'waybill.created': { label: 'Создание ПЛ', color: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200', icon: 'doc' },
+  'waybill.submitted': { label: 'Отправка на проверку', color: 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200', icon: 'doc' },
+  'waybill.posted': { label: 'Проведение путевого листа', color: 'bg-teal-600 text-white dark:bg-teal-500', icon: 'doc' },
+  'waybill.cancelled': { label: 'Отмена путевого листа', color: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200', icon: 'doc' },
+  'waybill.corrected': { label: 'Корректировка ПЛ', color: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200', icon: 'alert' },
+  'waybill.numberUsed': { label: 'Использование номера бланка', color: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200', icon: 'blank' },
+
+  'blanks.batchCreated': { label: 'Создание пачки бланков', color: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200', icon: 'blank' },
+  'blanks.materialized': { label: 'Материализация бланков', color: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200', icon: 'blank' },
+  'blanks.issued': { label: 'Выдача бланков водителю', color: 'bg-teal-600 text-white dark:bg-teal-500', icon: 'blank' },
+  'blanks.returnedToDriver': { label: 'Возврат бланка водителю', color: 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900 dark:text-cyan-200', icon: 'blank' },
+  'blank.spoiled': { label: 'Списание бланка', color: 'bg-rose-100 text-rose-800 dark:bg-rose-900 dark:text-rose-200', icon: 'alert' },
+  'blank.spoiled.bulk': { label: 'Массовое списание бланков', color: 'bg-rose-100 text-rose-800 dark:bg-rose-900 dark:text-rose-200', icon: 'alert' },
+
+  'employee.fuelReset': { label: 'Обнуление топливной карты', color: 'bg-pink-100 text-pink-800 dark:bg-pink-900 dark:text-pink-200', icon: 'user' },
+};

@@ -23,7 +23,7 @@ interface BadgeProps {
 }
 
 const variantClasses: Record<BadgeVariant, string> = {
-    success: 'bg-teal-100 text-teal-800 dark:bg-teal-900/50 dark:text-teal-200',
+    success: 'bg-teal-600 text-white dark:bg-teal-500',  // UI-DESIGN: Solid teal for POSTED status
     warning: 'bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-200',
     danger: 'bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-200',
     info: 'bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-200',

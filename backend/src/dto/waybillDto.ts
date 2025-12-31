@@ -31,6 +31,7 @@ export const routeSchema = z.object({
     plannedTime: z.string().optional().nullable(),
     actualTime: z.string().optional().nullable(),
     comment: z.string().optional().nullable(),
+    date: z.string().optional().nullable(), // WB-ROUTE-DATE: Route-specific date
 });
 
 /**

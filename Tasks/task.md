@@ -999,3 +999,19 @@ E) Admin endpoint
 Если где-то UI/отчёты всё ещё используют FuelCard.balanceLiters как “баланс карты”, после отключения increment нужно перевести эти места на ledger API (/api/stock/balance).
 Изменение occurredAt на nextRunAt изменит временную точку движения (это правильно для as-of, но важно понимать при отчётах).
 
+---
+
+# UI-DESIGN-007 — Унификация цветовых схем ✅
+
+**Цель:** Приведение всех элементов UI (справочники, сотрудники, склады) к единой схеме teal-600 для активных состояний.
+
+- [x] `constants.ts`: Обновить `WAYBILL_STATUS_COLORS` (POSTED → teal-600)
+- [x] `constants.ts`: Обновить `ORGANIZATION_STATUS_COLORS` (Active → teal-600)
+- [x] `constants.ts`: Обновить `VEHICLE_STATUS_COLORS` (Active → teal-600)
+- [x] `constants.ts`: Обновить `STORAGE_STATUS_COLORS` (Active → teal-600)
+- [x] `constants.ts`: Обновить `BLANK_STATUS_COLORS` (Used, Issued → teal-600)
+- [x] `constants.ts`: Обновить `BUSINESS_EVENT_CONFIG` (Posted, Issued → teal-600)
+- [x] `Badge.tsx`: Обновить `success` variant (bg-teal-600 text-white)
+- [x] `EmployeeList.tsx`: Исправить хардкод цвета ACTIVE (teal-600)
+- [x] `waybillService.ts`: Исправить ошибку сторно (404) при корректировке ПЛ
+

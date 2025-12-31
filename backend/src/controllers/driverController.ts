@@ -108,9 +108,16 @@ export async function searchDrivers(req: Request, res: Response, next: NextFunct
         const query = (req.query.q as string || '').trim();
         const limit = Math.min(parseInt(req.query.limit as string, 10) || 20, 50);
 
+        // ORG-HIERARCHY: Include drivers from this org AND all child orgs
+        const childOrgs = await prisma.organization.findMany({
+            where: { parentOrganizationId: organizationId },
+            select: { id: true }
+        });
+        const orgIds = [organizationId, ...childOrgs.map(o => o.id)];
+
         const where: any = {
             employee: {
-                organizationId,
+                organizationId: { in: orgIds },
                 isActive: true,
             },
         };
