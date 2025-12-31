@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
     getFuelCards,
     getTopUpRules,
@@ -707,7 +707,7 @@ const FuelCards: React.FC = () => {
         }
     };
 
-    const columns = [
+    const columns = useMemo(() => [
         { key: 'cardNumber', label: 'Номер карты', sortable: true },
         { key: 'provider', label: 'Поставщик', sortable: true },
         {
@@ -740,49 +740,7 @@ const FuelCards: React.FC = () => {
                 </span>
             )
         },
-        {
-            key: 'actions',
-            label: 'Действия',
-            render: (row: FuelCard) => (
-                <div className="flex gap-2 justify-center">
-                    <Button
-                        onClick={() => handleTopUp(row)}
-                        variant="success"
-                        size="sm"
-                        title="Пополнить карту"
-                        leftIcon={<BanknotesIcon className="h-3.5 w-3.5" />}
-                    >
-                        Пополнить
-                    </Button>
-                    <Button
-                        onClick={() => handleAssign(row)}
-                        variant="primary"
-                        size="sm"
-                        title="Привязать к водителю"
-                        leftIcon={<UserGroupIcon className="h-3.5 w-3.5" />}
-                    >
-                        Привязать
-                    </Button>
-                    <Button
-                        onClick={() => handleReset(row)}
-                        variant="warning"
-                        size="sm"
-                        title="Обнулить баланс карты"
-                        leftIcon={<ArrowUturnLeftIcon className="h-3.5 w-3.5" />}
-                    >
-                        Обнулить
-                    </Button>
-                    <button
-                        onClick={() => setDeleteConfirmCard(row)}
-                        className="p-1 text-red-500 hover:text-red-700 transition-colors"
-                        title="Удалить карту"
-                    >
-                        <TrashIcon className="h-4 w-4" />
-                    </button>
-                </div>
-            )
-        },
-    ];
+    ], []);
 
     return (
         <div className="p-0 space-y-6">
@@ -808,13 +766,40 @@ const FuelCards: React.FC = () => {
                 </div>
             </div>
 
-            <div className="bg-white dark:bg-gray-800 rounded-xl overflow-hidden">
+            <div className="bg-white dark:bg-gray-800 rounded-xl overflow-hidden shadow-sm border border-gray-100 dark:border-gray-700">
                 <DataTable
+                    tableId="fuel-cards"
                     columns={columns}
                     data={cards}
                     keyField="id"
+                    isLoading={loading}
                     emptyMessage="Топливные карты не найдены"
-                    searchable={false}
+                    actions={[
+                        {
+                            icon: <BanknotesIcon className="h-4 w-4" />,
+                            onClick: (row) => handleTopUp(row),
+                            title: "Пополнить карту",
+                            className: "text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20"
+                        },
+                        {
+                            icon: <UserGroupIcon className="h-4 w-4" />,
+                            onClick: (row) => handleAssign(row),
+                            title: "Привязать к водителю",
+                            className: "text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                        },
+                        {
+                            icon: <ArrowUturnLeftIcon className="h-4 w-4" />,
+                            onClick: (row) => handleReset(row),
+                            title: "Обнулить баланс",
+                            className: "text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-900/20"
+                        },
+                        {
+                            icon: <TrashIcon className="h-4 w-4" />,
+                            onClick: (row) => setDeleteConfirmCard(row),
+                            title: "Удалить карту",
+                            className: "text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
+                        }
+                    ]}
                 />
             </div>
 

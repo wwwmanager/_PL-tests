@@ -26,6 +26,14 @@ import { EmptyState, getEmptyStateFromError } from '../common/EmptyState';
 import { HttpError } from '../../services/httpClient';
 import { useAuth } from '../../services/auth';
 
+// DnD Imports
+import { DndContext, closestCenter, DragOverlay } from '@dnd-kit/core';
+import { SortableContext, horizontalListSortingStrategy } from '@dnd-kit/sortable';
+import { useColumnPersistence } from '../../hooks/useColumnPersistence';
+import { SortableHeader } from '../shared/SortableHeader';
+import { createPortal } from 'react-dom';
+import { Column } from '../shared/DataTable';
+
 
 type EnrichedWaybill = Waybill & { mileage?: number; rowNumber?: number; };
 
@@ -66,6 +74,41 @@ const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpene
   const [isSeasonModalOpen, setIsSeasonModalOpen] = useState(false);
   const [isBatchModalOpen, setIsBatchModalOpen] = useState(false);
   const [isCheckModalOpen, setIsCheckModalOpen] = useState(false);
+  const [activeId, setActiveId] = useState<string | null>(null);
+
+  // Column Definitions
+  const waybillColumns: Column<EnrichedWaybill>[] = useMemo(() => {
+    if (isExtendedView) {
+      return [
+        { key: 'rowNumber', label: '№', sortable: true },
+        { key: 'number', label: 'Номер', sortable: true, render: (w) => <span className="font-medium text-gray-900 dark:text-white">{w.number}</span> },
+        { key: 'validFrom', label: 'Выезд', sortable: true, render: (w) => w.validFrom ? new Date(w.validFrom).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—' },
+        { key: 'validTo', label: 'Возврат', sortable: true, render: (w) => w.validTo ? new Date(w.validTo).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—' },
+        { key: 'odometerStart', label: 'Одом. нач.', sortable: true },
+        { key: 'odometerEnd', label: 'Одом. кон.', sortable: true, render: (w) => w.odometerEnd ?? '—' },
+        { key: 'mileage', label: 'Пробег', sortable: true },
+        { key: 'fuelAtStart', label: 'Топл. нач.', sortable: true, render: (w) => <span className={Number(w.fuelAtStart) < 0 ? 'text-red-600' : ''}>{w.fuelAtStart ?? '—'}</span> },
+        { key: 'fuelReceived', label: 'Запр.', sortable: true, render: (w) => <span className="text-green-600 dark:text-green-400 font-medium">{(w as any).fuelReceived > 0 ? `+${(w as any).fuelReceived}` : '—'}</span> },
+        { key: 'fuelAtEnd', label: 'Топл. кон.', sortable: true, render: (w) => <span className={Number(w.fuelAtEnd) < 0 ? 'text-red-600' : ''}>{w.fuelAtEnd ?? '—'}</span> },
+        { key: 'status', label: 'Статус', sortable: true, render: (w) => <WaybillStatusBadge status={w.status} /> },
+      ];
+    }
+    return [
+      { key: 'number', label: 'Номер', sortable: true, render: (w) => <span className="font-medium text-gray-900 dark:text-white">{w.number}</span> },
+      { key: 'date', label: 'Дата', sortable: true, render: (w) => new Date(w.date).toLocaleDateString('ru-RU') },
+      { key: 'vehicle', label: 'ТС', sortable: true },
+      { key: 'driver', label: 'Водитель', sortable: true },
+      { key: 'organizationId', label: 'Организация', sortable: true },
+      { key: 'status', label: 'Статус', sortable: true, render: (w) => <WaybillStatusBadge status={w.status} /> },
+    ];
+  }, [isExtendedView]);
+
+  const { columns, sensors, onDragEnd } = useColumnPersistence(
+    waybillColumns,
+    isExtendedView ? 'waybills-extended' : 'waybills-standard'
+  );
+
+  const activeColumn = columns.find(c => c.key === activeId);
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -165,31 +208,7 @@ const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpene
     });
   }, [waybills, topLevelFilter, selectedVehicleId]);
 
-  const columns = useMemo(() => {
-    if (isExtendedView) {
-      return [
-        { key: 'rowNumber', label: '№ п/п' },
-        { key: 'number', label: '№ ПЛ' },
-        { key: 'validFrom', label: 'Дата Выезда' },
-        { key: 'validTo', label: 'Дата Возвращения' },
-        { key: 'odometerStart', label: 'Пробег Начальный' },
-        { key: 'odometerEnd', label: 'Пробег Конечный' },
-        { key: 'mileage', label: 'Пробег по ПЛ' },
-        { key: 'fuelAtStart', label: 'Топливо (выезд)' },
-        { key: 'fuelReceived', label: 'Заправлено' },
-        { key: 'fuelAtEnd', label: 'Топливо (возврат)' },
-        { key: 'status', label: 'Статус' },
-      ];
-    }
-    return [
-      { key: 'number', label: '№ Путевого листа' },
-      { key: 'date', label: 'Дата' },
-      { key: 'vehicle', label: 'ТС' },
-      { key: 'driver', label: 'Водитель' },
-      { key: 'organization', label: 'Организация' },
-      { key: 'status', label: 'Статус' },
-    ];
-  }, [isExtendedView]);
+
 
   const enrichedData = useMemo(() => {
     return preFilteredWaybills.map((w, index) => {
@@ -721,110 +740,115 @@ const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpene
           )}
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm text-left text-gray-500 dark:text-gray-400">
-            <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
-              <tr>
-                <th scope="col" className="p-4">
-                  <div className="flex items-center">
-                    <input
-                      type="checkbox"
-                      className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 dark:focus:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
-                      checked={rows.length > 0 && selectedIds.size === rows.length}
-                      onChange={(e) => handleSelectAll(e.target.checked)}
-                    />
-                    <label className="sr-only">Выбрать все</label>
-                  </div>
-                </th>
-                {columns.map(col => (
-                  <th key={col.key as string} scope="col" className="px-6 py-3 cursor-pointer" onClick={() => handleSort(col.key as any)}>
-                    <div className="flex items-center gap-1">
-                      {col.label}
-                      {sortColumn === col.key && (sortDirection === 'asc' ? <ArrowUpIcon className="h-4 w-4" /> : <ArrowDownIcon className="h-4 w-4" />)}
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={(e) => { setActiveId(null); onDragEnd(e); }}
+          onDragStart={(e) => setActiveId(String(e.active.id))}
+        >
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm text-left text-gray-500 dark:text-gray-400">
+              <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
+                <tr>
+                  <th scope="col" className="p-4 bg-gray-50 dark:bg-gray-700 sticky left-0 z-10">
+                    <div className="flex items-center">
+                      <input
+                        type="checkbox"
+                        className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 dark:focus:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+                        checked={rows.length > 0 && selectedIds.size === rows.length}
+                        onChange={(e) => handleSelectAll(e.target.checked)}
+                      />
+                      <label className="sr-only">Выбрать все</label>
                     </div>
                   </th>
-                ))}
-                <th scope="col" className="px-6 py-3 text-center">Действия</th>
-              </tr>
-              {!isExtendedView && (
-                <tr>
-                  <th />
-                  {columns.map(col => (
-                    <th key={`${col.key}-filter`} className="px-2 py-1">
-                      <input
-                        type="text"
-                        value={filters[col.key as string] || ''}
-                        onChange={e => handleFilterChange(col.key as any, e.target.value)}
-                        placeholder={`Поиск...`}
-                        className="w-full text-xs p-1 bg-gray-100 dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded"
-                      />
-                    </th>
-                  ))}
-                  <th className="px-2 py-1"></th>
-                </tr>
-              )}
-            </thead>
-            <tbody>
-              {loading || error || rows.length === 0 ? (
-                <tr>
-                  <td colSpan={columns.length + 2} className="p-0">
-                    <EmptyState
-                      reason={error ? getEmptyStateFromError(error) : (loading ? { type: 'loading' } : { type: 'empty', entityName: 'путевые листы' })}
-                      onRetry={fetchData}
-                    />
-                  </td>
-                </tr>
-              ) : (
-                rows.map(w => {
-                  const colors = WAYBILL_STATUS_COLORS[w.status];
-                  return (
-                    <tr key={w.id} className={'bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-600 border-b dark:border-gray-700'}>
-                      <td className="w-4 p-4">
-                        <div className="flex items-center">
-                          <input
-                            type="checkbox"
-                            className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 dark:focus:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
-                            checked={selectedIds.has(w.id)}
-                            onChange={(e) => handleSelectRow(w.id, e.target.checked)}
-                          />
+                  <SortableContext items={columns.map(c => c.key)} strategy={horizontalListSortingStrategy}>
+                    {columns.map(col => (
+                      <SortableHeader
+                        key={col.key}
+                        id={col.key}
+                        asTh
+                        className={`px-6 py-3 cursor-pointer bg-gray-50 dark:bg-gray-700 ${col.sortable ? 'hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors' : ''}`}
+                        onClick={() => col.sortable && handleSort(col.key as any)}
+                      >
+                        <div className="flex items-center gap-1">
+                          {col.label}
+                          {sortColumn === col.key && (sortDirection === 'asc' ? <ArrowUpIcon className="h-4 w-4" /> : <ArrowDownIcon className="h-4 w-4" />)}
                         </div>
-                      </td>
-                      {isExtendedView ? (
-                        <>
-                          <td className="px-6 py-4">{w.rowNumber}</td>
-                          <td className="px-6 py-4 font-medium text-gray-900 dark:text-white">{w.number}</td>
-                          <td className="px-6 py-4 whitespace-nowrap">{w.validFrom ? new Date(w.validFrom).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}</td>
-                          <td className="px-6 py-4 whitespace-nowrap">{w.validTo ? new Date(w.validTo).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}</td>
-                          <td className="px-6 py-4">{w.odometerStart}</td>
-                          <td className="px-6 py-4">{w.odometerEnd ?? '—'}</td>
-                          <td className="px-6 py-4">{w.mileage}</td>
-                          <td className={`px-6 py-4 ${Number(w.fuelAtStart) < 0 ? 'text-red-600' : ''}`}>{w.fuelAtStart ?? '—'}</td>
-                          <td className="px-6 py-4 text-green-600 dark:text-green-400 font-medium">{(w as any).fuelReceived > 0 ? `+${(w as any).fuelReceived}` : '—'}</td>
-                          <td className={`px-6 py-4 ${Number(w.fuelAtEnd) < 0 ? 'text-red-600' : ''}`}>{w.fuelAtEnd ?? '—'}</td>
-                          <td className="px-6 py-4">
-                            <WaybillStatusBadge status={w.status} />
+                      </SortableHeader>
+                    ))}
+                  </SortableContext>
+                  <th scope="col" className="px-6 py-3 text-center bg-gray-50 dark:bg-gray-700 sticky right-0 z-10">Действия</th>
+                </tr>
+                {!isExtendedView && (
+                  <tr>
+                    <th className="bg-gray-50 dark:bg-gray-700 sticky left-0 z-10" />
+                    {columns.map(col => (
+                      <th key={`${col.key}-filter`} className="px-2 py-1 bg-gray-50 dark:bg-gray-700">
+                        <input
+                          type="text"
+                          value={filters[col.key as string] || ''}
+                          onChange={e => handleFilterChange(col.key as any, e.target.value)}
+                          placeholder={`Поиск...`}
+                          className="w-full text-xs p-1 bg-gray-100 dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded"
+                        />
+                      </th>
+                    ))}
+                    <th className="px-2 py-1 bg-gray-50 dark:bg-gray-700 sticky right-0 z-10"></th>
+                  </tr>
+                )}
+              </thead>
+              <tbody>
+                {loading || error || rows.length === 0 ? (
+                  <tr>
+                    <td colSpan={columns.length + 2} className="p-0">
+                      <EmptyState
+                        reason={error ? getEmptyStateFromError(error) : (loading ? { type: 'loading' } : { type: 'empty', entityName: 'путевые листы' })}
+                        onRetry={fetchData}
+                      />
+                    </td>
+                  </tr>
+                ) : (
+                  rows.map(w => {
+                    return (
+                      <tr key={w.id} className={'bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-600 border-b dark:border-gray-700'}>
+                        <td className="w-4 p-4 sticky left-0 bg-inherit z-10">
+                          <div className="flex items-center">
+                            <input
+                              type="checkbox"
+                              className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 dark:focus:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+                              checked={selectedIds.has(w.id)}
+                              onChange={(e) => handleSelectRow(w.id, e.target.checked)}
+                            />
+                          </div>
+                        </td>
+                        {columns.map(col => (
+                          <td key={col.key} className="px-6 py-4">
+                            {col.render ? col.render(w) : (w as any)[col.key]}
                           </td>
-                        </>
-                      ) : (
-                        <>
-                          <td className="px-6 py-4 font-medium text-gray-900 dark:text-white">{w.number}</td>
-                          <td className="px-6 py-4">{new Date(w.date).toLocaleDateString('ru-RU')}</td>
-                          <td className="px-6 py-4">{w.vehicle}</td>
-                          <td className="px-6 py-4">{w.driver}</td>
-                          <td className="px-6 py-4">{w.organizationId}</td>
-                          <td className="px-6 py-4">
-                            <WaybillStatusBadge status={w.status} />
-                          </td>
-                        </>
-                      )}
-                      {renderActionButtons(w)}
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
+                        ))}
+                        <td className="sticky right-0 bg-inherit z-10 text-center">
+                          {renderActionButtons(w)}
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {typeof document !== 'undefined' && createPortal(
+            <DragOverlay>
+              {activeColumn ? (
+                <div className="bg-white dark:bg-gray-800 shadow-xl p-4 rounded-lg border-2 border-blue-500 dark:border-blue-400 font-bold opacity-90 cursor-grabbing text-xs uppercase text-gray-700 dark:text-gray-200 flex items-center gap-2">
+                  <span className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></span>
+                  {activeColumn.label}
+                </div>
+              ) : null}
+            </DragOverlay>,
+            document.body
+          )}
+        </DndContext>
 
         {/* Pagination Controls - Innovations Style */}
         <div className="mt-4 flex items-center justify-between border-t border-gray-200 dark:border-gray-700 pt-4">

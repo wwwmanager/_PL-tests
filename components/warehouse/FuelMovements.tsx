@@ -4,7 +4,7 @@ import { getOrganizations } from '../../services/organizationApi';
 import { StockMovementV2, GarageStockItem, StockLocation, Organization } from '../../types';
 import { useToast } from '../../hooks/useToast';
 import { PlusIcon, TrashIcon, PencilIcon, FunnelIcon } from '../Icons';
-import { RequireCapability } from '../../services/auth';
+import { useAuth } from '../../services/auth';
 import MovementCreateModal from './MovementCreateModal';
 import ConfirmationModal from '../shared/ConfirmationModal';
 import DataTable from '../shared/DataTable';
@@ -153,7 +153,9 @@ const FuelMovements: React.FC = () => {
 
 
 
-    const columns = [
+    const { can } = useAuth();
+
+    const columns = useMemo(() => [
         {
             key: 'occurredAt',
             label: 'Дата',
@@ -208,34 +210,7 @@ const FuelMovements: React.FC = () => {
                 </div>
             )
         },
-        {
-            key: 'actions',
-            label: 'Действия',
-            render: (row: StockMovementV2) => (
-                <div className="flex justify-center space-x-2">
-                    <RequireCapability cap="stock.manage">
-                        <button
-                            onClick={() => {
-                                setEditMovement(row);
-                                setIsCreateModalOpen(true);
-                            }}
-                            className="p-1 text-blue-500 hover:text-blue-700 transition-colors"
-                            title="Редактировать"
-                        >
-                            <PencilIcon className="w-4 h-4" />
-                        </button>
-                        <button
-                            onClick={() => setMovementToDelete(row)}
-                            className="p-1 text-red-500 hover:text-red-700 transition-colors"
-                            title="Удалить операцию"
-                        >
-                            <TrashIcon className="w-4 h-4" />
-                        </button>
-                    </RequireCapability>
-                </div>
-            )
-        }
-    ];
+    ], []);
 
     const totalPages = Math.ceil(total / limit);
 
@@ -328,7 +303,7 @@ const FuelMovements: React.FC = () => {
                         Найдено записей: {total}
                     </span>
                 </div>
-                <RequireCapability cap="stock.manage">
+                {can('stock.manage') && (
                     <Button
                         data-testid="btn-create-movement"
                         onClick={() => setIsCreateModalOpen(true)}
@@ -338,22 +313,39 @@ const FuelMovements: React.FC = () => {
                     >
                         Создать операцию
                     </Button>
-                </RequireCapability>
+                )}
             </div>
 
             {/* Table */}
-            <div className="bg-white dark:bg-gray-800 rounded-xl overflow-hidden">
-                {loading ? (
-                    <div className="p-12 text-center text-gray-500">Загрузка...</div>
-                ) : (
-                    <DataTable
-                        columns={columns}
-                        data={enrichedMovements}
-                        keyField="id"
-                        emptyMessage={Object.values(filters).some(v => v !== '') ? 'По вашему запросу ничего не найдено' : 'Движений еще нет'}
-                        searchable={false}
-                    />
-                )}
+            <div className="bg-white dark:bg-gray-800 rounded-xl overflow-hidden shadow-sm border border-gray-100 dark:border-gray-700">
+                <DataTable
+                    tableId="fuel-movements"
+                    columns={columns}
+                    data={enrichedMovements}
+                    keyField="id"
+                    isLoading={loading}
+                    emptyMessage={Object.values(filters).some(v => v !== '') ? 'По вашему запросу ничего не найдено' : 'Движений еще нет'}
+                    searchable={true}
+                    actions={[
+                        {
+                            icon: <PencilIcon className="w-4 h-4" />,
+                            onClick: (row) => {
+                                setEditMovement(row);
+                                setIsCreateModalOpen(true);
+                            },
+                            title: "Редактировать",
+                            className: "text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20",
+                            show: () => can('stock.manage')
+                        },
+                        {
+                            icon: <TrashIcon className="h-4 w-4" />,
+                            onClick: (row) => setMovementToDelete(row),
+                            title: "Удалить",
+                            className: "text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20",
+                            show: () => can('stock.manage')
+                        }
+                    ]}
+                />
             </div>
 
             {/* Pagination */}

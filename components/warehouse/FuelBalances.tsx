@@ -110,7 +110,7 @@ const FuelBalances: React.FC = () => {
         }
     };
 
-    const columns = [
+    const columns = useMemo(() => [
         {
             key: 'locationName',
             label: 'Локация',
@@ -152,14 +152,13 @@ const FuelBalances: React.FC = () => {
         {
             key: 'driver',
             label: 'Водитель / Ответственный',
-            sortable: false,
+            sortable: true,
             render: (row: LocationBalance) => {
                 // Driver name is already enriched in filteredBalances
                 return <span className="text-sm font-medium text-gray-800 dark:text-gray-200">{(row as any).driver || '-'}</span>;
             }
         },
-
-    ];
+    ], []);
 
     return (
         <div className="p-0 space-y-6">
@@ -218,18 +217,16 @@ const FuelBalances: React.FC = () => {
             </div>
 
             {/* Table */}
-            <div className="bg-white dark:bg-gray-800 rounded-xl overflow-hidden">
-                {loading ? (
-                    <div className="p-12 text-center text-gray-500">Загрузка...</div>
-                ) : (
-                    <DataTable
-                        columns={columns}
-                        data={filteredBalances}
-                        keyField="locationId" // Assuming unique by locationId here since filtered by single stockItem usually
-                        emptyMessage="Нет данных об остатках на выбранную дату"
-                        searchable={false}
-                    />
-                )}
+            <div className="bg-white dark:bg-gray-800 rounded-xl overflow-hidden shadow-sm border border-gray-100 dark:border-gray-700">
+                <DataTable
+                    tableId="fuel-balances"
+                    columns={columns}
+                    data={filteredBalances}
+                    keyField="locationId"
+                    isLoading={loading}
+                    emptyMessage="Нет данных об остатках на выбранную дату"
+                    searchable={true}
+                />
             </div>
         </div>
     );

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
     getTopUpRules,
     getResetRules,
@@ -234,7 +234,7 @@ const FuelRules: React.FC = () => {
         }
     };
 
-    const topUpColumns = [
+    const topUpColumns = useMemo(() => [
         { key: 'fuelCardNumber', label: 'Карта', sortable: true },
         {
             key: 'isActive',
@@ -249,9 +249,9 @@ const FuelRules: React.FC = () => {
             label: 'След. запуск',
             render: (row: TopUpRule) => row.nextRunAt ? new Date(row.nextRunAt).toLocaleString('ru-RU') : '-'
         },
-    ];
+    ], []);
 
-    const resetColumns = [
+    const resetColumns = useMemo(() => [
         { key: 'name', label: 'Название', sortable: true },
         {
             key: 'isActive',
@@ -270,7 +270,7 @@ const FuelRules: React.FC = () => {
             label: 'След. запуск',
             render: (row: ResetRule) => row.nextRunAt ? new Date(row.nextRunAt).toLocaleString('ru-RU') : '-'
         },
-    ];
+    ], []);
 
     return (
         <div className="p-0 space-y-8">
@@ -303,11 +303,13 @@ const FuelRules: React.FC = () => {
                 </div>
                 <div className="bg-white dark:bg-gray-800 rounded-xl overflow-hidden shadow-sm border border-gray-100 dark:border-gray-700">
                     <DataTable
+                        tableId="fuel-topup-rules"
                         columns={topUpColumns}
                         data={topUpRules}
                         keyField="id"
+                        isLoading={loading}
                         emptyMessage="Нет правил автопополнения"
-                        searchable={false}
+                        searchable={true}
                     />
                 </div>
             </section>
@@ -331,11 +333,13 @@ const FuelRules: React.FC = () => {
                 </div>
                 <div className="bg-white dark:bg-gray-800 rounded-xl overflow-hidden shadow-sm border border-gray-100 dark:border-gray-700">
                     <DataTable
+                        tableId="fuel-reset-rules"
                         columns={resetColumns}
                         data={resetRules}
                         keyField="id"
+                        isLoading={loading}
                         emptyMessage="Нет правил обнуления"
-                        searchable={false}
+                        searchable={true}
                     />
                 </div>
             </section>

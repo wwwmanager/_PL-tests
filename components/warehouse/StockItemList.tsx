@@ -2,7 +2,7 @@
  * REL-203: Stock Item List (Номенклатура)
  * CRUD component for unified stock items catalog
  */
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
     getStockItems,
     createStockItem,
@@ -175,7 +175,7 @@ const StockItemList: React.FC = () => {
     };
 
     // Define columns for DataTable
-    const columns = [
+    const columns = useMemo(() => [
         {
             key: 'code',
             label: 'Код',
@@ -212,31 +212,7 @@ const StockItemList: React.FC = () => {
                 </span>
             )
         },
-        {
-            key: 'actions',
-            label: 'Действия',
-            render: (row: StockItem) => (
-                <div className="flex justify-center space-x-2">
-                    <button
-                        onClick={() => openEditModal(row)}
-                        className="p-1 text-blue-600 hover:text-blue-800 transition-colors"
-                        title="Редактировать"
-                    >
-                        <PencilIcon className="w-4 h-4" />
-                    </button>
-                    {row.isActive && (
-                        <button
-                            onClick={() => handleDelete(row)}
-                            className="p-1 text-red-600 hover:text-red-800 transition-colors"
-                            title="Архивировать"
-                        >
-                            <ArchiveBoxIcon className="w-4 h-4" />
-                        </button>
-                    )}
-                </div>
-            )
-        }
-    ];
+    ], []);
 
     return (
         <div className="p-0 space-y-6">
@@ -301,18 +277,31 @@ const StockItemList: React.FC = () => {
             </div>
 
             {/* Table */}
-            <div className="bg-white dark:bg-gray-800 rounded-xl overflow-hidden">
-                {loading ? (
-                    <div className="p-12 text-center text-gray-500">Загрузка...</div>
-                ) : (
-                    <DataTable
-                        columns={columns}
-                        data={items}
-                        keyField="id"
-                        emptyMessage="Номенклатура не найдена"
-                        searchable={false}
-                    />
-                )}
+            <div className="bg-white dark:bg-gray-800 rounded-xl overflow-hidden shadow-sm border border-gray-100 dark:border-gray-700">
+                <DataTable
+                    tableId="stock-item-list"
+                    columns={columns}
+                    data={items}
+                    keyField="id"
+                    emptyMessage="Номенклатура не найдена"
+                    searchable={true}
+                    isLoading={loading}
+                    actions={[
+                        {
+                            icon: <PencilIcon className="w-4 h-4" />,
+                            onClick: (row) => openEditModal(row),
+                            title: "Редактировать",
+                            className: "text-blue-600 hover:text-blue-800"
+                        },
+                        {
+                            icon: <ArchiveBoxIcon className="w-4 h-4" />,
+                            onClick: (row) => handleDelete(row),
+                            title: "Архивировать",
+                            className: "text-red-600 hover:text-red-800",
+                            show: (row) => row.isActive
+                        }
+                    ]}
+                />
             </div>
 
             {/* Create/Edit Modal */}

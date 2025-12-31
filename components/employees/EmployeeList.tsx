@@ -4,8 +4,10 @@ import { Employee, Organization, EmployeeType, EMPLOYEE_TYPE_TRANSLATIONS, Waybi
 import { getEmployees, createEmployee, updateEmployee, deleteEmployee } from '../../services/api/employeeApi';
 import { getOrganizations } from '../../services/organizationApi';
 import { getFuelCardsForDriver } from '../../services/stockApi'; // Import added
-import { PencilIcon, TrashIcon, PlusIcon, ArrowUpIcon, ArrowDownIcon, XIcon } from '../Icons';
-import useTable from '../../hooks/useTable';
+import { PencilIcon, TrashIcon, PlusIcon, XIcon } from '../Icons';
+import DataTable, { Column } from '../shared/DataTable';
+import { Badge } from '../shared/Badge';
+import { Button } from '../shared/Button';
 import Modal from '../shared/Modal';
 import ConfirmationModal from '../shared/ConfirmationModal';
 import { useToast } from '../../hooks/useToast';
@@ -211,23 +213,26 @@ const EmployeeList: React.FC = () => {
     type EnrichedEmployee = (typeof enrichedData)[0];
     type EnrichedEmployeeKey = Extract<keyof EnrichedEmployee, string>;
 
-    const columns: { key: EnrichedEmployeeKey; label: string }[] = [
+    const columns: Column<EnrichedEmployee>[] = useMemo(() => [
         { key: 'shortName', label: 'ФИО (сокращ.)' },
         { key: 'personnelNumber', label: 'Таб. номер' },
         { key: 'position', label: 'Должность' },
-        { key: 'fuelCardBalance', label: 'Баланс ТК, л' },
+        {
+            key: 'fuelCardBalance',
+            label: 'Баланс ТК, л',
+            render: (e) => <span className="font-mono">{e.fuelCardBalance?.toFixed(2) ?? '0.00'}</span>
+        },
         { key: 'organizationName', label: 'Организация' },
-        { key: 'status', label: 'Статус' },
-    ];
-
-    const {
-        rows,
-        sortColumn,
-        sortDirection,
-        handleSort,
-        filters,
-        handleFilterChange,
-    } = useTable(enrichedData, columns);
+        {
+            key: 'status',
+            label: 'Статус',
+            render: (e) => (
+                <Badge variant={e.status === 'Active' ? 'success' : 'danger'}>
+                    {e.status === 'Active' ? 'Активен' : 'Неактивен'}
+                </Badge>
+            )
+        },
+    ], []);
 
     const handleEdit = (employee: Employee) => {
         const copy = { ...employee };
@@ -539,79 +544,41 @@ const EmployeeList: React.FC = () => {
                 )}
             </Modal >
 
-            <div>
-                <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-xl font-semibold text-gray-800 dark:text-white">Справочник: Сотрудники</h3>
-                    <button onClick={handleAddNew} className="flex items-center gap-2 bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md hover:bg-blue-700 transition-colors">
-                        <PlusIcon className="h-5 w-5" />
+            <div className="space-y-6">
+                <div className="flex justify-between items-center mb-6">
+                    <div className="flex items-center gap-3">
+                        <h2 className="text-xl font-bold text-gray-900 dark:text-white tracking-tight">Сотрудники</h2>
+                        <span className="px-2.5 py-0.5 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 text-xs font-semibold">
+                            {employees.length}
+                        </span>
+                    </div>
+                    <Button onClick={handleAddNew} variant="primary" leftIcon={<PlusIcon className="h-5 w-5" />}>
                         Добавить сотрудника
-                    </button>
+                    </Button>
                 </div>
 
-                <div className="overflow-x-auto">
-                    <table className="w-full text-sm text-left text-gray-500 dark:text-gray-400">
-                        <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
-                            <tr>
-                                {columns.map(col => (
-                                    <th key={col.key} scope="col" className="px-6 py-3 cursor-pointer" onClick={() => handleSort(col.key)}>
-                                        <div className="flex items-center gap-1">
-                                            {col.label}
-                                            {sortColumn === col.key && (sortDirection === 'asc' ? <ArrowUpIcon className="h-4 w-4" /> : <ArrowDownIcon className="h-4 w-4" />)}
-                                        </div>
-                                    </th>
-                                ))}
-                                <th scope="col" className="px-6 py-3 text-center">Действия</th>
-                            </tr>
-                            <tr>
-                                {columns.map(col => (
-                                    <th key={`${col.key} -filter`} className="px-2 py-1">
-                                        <input
-                                            type="text"
-                                            value={filters[col.key] || ''}
-                                            onChange={e => handleFilterChange(col.key, e.target.value)}
-                                            placeholder={`Поиск...`}
-                                            className="w-full text-xs p-1 bg-gray-100 dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded"
-                                        />
-                                    </th>
-                                ))}
-                                <th className="px-2 py-1"></th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {isLoading || error || rows.length === 0 ? (
-                                <tr>
-                                    <td colSpan={columns.length + 1} className="p-0">
-                                        <EmptyState
-                                            reason={error ? getEmptyStateFromError(error) : (isLoading ? { type: 'loading' } : { type: 'empty', entityName: 'сотрудники' })}
-                                            onRetry={fetchData}
-                                        />
-                                    </td>
-                                </tr>
-                            ) : rows.map(e => (
-                                <tr key={e.id} className="bg-white dark:bg-gray-800 border-b dark:border-gray-700">
-                                    <td className="px-6 py-4 font-medium text-gray-900 dark:text-white" title={e.fullName}>{e.shortName}</td>
-                                    <td className="px-6 py-4">{e.personnelNumber || '—'}</td>
-                                    <td className="px-6 py-4">{e.position || '—'}</td>
-                                    <td className="px-6 py-4 font-mono">{e.fuelCardBalance?.toFixed(2) ?? '0.00'}</td>
-                                    <td className="px-6 py-4">{e.organizationName}</td>
-                                    <td className="px-6 py-4">
-                                        <span className={`px-2 py-1 text-xs font-semibold rounded-full ${e.status === 'Active' ? 'bg-teal-600 text-white dark:bg-teal-500' : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'}`}>
-                                            {e.status === 'Active' ? 'Активен' : 'Неактивен'}
-                                        </span>
-                                    </td>
-                                    <td className="px-6 py-4 text-center">
-                                        <button onClick={() => handleEdit(e)} className="p-2 text-blue-500 transition-all duration-200 transform hover:scale-110 hover:shadow-lg hover:shadow-blue-500/40">
-                                            <PencilIcon className="h-5 w-5 pointer-events-none" />
-                                        </button>
-                                        <button onClick={() => handleRequestDelete(e)} className="p-2 text-red-500 transition-all duration-200 transform hover:scale-110 hover:shadow-lg hover:shadow-red-500/40">
-                                            <TrashIcon className="h-5 w-5 pointer-events-none" />
-                                        </button>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
+                <DataTable
+                    tableId="employee-list"
+                    columns={columns}
+                    data={enrichedData}
+                    keyField="id"
+                    searchable={true}
+                    isLoading={isLoading}
+                    actions={[
+                        {
+                            icon: <PencilIcon className="h-4 w-4" />,
+                            onClick: (e) => handleEdit(e),
+                            title: "Редактировать",
+                            className: "text-blue-600 hover:text-blue-800"
+                        },
+                        {
+                            icon: <TrashIcon className="h-4 w-4" />,
+                            onClick: (e) => handleRequestDelete(e),
+                            title: "Удалить",
+                            className: "text-red-600 hover:text-red-800"
+                        }
+                    ]}
+                />
             </div>
         </>
     );
