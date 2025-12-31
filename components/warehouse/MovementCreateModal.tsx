@@ -137,8 +137,17 @@ const MovementCreateModal: React.FC<Props> = ({ isOpen, onClose, initialData }) 
                 const locId = original.stockLocationId || original.fromStockLocationId || (original as any).stockLocation?.id || '';
                 setValue('fromStockLocationId', locId);
 
-                // Set negative quantity as default for correction/storno
-                setValue('quantity', -Number(original.quantity));
+                // Smarter quantity calculation for Storno/Reversal
+                let qty = -Number(original.quantity);
+                if (original.movementType === 'EXPENSE') {
+                    // Reverting an expense means adding back (+Q)
+                    qty = Number(original.quantity);
+                } else if (original.movementType === 'TRANSFER') {
+                    // Reverting a transfer (out from source) means adding back (+Q)
+                    // Since we defaulted 'fromStockLocationId' to the source, we assume we are fixing the source.
+                    qty = Number(original.quantity);
+                }
+                setValue('quantity', qty);
 
                 setValue('comment', `Корректировка к: ${original.documentType || 'Док'} ${original.documentId || ''} (${original.id.slice(0, 8)})`);
 
@@ -343,6 +352,7 @@ const MovementCreateModal: React.FC<Props> = ({ isOpen, onClose, initialData }) 
                             type="number"
                             step="0.01"
                             {...register('quantity')}
+                            onWheel={(e) => e.currentTarget.blur()}
                             className={`w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white ${errors.quantity ? 'border-red-500' : 'border-gray-300'}`}
                         />
                         {errors.quantity && <p className="mt-1 text-xs text-red-500">{errors.quantity.message}</p>}

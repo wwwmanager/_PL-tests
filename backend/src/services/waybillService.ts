@@ -1502,9 +1502,49 @@ export async function changeWaybillStatus(
 
             for (let expenseIndex = 0; expenseIndex < waybill.fuelLines.length; expenseIndex++) {
                 const fuelLine = waybill.fuelLines[expenseIndex];
-                const fuelConsumed = Number(fuelLine.fuelConsumed || 0);
 
-                if (fuelConsumed > 0) {
+                // WB-FUEL-NEG-001: Auto-calculate fuelConsumed if missing but we have start/end values
+                let effectiveFuelConsumed = Number(fuelLine.fuelConsumed || 0);
+
+                if (effectiveFuelConsumed === 0 && fuelLine.fuelStart != null && fuelLine.fuelEnd != null) {
+                    const fuelStart = Number(fuelLine.fuelStart);
+                    const fuelReceived = Number(fuelLine.fuelReceived || 0);
+                    const fuelEnd = Number(fuelLine.fuelEnd);
+                    const calculatedConsumed = fuelStart + fuelReceived - fuelEnd;
+
+                    if (calculatedConsumed > 0) {
+                        effectiveFuelConsumed = calculatedConsumed;
+                        console.log(`[WB-FUEL-NEG-001] Auto-calculated fuelConsumed: ${fuelStart} + ${fuelReceived} - ${fuelEnd} = ${effectiveFuelConsumed}`);
+                    }
+                }
+
+                // WB-FUEL-NEG-001: Also use fuelPlanned if no other consumption data
+                if (effectiveFuelConsumed === 0 && fuelLine.fuelPlanned != null) {
+                    const planned = Number(fuelLine.fuelPlanned);
+                    if (planned > 0) {
+                        effectiveFuelConsumed = planned;
+                        console.log(`[WB-FUEL-NEG-001] Using fuelPlanned as fuelConsumed: ${effectiveFuelConsumed}`);
+                    }
+                }
+
+                if (effectiveFuelConsumed > 0) {
+                    // WB-FUEL-NEG-001: Pre-validate tank balance BEFORE creating EXPENSE
+                    const tankBalance = await getBalanceAt(vehicleTank.id, fuelLine.stockItemId, expenseOccurredAt);
+
+                    // Account for fuel received in this waybill (TRANSFER happened above)
+                    const fuelReceived = Number(fuelLine.fuelReceived || 0);
+                    const effectiveBalance = tankBalance + fuelReceived;
+
+                    if (effectiveBalance < effectiveFuelConsumed) {
+                        throw new BadRequestError(
+                            `Недостаточно топлива в баке ТС для проведения ПЛ №${waybill.number}. ` +
+                            `Требуется списать: ${effectiveFuelConsumed.toFixed(2)} л, ` +
+                            `доступно в баке: ${effectiveBalance.toFixed(2)} л (баланс ${tankBalance.toFixed(2)} + заправка ${fuelReceived.toFixed(2)}). ` +
+                            `Добавьте заправку или скорректируйте расход.`,
+                            'INSUFFICIENT_TANK_FUEL'
+                        );
+                    }
+
                     // IDEMPOTENCY-FIX: Check if this expense movement already exists
                     const existingExpense = await tx.stockMovement.findFirst({
                         where: {
@@ -1524,7 +1564,7 @@ export async function changeWaybillStatus(
                         await createExpenseMovement(
                             organizationId,
                             fuelLine.stockItemId,
-                            fuelConsumed,
+                            effectiveFuelConsumed,
                             'WAYBILL',
                             waybill.id,
                             userId,
@@ -1534,7 +1574,7 @@ export async function changeWaybillStatus(
                             expenseOccurredAt  // occurredAt = endAt или date
                         );
 
-                        console.log(`[REL-103] EXPENSE created: ${fuelConsumed}L from tank ${vehicleTank.id}`);
+                        console.log(`[REL-103] EXPENSE created: ${effectiveFuelConsumed}L from tank ${vehicleTank.id}`);
                     }
                 }
             }

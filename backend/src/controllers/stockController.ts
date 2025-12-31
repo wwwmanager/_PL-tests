@@ -262,9 +262,17 @@ export async function deleteStockMovement(req: Request, res: Response, next: Nex
             });
         }
 
-        // P0-2: Block ALL hard deletes (temporary until void is implemented)
+        // P0-2: Block ALL hard deletes unless allowed by settings
+        const { getAppSettings } = await import('../services/settingsService');
+        const settings = await getAppSettings();
+
+        if (settings.allowDirectStockMovementDeletion) {
+            await prisma.stockMovement.delete({ where: { id } });
+            return res.status(204).send();
+        }
+
         return res.status(405).json({
-            error: 'Hard delete is disabled. Use void operation instead.',
+            error: 'Hard delete is disabled. Use void operation instead (or enable direct deletion in Settings).',
             code: 'DELETE_METHOD_NOT_ALLOWED',
             migration: {
                 endpoint: 'POST /api/stock/movements/:id/void',

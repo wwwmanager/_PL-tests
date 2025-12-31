@@ -70,7 +70,13 @@ type TransactionFormData = z.infer<typeof transactionSchema>;
 const FormField: React.FC<{ label: string; children: React.ReactNode; error?: string }> = ({ label, children, error }) => (
     <div><label className="block text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">{label}</label>{children}{error && <p className="text-xs text-red-500 mt-1">{error}</p>}</div>
 );
-const FormInput = (props: React.InputHTMLAttributes<HTMLInputElement>) => <input {...props} className="w-full bg-white dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded-md p-2 read-only:bg-gray-200 dark:read-only:bg-gray-700" />;
+const FormInput = (props: React.InputHTMLAttributes<HTMLInputElement>) => (
+    <input
+        {...props}
+        onWheel={(e) => props.type === 'number' ? e.currentTarget.blur() : props.onWheel?.(e)}
+        className="w-full bg-white dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded-md p-2 read-only:bg-gray-200 dark:read-only:bg-gray-700"
+    />
+);
 const FormSelect = (props: React.SelectHTMLAttributes<HTMLSelectElement>) => <select {...props} className="w-full bg-white dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded-md p-2" />;
 const FormTextarea = (props: React.TextareaHTMLAttributes<HTMLTextAreaElement>) => <textarea {...props} className="w-full bg-white dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded-md p-2" rows={3} />;
 

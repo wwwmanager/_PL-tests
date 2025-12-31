@@ -15,7 +15,11 @@ const FuelBalances: React.FC = () => {
     const [vehicles, setVehicles] = useState<Vehicle[]>([]);
     const [locations, setLocations] = useState<StockLocation[]>([]);
     const [loading, setLoading] = useState(false);
-    const [asOf, setAsOf] = useState(new Date().toISOString().slice(0, 16));
+    const [asOf, setAsOf] = useState(() => {
+        const now = new Date();
+        now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+        return now.toISOString().slice(0, 16);
+    });
 
     const [filters, setFilters] = useState({
         stockItemId: '',

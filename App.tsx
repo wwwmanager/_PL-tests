@@ -53,6 +53,20 @@ const AppContent: React.FC = () => {
     });
   }, [requestNavigation]);
 
+  // UX-NUMBER-SCROLL-FE-010: Disable numeric input value change on scroll
+  React.useEffect(() => {
+    const onWheel = (e: WheelEvent) => {
+      const el = document.activeElement as HTMLElement | null;
+      if (!el) return;
+      if (el instanceof HTMLInputElement && el.type === 'number') {
+        el.blur();
+      }
+    };
+
+    window.addEventListener('wheel', onWheel, { passive: true });
+    return () => window.removeEventListener('wheel', onWheel);
+  }, []);
+
   // Если нет пользователя - показываем Login
   if (!currentUser) {
     return <Login />;

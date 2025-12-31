@@ -407,11 +407,12 @@ export async function createAdjustment(params: CreateAdjustmentParams) {
             const currentBalance = await getBalanceAtTx(tx, stockLocationId, stockItemId, occurredAt);
             const resultingBalance = currentBalance + quantity; // quantity is negative
 
-            if (resultingBalance < 0) {
-                throw new BadRequestError(
-                    `Корректировка ${quantity} приведёт к отрицательному остатку. Текущий баланс: ${currentBalance}, результат: ${resultingBalance}`
-                );
-            }
+            // REL-107: User requested to allow negative balance for adjustments (force correction)
+            // if (resultingBalance < 0) {
+            //     throw new BadRequestError(
+            //         `Корректировка ${quantity} приведёт к отрицательному остатку. Текущий баланс: ${currentBalance}, результат: ${resultingBalance}`
+            //     );
+            // }
 
             // P0-4: Period lock check
             await checkPeriodLock(tx, organizationId, occurredAt);

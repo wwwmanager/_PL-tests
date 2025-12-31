@@ -600,12 +600,12 @@ const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpene
     const canDelete = waybill.status !== WaybillStatus.POSTED || appSettings?.allowDeletePostedWaybills;
 
     return (
-      <td className="px-6 py-4 text-center whitespace-nowrap">
+      <div className="px-6 py-4 flex justify-center gap-1 whitespace-nowrap">
         <button onClick={() => handleEdit(waybill)} className="p-2 text-blue-500 transition-all duration-200 transform hover:scale-110" title="Редактировать"><PencilIcon className="h-5 w-5" /></button>
         {canDelete && (
           <button onClick={() => handleRequestDelete(waybill)} className="p-2 text-red-500 transition-all duration-200 transform hover:scale-110" title="Удалить"><TrashIcon className="h-5 w-5" /></button>
         )}
-      </td>
+      </div>
     );
   };
 

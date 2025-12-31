@@ -177,7 +177,7 @@ export const BLANK_STATUS_COLORS: Record<BlankStatus, string> = {
   available: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
   issued: 'bg-teal-600 text-white dark:bg-teal-500',  // UI-DESIGN: Solid teal for Issued
   reserved: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200',
-  used: 'bg-teal-600 text-white dark:bg-teal-500',    // UI-DESIGN: Same as Posted
+  used: 'bg-orange-600 text-white dark:bg-orange-500',    // UI-DESIGN: Distinct Orange
   returned: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200',
   spoiled: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
 };

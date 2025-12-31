@@ -109,7 +109,11 @@ export async function getDashboardStats(filters: DashboardFilters): Promise<Dash
             ...baseWhere,
             date: { gte: dateFrom, lte: dateTo }
         },
-        select: { date: true, fuelLines: { select: { fuelConsumed: true } } }
+        select: {
+            date: true,
+            fuelLines: { select: { fuelConsumed: true } },
+            routes: { select: { date: true } }
+        }
     });
 
     // Aggregate by month
@@ -117,10 +121,35 @@ export async function getDashboardStats(filters: DashboardFilters): Promise<Dash
     const examsByMonth = new Map<string, number>();
 
     waybillsForCharts.forEach(w => {
-        const monthKey = MONTH_NAMES[w.date.getMonth()];
+        // Fuel aggregation (attributed to Waybill Date)
+        const wbMonthKey = MONTH_NAMES[w.date.getMonth()];
         const fuelSum = w.fuelLines.reduce((sum, f) => sum + toNumber(f.fuelConsumed), 0);
-        fuelByMonth.set(monthKey, (fuelByMonth.get(monthKey) || 0) + fuelSum);
-        examsByMonth.set(monthKey, (examsByMonth.get(monthKey) || 0) + 1); // 1 waybill = 1 pre-trip exam
+        fuelByMonth.set(wbMonthKey, (fuelByMonth.get(wbMonthKey) || 0) + fuelSum);
+
+        // Medical Exams aggregation (attributed to distinct dates of activity)
+        // Set of unique date strings (YYYY-MM-DD) to count exams
+        const distinctDates = new Set<string>();
+
+        // Always include the waybill start date - REMOVED based on user feedback
+        // distinctDates.add(w.date.toISOString().slice(0, 10));
+
+        // Add any specific dates from routes
+        w.routes.forEach(r => {
+            if (r.date) {
+                distinctDates.add(r.date.toISOString().slice(0, 10));
+            } else {
+                // Should we count routes without dates? 
+                // Assumed yes, using waybill date as fallback if it's a real trip
+                distinctDates.add(w.date.toISOString().slice(0, 10));
+            }
+        });
+
+        // Increment exam count for the month of EACH unique date
+        distinctDates.forEach(dateStr => {
+            const date = new Date(dateStr);
+            const monthKey = MONTH_NAMES[date.getMonth()];
+            examsByMonth.set(monthKey, (examsByMonth.get(monthKey) || 0) + 1);
+        });
     });
 
     const fuelConsumptionByMonth = Array.from(fuelByMonth.entries()).map(([month, value]) => ({

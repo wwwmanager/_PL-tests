@@ -133,6 +133,7 @@ const RouteRowComponent: React.FC<RouteRowProps> = ({
                     onChange={(e) =>
                         onChange(route.id, 'distanceKm', Number(e.target.value))
                     }
+                    onWheel={(e) => e.currentTarget.blur()}
                     className="w-full bg-gray-50 dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded-md p-2"
                 />
             </FormField>

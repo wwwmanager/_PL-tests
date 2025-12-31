@@ -378,6 +378,7 @@ const StockItemList: React.FC = () => {
                                             name="density"
                                             value={formData.density}
                                             onChange={handleFormChange}
+                                            onWheel={(e) => e.currentTarget.blur()}
                                             step="0.001"
                                             className="w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-md shadow-sm"
                                             placeholder="0.735"

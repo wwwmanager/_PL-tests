@@ -17,6 +17,7 @@ const FormField: React.FC<{ label: string; children: React.ReactNode }> = ({ lab
 const FormInput = (props: React.InputHTMLAttributes<HTMLInputElement>) => (
   <input
     {...props}
+    onWheel={(e) => props.type === 'number' ? e.currentTarget.blur() : props.onWheel?.(e)}
     className="w-full bg-white dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded-md p-2 focus:ring-blue-500 focus:border-blue-500 text-gray-700 dark:text-gray-200"
   />
 );

@@ -13,6 +13,7 @@ import { appendAuditEventChunked, buildParams, uid, isEntityArray, entityIdField
 import { useAuth } from '../../services/auth';
 import { Waybill, Employee, Vehicle, Organization, AppSettings, AppMode } from '../../types';
 import ConfirmationModal from '../shared/ConfirmationModal';
+import { TabsNavigation } from '../shared/TabsNavigation';
 
 const UserManagement = lazy(() => import('./UserManagement'));
 const RoleManagement = lazy(() => import('./RoleManagement'));
@@ -756,6 +757,24 @@ export const AppSettingsComponent: React.FC = () => {
             <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-600 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-500 peer-checked:bg-blue-600"></div>
           </div>
         </label>
+        {/* P0-2: Allow direct deletion of stock movement documents */}
+        <label className="flex items-center justify-between p-3 rounded-lg bg-gray-50 dark:bg-gray-700/50">
+          <div>
+            <div className="font-medium text-gray-800 dark:text-white">Разрешить удаление складских движений</div>
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              По умолчанию документы движений удалять нельзя (только сторнировать). Включите для разрешения прямого удаления (опасно!).
+            </p>
+          </div>
+          <div className="relative inline-flex items-center cursor-pointer">
+            <input
+              type="checkbox"
+              checked={settings.allowDirectStockMovementDeletion || false}
+              onChange={(e) => handleSettingChange('allowDirectStockMovementDeletion', e.target.checked)}
+              className="sr-only peer"
+            />
+            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-600 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-500 peer-checked:bg-blue-600"></div>
+          </div>
+        </label>
       </div>
     </section>
   );
@@ -1260,19 +1279,25 @@ const Admin: React.FC = () => {
     }
   };
 
-  const TabButton = ({ tab, label }: { tab: AdminTab; label: string }) => (
-    <button
-      onClick={() => setActiveTab(tab)}
-      className={classNames(
-        'px-4 py-2 text-sm font-medium rounded-md transition-colors',
-        activeTab === tab
-          ? 'bg-blue-600 text-white'
-          : 'text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
-      )}
-    >
-      {label}
-    </button>
-  );
+  const tabs = useMemo(() => {
+    const t = [
+      { id: 'settings', label: 'Общие настройки' },
+    ];
+    if (can('admin.panel')) {
+      t.push({ id: 'users', label: 'Пользователи' });
+      t.push({ id: 'roles', label: 'Управление ролями' });
+      t.push({ id: 'blanks', label: 'Бланки ПЛ' });
+    }
+    t.push({ id: 'import_audit', label: 'Журнал импорта' });
+    if (can('audit.business.read')) {
+      t.push({ id: 'business_audit', label: 'Бизнес-аудит' });
+    }
+    t.push({ id: 'calendar', label: 'Календарь' });
+    if (can('admin.panel')) {
+      t.push({ id: 'diag', label: 'Диагностика' });
+    }
+    return t;
+  }, [can]);
 
   const renderActiveTab = () => {
     switch (activeTab) {
@@ -1351,22 +1376,19 @@ const Admin: React.FC = () => {
       <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
         <h2 className="text-2xl font-bold text-gray-800 dark:text-white">Настройки</h2>
         <div className="flex items-center gap-4 flex-wrap">
-          <div className="flex space-x-2 p-1 bg-gray-100 dark:bg-gray-900 rounded-lg">
-            <TabButton tab="settings" label="Общие настройки" />
-            {can('admin.panel') && <TabButton tab="users" label="Пользователи" />}
-            {can('admin.panel') && <TabButton tab="roles" label="Управление ролями" />}
-            {can('admin.panel') && <TabButton tab="blanks" label="Бланки ПЛ" />}
-            <TabButton tab="import_audit" label="Журнал импорта" />
-            {can('audit.business.read') && <TabButton tab="business_audit" label="Бизнес-аудит" />}
-            <TabButton tab="calendar" label="Календарь" />
-            {can('admin.panel') && <TabButton tab="diag" label="Диагностика" />}
-          </div>
           <button onClick={handleImportClick} disabled={!importPolicy || isImporting} className="flex items-center gap-2 bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md hover:bg-blue-700 transition-colors disabled:opacity-50"><UploadIcon className="h-5 w-5" />{isImporting ? 'Импорт...' : 'Импорт'}</button>
           <button onClick={() => (canImportFull ? startExport() : handleExportAllData())} disabled={!canExport || isImporting} className="flex items-center gap-2 bg-green-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md hover:bg-green-700 transition-colors disabled:opacity-50"><DownloadIcon className="h-5 w-5" />{isExporting ? 'Экспорт...' : 'Экспорт'}</button>
           {skel && <ExportContextPackButton packSkeleton={skel} mode="skeleton" />}
         </div>
       </div>
-      <div className="overflow-x-auto">{renderActiveTab()}</div>
+
+      <TabsNavigation
+        tabs={tabs}
+        activeTab={activeTab}
+        onTabChange={(id) => setActiveTab(id as AdminTab)}
+        className="mb-6"
+      />
+      <div>{renderActiveTab()}</div>
 
       {can('admin.panel') && (
         <div className="mt-8">

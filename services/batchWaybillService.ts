@@ -229,6 +229,13 @@ const createWaybillFromGroup = async (
     const endOdo = Number(startOdo) + Number(distance);
     const endFuel = startFuel + fuelFilledSum - consumption;
 
+    // WB-FUEL-NEG-001: Warn if calculated fuel end is negative
+    let notes = 'Пакетная генерация';
+    if (endFuel < 0) {
+        notes += ` ⚠️ ВНИМАНИЕ: Расчётный остаток топлива отрицательный (${endFuel.toFixed(2)} л). Добавьте заправку!`;
+        console.warn(`[WB-FUEL-NEG-001] Negative fuel end detected: ${endFuel.toFixed(2)} for group starting ${group[0].dateStr}`);
+    }
+
     const waybillRoutes = [];
     let minMinutes = 24 * 60;
     let maxMinutes = 0;
@@ -283,9 +290,10 @@ const createWaybillFromGroup = async (
         fuelAtStart: Math.round(startFuel * 100) / 100,
         fuelAtEnd: Math.round(endFuel * 100) / 100,
         fuelPlanned: Math.round(consumption * 100) / 100,
+        fuelConsumed: Math.round(consumption * 100) / 100,  // WB-FUEL-NEG-001: Pass fuelConsumed
         fuelFilled: fuelFilledSum,
         routes: waybillRoutes,
-        notes: 'Пакетная генерация',
+        notes,
         calculationMethod: config.calculationMethod,
         // WB-BATCH-001: Pass stockItemId to trigger mapLegacyFuelFields in backend controller
         stockItemId: vehicle.fuelStockItemId || undefined,

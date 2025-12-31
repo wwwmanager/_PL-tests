@@ -130,6 +130,7 @@ function CreateTopUpRuleModal({ isOpen, onClose, onSuccess }: CreateTopUpRuleMod
                         type="number"
                         value={amountLiters}
                         onChange={(e) => setAmountLiters(e.target.value)}
+                        onWheel={(e) => e.currentTarget.blur()}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md"
                         placeholder="100"
                         min="0"
@@ -146,6 +147,7 @@ function CreateTopUpRuleModal({ isOpen, onClose, onSuccess }: CreateTopUpRuleMod
                         type="number"
                         value={minBalanceLiters}
                         onChange={(e) => setMinBalanceLiters(e.target.value)}
+                        onWheel={(e) => e.currentTarget.blur()}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md"
                         placeholder="Пополнять при балансе ниже..."
                         min="0"

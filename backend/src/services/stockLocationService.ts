@@ -215,8 +215,15 @@ export async function listLocations(
     isActive: boolean;
     createdAt: Date;
 }>> {
+    // Include child organizations to match vehicle visibility
+    const childOrgs = await prisma.organization.findMany({
+        where: { parentOrganizationId: organizationId },
+        select: { id: true }
+    });
+    const orgIds = [organizationId, ...childOrgs.map(o => o.id)];
+
     const where: any = {
-        organizationId,
+        organizationId: { in: orgIds },
     };
 
     if (filters.type) {

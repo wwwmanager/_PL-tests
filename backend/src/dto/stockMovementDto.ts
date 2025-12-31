@@ -16,8 +16,15 @@ const decimalString = z.preprocess(
         return val;
     },
     z.string()
+        // Allow negative, positive, int, float.
         .regex(/^-?\d+(\.\d+)?$/, 'Должно быть числом (Decimal)')
         .refine((val) => parseFloat(val) !== 0, 'Количество не может быть 0')
+);
+
+// Helper for optional string -> null if empty
+const emptyToNull = z.preprocess(
+    (val) => val === '' ? null : val,
+    z.string().optional().nullable()
 );
 
 /**
@@ -49,7 +56,7 @@ const baseMovementSchema = z.object({
     occurredSeq: z.number().int().min(0).optional(),
     documentType: z.string().optional().nullable(),
     documentId: z.string().uuid().optional().nullable(),
-    externalRef: z.string().max(120).optional().nullable(),
+    externalRef: emptyToNull,
     comment: z.string().max(500).optional().nullable(),
 });
 

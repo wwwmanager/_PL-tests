@@ -157,6 +157,7 @@ function ManualTopUpModal({ card, isOpen, onClose, onSuccess }: ManualTopUpModal
                             min="0.01"
                             value={formData.quantity}
                             onChange={(e) => setFormData(f => ({ ...f, quantity: e.target.value }))}
+                            onWheel={(e) => e.currentTarget.blur()}
                             className="w-full px-3 py-2 border border-gray-300 rounded-md"
                             placeholder="например: 50.00"
                             required
@@ -545,8 +546,12 @@ function ResetCardModal({ card, isOpen, onClose, onSuccess }: ResetCardModalProp
                 mode: formData.mode,
             });
 
-            if (result.previousBalance > 0) {
-                showToast(`Карта ${card.cardNumber} обнулена. Списано: ${result.previousBalance.toFixed(2)} л`, 'success');
+            if (result.previousBalance !== 0) {
+                if (result.previousBalance > 0) {
+                    showToast(`Карта ${card.cardNumber} обнулена. Списано: ${result.previousBalance.toFixed(2)} л`, 'success');
+                } else {
+                    showToast(`Карта ${card.cardNumber} восстановлена. Покрыт долг: ${Math.abs(result.previousBalance).toFixed(2)} л`, 'success');
+                }
             } else {
                 showToast(`Карта ${card.cardNumber} уже имеет нулевой баланс`, 'info');
             }

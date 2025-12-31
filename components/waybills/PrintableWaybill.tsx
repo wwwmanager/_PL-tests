@@ -249,9 +249,11 @@ const formatTime = (dateStr?: string): string =>
     })
     : '';
 
-const formatPrintNumber = (num?: number): string => {
-  if (num === undefined || num === null) return '';
-  return Number.isInteger(num) ? String(num) : num.toFixed(2).replace('.', ',');
+const formatPrintNumber = (num?: number | string | null): string => {
+  if (num === undefined || num === null || num === '') return '';
+  const n = Number(num);
+  if (isNaN(n)) return String(num);
+  return Number.isInteger(n) ? String(n) : n.toFixed(2).replace('.', ',');
 };
 
 const PrintableWaybill: FC<PrintableWaybillProps> = ({
@@ -813,6 +815,7 @@ const PrintableWaybill: FC<PrintableWaybillProps> = ({
                         onChange={(event) =>
                           setGridSize(Math.max(1, Number(event.target.value)))
                         }
+                        onWheel={(e) => e.currentTarget.blur()}
                         className="w-16 p-1 text-sm bg-white dark:bg-gray-600 border rounded"
                       />
                       <span>px</span>
@@ -890,6 +893,7 @@ const PrintableWaybill: FC<PrintableWaybillProps> = ({
                       type="number"
                       value={pageOffsets[pageKey].x}
                       onChange={(event) => updatePageOffset(pageKey, 'x', event)}
+                      onWheel={(e) => e.currentTarget.blur()}
                       className="w-16 p-1 bg-white dark:bg-gray-600 border rounded"
                     />
                     <span>Y:</span>
@@ -897,6 +901,7 @@ const PrintableWaybill: FC<PrintableWaybillProps> = ({
                       type="number"
                       value={pageOffsets[pageKey].y}
                       onChange={(event) => updatePageOffset(pageKey, 'y', event)}
+                      onWheel={(e) => e.currentTarget.blur()}
                       className="w-16 p-1 bg-white dark:bg-gray-600 border rounded"
                     />
                     <span>px</span>

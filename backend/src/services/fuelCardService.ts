@@ -126,23 +126,23 @@ export async function calculateRealBalance(organizationId: string, fuelCardId: s
 
     const [incomes, expenses, adjustments, transfersIn, transfersOut] = await Promise.all([
         prisma.stockMovement.aggregate({
-            where: { stockLocationId: location.id, movementType: 'INCOME' },
+            where: { stockLocationId: location.id, movementType: 'INCOME', isVoid: false },
             _sum: { quantity: true },
         }),
         prisma.stockMovement.aggregate({
-            where: { stockLocationId: location.id, movementType: 'EXPENSE' },
+            where: { stockLocationId: location.id, movementType: 'EXPENSE', isVoid: false },
             _sum: { quantity: true },
         }),
         prisma.stockMovement.aggregate({
-            where: { stockLocationId: location.id, movementType: 'ADJUSTMENT' },
+            where: { stockLocationId: location.id, movementType: 'ADJUSTMENT', isVoid: false },
             _sum: { quantity: true },
         }),
         prisma.stockMovement.aggregate({
-            where: { toStockLocationId: location.id, movementType: 'TRANSFER' },
+            where: { toStockLocationId: location.id, movementType: 'TRANSFER', isVoid: false },
             _sum: { quantity: true },
         }),
         prisma.stockMovement.aggregate({
-            where: { fromStockLocationId: location.id, movementType: 'TRANSFER' },
+            where: { fromStockLocationId: location.id, movementType: 'TRANSFER', isVoid: false },
             _sum: { quantity: true },
         }),
     ]);
@@ -728,7 +728,34 @@ export async function resetFuelCard(
     // 2. Get current balance
     const balance = await getBalanceAt(cardLocation.id, stockItemId, new Date());
 
-    if (balance <= 0) {
+    let targetBalance = balance;
+    let targetStockItemId = stockItemId;
+
+    // If selected fuel has 0 balance, check if ANY fuel has balance (robustness fix)
+    if (Math.abs(targetBalance) < 0.001) {
+        const anyBalance = await prisma.stockMovement.groupBy({
+            by: ['stockItemId'],
+            where: {
+                OR: [
+                    { stockLocationId: cardLocation.id },
+                    { fromStockLocationId: cardLocation.id },
+                    { toStockLocationId: cardLocation.id }
+                ]
+            }
+        });
+
+        for (const item of anyBalance) {
+            const b = await getBalanceAt(cardLocation.id, item.stockItemId, new Date());
+            if (Math.abs(b) > 0.001) {
+                console.log(`[FUEL-CARD-RESET] Auto-switch stockItem from ${stockItemId} to ${item.stockItemId} (bal: ${b})`);
+                targetBalance = b;
+                targetStockItemId = item.stockItemId;
+                break;
+            }
+        }
+    }
+
+    if (Math.abs(targetBalance) < 0.001) {
         return {
             success: true,
             fuelCardId,
@@ -741,50 +768,89 @@ export async function resetFuelCard(
     // 3. Create movement based on mode
     let movement;
     const externalRef = `MANUAL_RESET:${fuelCardId}:${new Date().toISOString()}`;
+    const absBalance = Math.abs(targetBalance);
+    const useStockItemId = targetStockItemId;
 
-    if (mode === 'TRANSFER_TO_WAREHOUSE') {
-        // OWN-ORG-DEPT-TOPUP-020: Get departmentId from card's vehicle/driver
-        const cardWithDept = await prisma.fuelCard.findUnique({
-            where: { id: fuelCardId },
-            include: {
-                assignedToVehicle: { select: { departmentId: true } },
-                assignedToDriver: { include: { employee: { select: { departmentId: true } } } }
-            }
-        });
-        const departmentId = cardWithDept?.assignedToVehicle?.departmentId
-            || cardWithDept?.assignedToDriver?.employee?.departmentId
-            || null;
+    // OWN-ORG-DEPT-TOPUP-020: Get departmentId from card's vehicle/driver
+    const cardWithDept = await prisma.fuelCard.findUnique({
+        where: { id: fuelCardId },
+        include: {
+            assignedToVehicle: { select: { departmentId: true } },
+            assignedToDriver: { include: { employee: { select: { departmentId: true } } } }
+        }
+    });
+    const departmentId = cardWithDept?.assignedToVehicle?.departmentId
+        || cardWithDept?.assignedToDriver?.employee?.departmentId
+        || null;
 
-        // Transfer back to department's warehouse (or central if no dept)
-        const warehouseLocation = await getOrCreateDefaultWarehouseLocation(organizationId, departmentId);
+    if (targetBalance > 0) {
+        // POSITIVE BALANCE: Write off / Return
+        if (mode === 'TRANSFER_TO_WAREHOUSE') {
+            const warehouseLocation = await getOrCreateDefaultWarehouseLocation(organizationId, departmentId);
 
-        movement = await createTransfer({
-            organizationId,
-            stockItemId,
-            quantity: balance,
-            fromLocationId: cardLocation.id,
-            toLocationId: warehouseLocation.id,
-            occurredAt: new Date(),
-            documentType: 'FUEL_CARD_MANUAL_RESET',
-            documentId: fuelCardId,
-            externalRef,
-            comment: reason,
-            userId,
-        });
+            movement = await createTransfer({
+                organizationId,
+                stockItemId: useStockItemId,
+                quantity: targetBalance,
+                fromLocationId: cardLocation.id,
+                toLocationId: warehouseLocation.id,
+                occurredAt: new Date(),
+                documentType: 'FUEL_CARD_MANUAL_RESET',
+                documentId: fuelCardId,
+                externalRef,
+                comment: reason,
+                userId,
+            });
+        } else {
+            // EXPIRE_EXPENSE: Write off as expense
+            movement = await createExpenseMovement(
+                organizationId,
+                useStockItemId,
+                targetBalance,
+                'FUEL_CARD_MANUAL_RESET',
+                fuelCardId,
+                userId,
+                null,
+                reason,
+                cardLocation.id,
+                new Date()
+            );
+        }
     } else {
-        // EXPIRE_EXPENSE: Write off as expense
-        movement = await createExpenseMovement(
-            organizationId,
-            stockItemId,
-            balance,
-            'FUEL_CARD_MANUAL_RESET',
-            fuelCardId,
-            userId,
-            null,
-            reason,
-            cardLocation.id,
-            new Date()
-        );
+        // NEGATIVE BALANCE: Cover debt / Top-up
+        if (mode === 'TRANSFER_TO_WAREHOUSE') {
+            // Take from Warehouse to cover negative balance
+            const warehouseLocation = await getOrCreateDefaultWarehouseLocation(organizationId, departmentId);
+
+            movement = await createTransfer({
+                organizationId,
+                stockItemId: useStockItemId,
+                quantity: absBalance,
+                fromLocationId: warehouseLocation.id, // FROM Warehouse
+                toLocationId: cardLocation.id,       // TO Card
+                occurredAt: new Date(),
+                documentType: 'FUEL_CARD_MANUAL_RESET',
+                documentId: fuelCardId,
+                externalRef,
+                comment: `Покрытие отрицательного баланса: ${reason}`,
+                userId,
+            });
+        } else {
+            // EXPIRE_EXPENSE (but negative): Use Adjustment to fix
+            const { createAdjustment } = await import('./stockService');
+            movement = await createAdjustment({
+                organizationId,
+                stockItemId: useStockItemId,
+                stockLocationId: cardLocation.id,
+                quantity: absBalance, // Add positive amount
+                occurredAt: new Date(),
+                documentType: 'FUEL_CARD_MANUAL_RESET',
+                documentId: fuelCardId,
+                externalRef,
+                comment: `Корректировка отрицательного баланса: ${reason}`,
+                userId,
+            });
+        }
     }
 
     // 4. Update FuelCard.balanceLiters to 0
@@ -793,12 +859,12 @@ export async function resetFuelCard(
         data: { balanceLiters: 0 }
     });
 
-    console.log(`[FUEL-CARD-RESET] Card ${fuelCardId} reset: ${balance}L -> 0 (mode: ${mode})`);
+    console.log(`[FUEL-CARD-RESET] Card ${fuelCardId} reset: ${targetBalance}L -> 0 (mode: ${mode})`);
 
     return {
         success: true,
         fuelCardId,
-        previousBalance: balance,
+        previousBalance: targetBalance,
         mode,
         movementId: movement.id,
     };
