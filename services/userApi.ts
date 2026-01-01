@@ -20,7 +20,8 @@ export const userApi = {
             extraCaps: [],
             organizationId: u.organizationId,
             departmentId: u.departmentId,
-            isActive: u.isActive
+            isActive: u.isActive,
+            employeeId: u.employeeId || null,  // RLS-USER-EMP-001
         }));
     },
 
@@ -32,7 +33,8 @@ export const userApi = {
             roleCodes: [user.role],
             organizationId: user.organizationId,
             extraCaps: user.extraCaps,
-            isActive: true
+            isActive: true,
+            employeeId: user.employeeId || null,  // RLS-USER-EMP-001
         };
         const response = await httpClient.post<any>('/users', payload);
         return {
@@ -42,7 +44,8 @@ export const userApi = {
             role: user.role,
             extraCaps: [],
             organizationId: response.organizationId,
-            isActive: response.isActive
+            isActive: response.isActive,
+            employeeId: response.employeeId || null,  // RLS-USER-EMP-001
         };
     },
 
@@ -51,14 +54,16 @@ export const userApi = {
             email: user.email,
             fullName: user.displayName,
             roleCodes: [user.role],
-            isActive: user.isActive
+            isActive: user.isActive,
+            employeeId: user.employeeId || null,  // RLS-USER-EMP-001
         };
         const response = await httpClient.put<any>(`/users/${user.id}`, payload);
         return {
             ...user,
             displayName: response.fullName,
             email: response.email,
-            role: user.role
+            role: user.role,
+            employeeId: response.employeeId || null,  // RLS-USER-EMP-001
         };
     },
 

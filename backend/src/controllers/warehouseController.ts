@@ -6,9 +6,18 @@ import * as warehouseService from '../services/warehouseService';
  */
 export async function listWarehouses(req: Request, res: Response, next: NextFunction) {
     try {
-        const organizationId = req.user!.organizationId;
+        const user = req.user!;
+        const organizationId = user.organizationId;
         const warehouses = await warehouseService.listWarehouses(organizationId);
-        res.json({ data: warehouses });
+
+        // RLS-WAREHOUSE-010: Drivers get read-only access
+        const isDriver = user.role === 'driver';
+        const warehousesWithAccess = warehouses.map((wh: any) => ({
+            ...wh,
+            _canEdit: !isDriver  // Drivers cannot edit
+        }));
+
+        res.json({ data: warehousesWithAccess });
     } catch (err) {
         next(err);
     }

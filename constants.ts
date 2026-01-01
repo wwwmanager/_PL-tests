@@ -201,29 +201,55 @@ export const ROLE_TRANSLATIONS: Record<Role, string> = {
 };
 
 export const CAPABILITY_TRANSLATIONS: Record<Capability, string> = {
-  'admin.panel': 'Админ. панель',
-  'import.run': 'Полный импорт',
-  'import.limited': 'Ограниченный импорт',
-  'export.run': 'Экспорт данных',
-  'audit.read': 'Просмотр аудита',
-  'audit.diff': 'Сравнение версий',
-  'audit.rollback': 'Откат изменений',
-  'audit.delete': 'Удаление из аудита',
-  'audit.business.read': 'Просмотр бизнес-журнала',
+  // Waybills (7)
+  'waybill.read': 'Просмотр ПЛ',
   'waybill.create': 'Создание ПЛ',
   'waybill.submit': 'Отправка на проверку',
   'waybill.post': 'Проведение ПЛ',
   'waybill.cancel': 'Отмена ПЛ',
   'waybill.backdate': 'Проведение задним числом',
   'waybill.correct': 'Корректировка проведенного ПЛ',
+  // Blanks (8)
+  'blank.read': 'Просмотр бланков',
+  'blank.create': 'Создание бланков',
+  'blank.update': 'Редактирование бланков',
   'blanks.issue': 'Выдача бланков',
   'blanks.return': 'Возврат бланков',
   'blanks.spoil.self': 'Списание своих бланков',
   'blanks.spoil.warehouse': 'Списание со склада',
   'blanks.spoil.override': 'Списание любых бланков',
+  // RBAC (1)
   'rbac.delegate': 'Управление правами',
+  // Audit (5)
+  'audit.business.read': 'Просмотр бизнес-журнала',
+  'audit.read': 'Просмотр аудита',
+  'audit.diff': 'Сравнение версий',
+  'audit.rollback': 'Откат изменений',
+  'audit.delete': 'Удаление из аудита',
+  // Admin (1)
+  'admin.panel': 'Админ. панель',
+  // Import/Export (3)
+  'import.run': 'Полный импорт',
+  'import.limited': 'Ограниченный импорт',
+  'export.run': 'Экспорт данных',
+  // Stock (5)
   'stock.read': 'Просмотр склада',
+  'stock.create': 'Создание складских операций',
+  'stock.update': 'Редактирование складских операций',
+  'stock.delete': 'Удаление складских операций',
   'stock.manage': 'Управление складом',
+  // Vehicles (4)
+  'vehicle.view': 'Просмотр транспорта',
+  'vehicle.create': 'Создание транспорта',
+  'vehicle.update': 'Редактирование транспорта',
+  'vehicle.delete': 'Удаление транспорта',
+  // Drivers (4)
+  'driver.view': 'Просмотр водителей',
+  'driver.create': 'Создание водителей',
+  'driver.update': 'Редактирование водителей',
+  'driver.delete': 'Удаление водителей',
+  // Organizations (1)
+  'org.manage': 'Управление организациями',
 };
 
 export const DEFAULT_ROLE_POLICIES: Record<Role, Capability[]> = {
@@ -237,16 +263,15 @@ export const DEFAULT_ROLE_POLICIES: Record<Role, Capability[]> = {
   ],
   auditor: ['audit.read', 'audit.diff', 'audit.business.read'],
   dispatcher: ['import.limited', 'export.run'],
-  driver: ['waybill.create', 'waybill.submit', 'waybill.post', 'waybill.cancel', 'export.run', 'blanks.spoil.self'],
+  driver: ['waybill.create', 'waybill.submit', 'waybill.post', 'waybill.cancel', 'export.run', 'blanks.spoil.self', 'blanks.issue', 'blank.read', 'blank.create', 'blank.update'],
   mechanic: ['export.run', 'blanks.spoil.warehouse'], // 'stock.move' - capability to be added if needed
   reviewer: ['audit.business.read', 'waybill.submit'],
   accountant: ['waybill.post', 'audit.business.read', 'export.run', 'stock.read', 'stock.manage'],
   viewer: ['audit.read'],
 };
 
-export const ALL_CAPS: Capability[] = Array.from(
-  new Set(Object.values(DEFAULT_ROLE_POLICIES).flat())
-) as Capability[];
+// ALL_CAPS: Full list of all capabilities, taken from CAPABILITY_TRANSLATIONS
+export const ALL_CAPS: Capability[] = Object.keys(CAPABILITY_TRANSLATIONS) as Capability[];
 
 // --- Business Audit Translations ---
 

@@ -7,12 +7,13 @@ import { Organization, OrganizationStatus } from '../../types';
 import { getOrganizations, addOrganization, updateOrganization, deleteOrganization } from '../../services/organizationApi';
 import { lockStockPeriod, unlockStockPeriod } from '../../services/adminApi';
 import { validation } from '../../services/faker'; // Валидация все еще нужна для схемы
-import { PencilIcon, TrashIcon, PlusIcon, ArrowUpIcon, ArrowDownIcon, ArchiveBoxIcon, ArrowUpTrayIcon } from '../Icons';
+import { PencilIcon, TrashIcon, PlusIcon, ArrowUpIcon, ArrowDownIcon, ArchiveBoxIcon, ArrowUpTrayIcon, EyeIcon } from '../Icons';
 import useTable from '../../hooks/useTable';
 import { ORGANIZATION_STATUS_COLORS, ORGANIZATION_STATUS_TRANSLATIONS } from '../../constants';
 import Modal from '../shared/Modal';
 import ConfirmationModal from '../shared/ConfirmationModal';
 import { useToast } from '../../hooks/useToast';
+import { useAuth } from '../../services/auth';  // RLS-ORG-FE-010
 import CollapsibleSection from '../shared/CollapsibleSection';
 import { FormField, FormInput, FormSelect, FormTextarea } from '../shared/FormComponents';
 import { createRequiredProps } from '../../utils/schemaHelpers';
@@ -89,13 +90,15 @@ const defaultValues: OrganizationFormData = {
 
 
 const OrganizationManagement = () => {
-    const [organizations, setOrganizations] = useState<Organization[]>([]);
+    const [organizations, setOrganizations] = useState<(Organization & { _canEdit?: boolean })[]>([]);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
     const [showArchived, setShowArchived] = useState(false);
     const [actionModal, setActionModal] = useState<{ isOpen: boolean; type?: 'delete' | 'archive' | 'unarchive'; item?: Organization }>({ isOpen: false });
     const [lockDate, setLockDate] = useState<string>('');
     const { showToast } = useToast();
+    const { currentUser } = useAuth();  // RLS-ORG-FE-010
+    const isDriver = currentUser?.role === 'driver';  // RLS-ORG-FE-010
 
     const {
         register,
@@ -404,9 +407,12 @@ const OrganizationManagement = () => {
             <div>
                 <div className="flex justify-between items-center mb-4">
                     <h3 className="text-xl font-semibold text-gray-800 dark:text-white">Справочник: Организации</h3>
-                    <button onClick={handleAddNew} className="flex items-center gap-2 bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md hover:bg-blue-700 transition-colors">
-                        <PlusIcon className="h-5 w-5" /> Добавить
-                    </button>
+                    {/* RLS-ORG-FE-010: Hide Add button for drivers */}
+                    {!isDriver && (
+                        <button onClick={handleAddNew} className="flex items-center gap-2 bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md hover:bg-blue-700 transition-colors">
+                            <PlusIcon className="h-5 w-5" /> Добавить
+                        </button>
+                    )}
                 </div>
                 <label className="flex items-center text-sm text-gray-600 dark:text-gray-300 cursor-pointer my-4">
                     <input type="checkbox" checked={showArchived} onChange={e => setShowArchived(e.target.checked)} className="h-4 w-4 rounded border-gray-300 dark:border-gray-500 text-blue-600 focus:ring-blue-500" />
@@ -440,9 +446,18 @@ const OrganizationManagement = () => {
                                         <td className="px-6 py-4">{o.address}</td>
                                         <td className="px-6 py-4"><span className={`px-2 py-1 text-xs font-semibold rounded-full ${ORGANIZATION_STATUS_COLORS[o.status]}`}>{ORGANIZATION_STATUS_TRANSLATIONS[o.status]}</span></td>
                                         <td className="px-6 py-4 text-center">
-                                            <button onClick={() => handleEdit(o)} className="p-2 text-blue-500" title="Редактировать"><PencilIcon className="h-5 w-5" /></button>
-                                            {o.status === OrganizationStatus.ACTIVE ? <button onClick={() => openActionModal('archive', o)} className="p-2 text-purple-500" title="Архивировать"><ArchiveBoxIcon className="h-5 w-5" /></button> : <button onClick={() => openActionModal('unarchive', o)} className="p-2 text-green-500" title="Восстановить"><ArrowUpTrayIcon className="h-5 w-5" /></button>}
-                                            <button onClick={() => openActionModal('delete', o)} className="p-2 text-red-500" title="Удалить"><TrashIcon className="h-5 w-5" /></button>
+                                            {/* RLS-ORG-FE-010: Show view-only icon or edit buttons based on _canEdit */}
+                                            {o._canEdit === false ? (
+                                                <button onClick={() => handleEdit(o)} className="p-2 text-gray-400" title="Просмотр (только чтение)">
+                                                    <EyeIcon className="h-5 w-5" />
+                                                </button>
+                                            ) : (
+                                                <>
+                                                    <button onClick={() => handleEdit(o)} className="p-2 text-blue-500" title="Редактировать"><PencilIcon className="h-5 w-5" /></button>
+                                                    {o.status === OrganizationStatus.ACTIVE ? <button onClick={() => openActionModal('archive', o)} className="p-2 text-purple-500" title="Архивировать"><ArchiveBoxIcon className="h-5 w-5" /></button> : <button onClick={() => openActionModal('unarchive', o)} className="p-2 text-green-500" title="Восстановить"><ArrowUpTrayIcon className="h-5 w-5" /></button>}
+                                                    <button onClick={() => openActionModal('delete', o)} className="p-2 text-red-500" title="Удалить"><TrashIcon className="h-5 w-5" /></button>
+                                                </>
+                                            )}
                                         </td>
                                     </tr>
                                 ))}

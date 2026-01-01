@@ -35,6 +35,83 @@ export async function listOrganizations(req: Request, res: Response, next: NextF
             return res.status(401).json({ error: 'Unauthorized' });
         }
 
+        const user = req.user;
+
+        // RLS-ORG-010: Driver sees only their employee's organization, parent, and siblings
+        if (user.role === 'driver' && user.employeeId) {
+            // Get the employee's organization (the one driver can edit)
+            const employee = await prisma.employee.findUnique({
+                where: { id: user.employeeId },
+                select: { organizationId: true }
+            });
+
+            if (!employee) {
+                return res.json({ data: [] });
+            }
+
+            const employeeOrgId = employee.organizationId;
+
+            // Get employee's org with parent info
+            const employeeOrg = await prisma.organization.findUnique({
+                where: { id: employeeOrgId },
+                include: {
+                    parentOrganization: {
+                        select: { id: true, shortName: true, inn: true, name: true, status: true }
+                    }
+                }
+            });
+
+            if (!employeeOrg) {
+                return res.json({ data: [] });
+            }
+
+            // Start with employee's org (the only one driver CAN edit)
+            const orgs: any[] = [{
+                ...employeeOrg,
+                _canEdit: true  // Driver can edit their employee's org
+            }];
+
+            // Add parent org (read-only)
+            if (employeeOrg.parentOrganization) {
+                const parentOrg = await prisma.organization.findUnique({
+                    where: { id: employeeOrg.parentOrganization.id },
+                    include: {
+                        parentOrganization: {
+                            select: { id: true, shortName: true, inn: true, name: true, status: true }
+                        }
+                    }
+                });
+                if (parentOrg) {
+                    orgs.push({
+                        ...parentOrg,
+                        _canEdit: false  // Driver cannot edit parent org
+                    });
+                }
+
+                // Also add sibling orgs (other children of parent, read-only)
+                const siblingOrgs = await prisma.organization.findMany({
+                    where: {
+                        parentOrganizationId: employeeOrg.parentOrganization.id,
+                        id: { not: employeeOrgId }  // Exclude driver's own org (already added)
+                    },
+                    include: {
+                        parentOrganization: {
+                            select: { id: true, shortName: true, inn: true, name: true, status: true }
+                        }
+                    }
+                });
+                for (const siblingOrg of siblingOrgs) {
+                    orgs.push({
+                        ...siblingOrg,
+                        _canEdit: false  // Driver cannot edit sibling orgs
+                    });
+                }
+            }
+
+            console.log(`[RLS-ORG-010] Driver ${user.id} (employee ${user.employeeId}) sees ${orgs.length} org(s), can edit: ${employeeOrg.shortName}`);
+            return res.json({ data: orgs });
+        }
+
         const organizations = await prisma.organization.findMany({
             orderBy: { name: 'asc' },
             // ORG-HIERARCHY-001: Include parent org for hierarchy display

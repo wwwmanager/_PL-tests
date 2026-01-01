@@ -11,7 +11,7 @@ import {
     getFuelCardBalance, getAvailableFuelExpenses
 } from '../controllers/stockController';
 import {
-    getBalances, getBalance, createMovement, listMovementsV2, stornoDocument, createCorrection
+    getBalances, getBalance, createMovement, listMovementsV2, listMyMovementsV2, stornoDocument, createCorrection
 } from '../controllers/stockBalanceController';
 
 export const router = Router();
@@ -31,6 +31,8 @@ router.delete('/items/:id', deleteStockItem);     // DELETE /api/stock/items/:id
 // Stock Movements (Transactions) CRUD
 router.get('/movements', listStockMovements);     // GET /api/stock/movements
 router.post('/movements', createStockMovement);   // POST /api/stock/movements (legacy)
+// DRIVER-STOCK-MOVEMENTS-002: Driver's own movements (must be before /v2)
+router.get('/movements/my', listMyMovementsV2);   // GET /api/stock/movements/my (driver-only)
 // BE-002: v2 endpoint with Zod DTO validation
 router.get('/movements/v2', listMovementsV2);     // GET /api/stock/movements/v2 (STOCK-MOVEMENTS-V2-GET-001)
 router.post('/movements/v2', validateDto(createMovementSchema), createMovement);

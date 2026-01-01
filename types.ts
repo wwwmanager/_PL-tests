@@ -12,30 +12,55 @@ export type Role =
   | 'viewer';
 
 export type Capability =
+  // Waybills (7)
+  | 'waybill.read'
   | 'waybill.create'
   | 'waybill.submit'
   | 'waybill.post'
   | 'waybill.cancel'
   | 'waybill.backdate'
   | 'waybill.correct'
+  // Blanks (8)
+  | 'blank.read'
+  | 'blank.create'
+  | 'blank.update'
   | 'blanks.issue'
   | 'blanks.return'
   | 'blanks.spoil.self'
   | 'blanks.spoil.warehouse'
   | 'blanks.spoil.override'
+  // RBAC (1)
   | 'rbac.delegate'
+  // Audit (5)
   | 'audit.business.read'
-  | 'stock.read'
-  | 'stock.manage'
-  // существующие:
-  | 'admin.panel'
-  | 'import.run'
-  | 'import.limited'
-  | 'export.run'
   | 'audit.read'
   | 'audit.diff'
   | 'audit.rollback'
-  | 'audit.delete';
+  | 'audit.delete'
+  // Admin (1)
+  | 'admin.panel'
+  // Import/Export (3)
+  | 'import.run'
+  | 'import.limited'
+  | 'export.run'
+  // Stock (5)
+  | 'stock.read'
+  | 'stock.create'
+  | 'stock.update'
+  | 'stock.delete'
+  | 'stock.manage'
+  // Vehicles (4)
+  | 'vehicle.view'
+  | 'vehicle.create'
+  | 'vehicle.update'
+  | 'vehicle.delete'
+  // Drivers (4)
+  | 'driver.view'
+  | 'driver.create'
+  | 'driver.update'
+  | 'driver.delete'
+  // Organizations (1)
+  | 'org.manage';
 
 export type User = {
   id: string;
@@ -43,6 +68,10 @@ export type User = {
   email?: string;
   role: Role;
   extraCaps?: Capability[];
+  employeeId?: string | null;  // RLS-USER-EMP-001: Link to Employee for RLS
+  organizationId?: string;
+  departmentId?: string | null;
+  isActive?: boolean;
 };
 
 export type View =

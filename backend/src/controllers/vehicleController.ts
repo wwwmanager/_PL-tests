@@ -12,10 +12,17 @@ function logToFile(msg: string) {
 
 export async function listVehicles(req: Request, res: Response, next: NextFunction) {
     try {
-        const orgId = req.user!.organizationId;
-        const departmentId = req.user!.departmentId;
-        logToFile(`🌐 GET /vehicles - User Org: ${orgId}, Dept: ${departmentId}`);
-        const vehicles = await vehicleService.listVehicles(orgId, departmentId);
+        const user = req.user!;
+        const orgId = user.organizationId;
+        const departmentId = user.departmentId;
+
+        // RLS-SCOPE-020: Driver sees only assigned vehicles
+        const options = user.role === 'driver' && user.employeeId
+            ? { driverEmployeeId: user.employeeId }
+            : undefined;
+
+        logToFile(`🌐 GET /vehicles - User Org: ${orgId}, Dept: ${departmentId}, Role: ${user.role}, DriverFilter: ${options?.driverEmployeeId || 'none'}`);
+        const vehicles = await vehicleService.listVehicles(orgId, departmentId, options);
         logToFile(`🌐 Found ${vehicles.length} vehicles for org ${orgId}`);
         res.json(vehicles);
     } catch (err: any) {

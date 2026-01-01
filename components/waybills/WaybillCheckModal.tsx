@@ -200,9 +200,10 @@ const WaybillCheckModal: React.FC<WaybillCheckModalProps> = ({ isOpen, onClose, 
 
         // Check: Odometer (Start + Routes = End) - ONLY if routes are filled
         if (hasRoutes) {
-          const calcOdometerEnd = odometerStart + routesDistance;
+          // Sum all route segments first, then round the total (not each segment individually)
+          const calcOdometerEnd = Math.round(odometerStart + routesDistance);
           if (odometerEnd > 0 && Math.abs(odometerEnd - calcOdometerEnd) > 2) {
-            errors.push(`Не сходится пробег внутри ПЛ. Расчет: ${calcOdometerEnd.toFixed(0)}, В документе: ${odometerEnd}. Разница: ${(odometerEnd - calcOdometerEnd).toFixed(0)} км.`);
+            errors.push(`Не сходится пробег внутри ПЛ. Расчет: ${calcOdometerEnd}, В документе: ${odometerEnd}. Разница: ${(odometerEnd - calcOdometerEnd)} км.`);
           }
         }
 

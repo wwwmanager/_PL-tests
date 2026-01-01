@@ -196,6 +196,11 @@ export interface ListLocationsFilter {
     fuelCardId?: string;
     warehouseId?: string;
     isActive?: boolean;
+    or?: Array<{
+        vehicleId?: string;
+        fuelCardId?: string | { in: string[] };
+        type?: StockLocationType;
+    }>; // RLS-STOCK-LOC-010: Support OR for driver filtering
 }
 
 /**
@@ -243,6 +248,9 @@ export async function listLocations(
     }
     if (filters.isActive !== undefined) {
         where.isActive = filters.isActive;
+    }
+    if (filters.or) {
+        where.OR = filters.or;
     }
 
     const locations = await prisma.stockLocation.findMany({

@@ -2,10 +2,11 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { User, Role, Capability, Organization } from '../../types';
+import { User, Role, Capability, Organization, Employee } from '../../types';
 import { userApi } from '../../services/userApi';
 import { transferUser, TransferUserResponse } from '../../services/adminApi';
 import { getOrganizations } from '../../services/organizationApi';
+import { getEmployees } from '../../services/employeeApiFacade';
 import { useAuth } from '../../services/auth';
 import { PencilIcon, TrashIcon, PlusIcon, ArrowsRightLeftIcon } from '../Icons';
 import Modal from '../shared/Modal';
@@ -20,6 +21,7 @@ const userSchema = z.object({
     password: z.string().optional(),
     role: z.enum(['admin', 'dispatcher', 'auditor', 'driver', 'mechanic', 'reviewer', 'accountant', 'viewer']),
     extraCaps: z.array(z.string()).optional(),
+    employeeId: z.string().nullable().optional(),  // RLS-USER-EMP-FE-010: Link to Employee
 });
 type UserFormData = z.infer<typeof userSchema>;
 
@@ -37,6 +39,7 @@ const UserManagement: React.FC = () => {
     const { can, allCaps, rolePolicies, currentUser } = useAuth();
     const [users, setUsers] = useState<User[]>([]);
     const [organizations, setOrganizations] = useState<Organization[]>([]);
+    const [employees, setEmployees] = useState<Employee[]>([]);  // RLS-USER-EMP-FE-010
     const [currentItem, setCurrentItem] = useState<Partial<User> | null>(null);
     const [deleteModal, setDeleteModal] = useState<User | null>(null);
     const [transferModal, setTransferModal] = useState<User | null>(null);
@@ -53,12 +56,14 @@ const UserManagement: React.FC = () => {
 
     const fetchData = useCallback(async () => {
         try {
-            const [userData, orgData] = await Promise.all([
+            const [userData, orgData, empData] = await Promise.all([
                 userApi.getUsers(),
-                getOrganizations()
+                getOrganizations(),
+                getEmployees({ isActive: true })  // RLS-USER-EMP-FE-010
             ]);
             setUsers(userData);
             setOrganizations(orgData);
+            setEmployees(empData);
         } catch (e) {
             console.error(e);
             showToast('Не удалось загрузить данные', 'error');
@@ -67,8 +72,8 @@ const UserManagement: React.FC = () => {
 
     useEffect(() => { fetchData(); }, [fetchData]);
 
-    const handleEdit = (item: User) => { reset(item); setCurrentItem(item); };
-    const handleAddNew = () => { reset({ displayName: '', email: '', password: '', role: 'dispatcher', extraCaps: [] }); setCurrentItem({}); };
+    const handleEdit = (item: User) => { reset({ ...item, employeeId: item.employeeId || null }); setCurrentItem(item); };
+    const handleAddNew = () => { reset({ displayName: '', email: '', password: '', role: 'dispatcher', extraCaps: [], employeeId: null }); setCurrentItem({}); };
     const handleCancel = () => setCurrentItem(null);
 
     const onSubmit = async (data: UserFormData) => {
@@ -198,6 +203,18 @@ const UserManagement: React.FC = () => {
                         <FormSelect {...register("role")}>
                             {(Object.keys(rolePolicies) as Role[]).map(r => <option key={r} value={r}>{ROLE_TRANSLATIONS[r] ?? r}</option>)}
                         </FormSelect>
+                    </FormField>
+                    {/* RLS-USER-EMP-FE-010: Employee link for RLS */}
+                    <FormField label="Связанный сотрудник" error={errors.employeeId?.message}>
+                        <FormSelect {...register("employeeId")}>
+                            <option value="">— Не выбран —</option>
+                            {employees.map(emp => (
+                                <option key={emp.id} value={emp.id}>
+                                    {emp.fullName} {emp.employeeType === 'driver' ? '(водитель)' : ''}
+                                </option>
+                            ))}
+                        </FormSelect>
+                        <p className="text-xs text-gray-500 mt-1">Для водителей — определяет какие данные доступны</p>
                     </FormField>
                     <div>
                         <label className="block text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">Дополнительные привилегии</label>

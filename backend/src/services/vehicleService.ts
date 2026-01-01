@@ -77,8 +77,12 @@ function normalizeFuelTypeData(data: any) {
     return { fuelType, fuelTypeId };
 }
 
-export async function listVehicles(organizationId: string, departmentId?: string | null) {
-    console.log(`📊 [vehicleService] Listing vehicles for org: ${organizationId}, dept: ${departmentId || 'ALL'}`);
+export async function listVehicles(
+    organizationId: string,
+    departmentId?: string | null,
+    options?: { driverEmployeeId?: string }  // RLS-SCOPE-020: Driver filter
+) {
+    console.log(`📊 [vehicleService] Listing vehicles for org: ${organizationId}, dept: ${departmentId || 'ALL'}, driverFilter: ${options?.driverEmployeeId || 'none'}`);
 
     // ORG-HIERARCHY: Include vehicles from this org AND all child orgs
     const childOrgs = await prisma.organization.findMany({
@@ -92,6 +96,11 @@ export async function listVehicles(organizationId: string, departmentId?: string
 
     if (departmentId) {
         where.departmentId = departmentId;
+    }
+
+    // RLS-SCOPE-020: Driver sees only assigned vehicles
+    if (options?.driverEmployeeId) {
+        where.assignedDriverId = options.driverEmployeeId;
     }
 
     const vehicles = await prisma.vehicle.findMany({

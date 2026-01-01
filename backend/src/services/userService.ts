@@ -12,6 +12,7 @@ export interface CreateUserData {
     departmentId?: string | null;
     isActive: boolean;
     organizationId: string;
+    employeeId?: string | null;  // RLS-USER-EMP-001
 }
 
 export interface UpdateUserData {
@@ -21,6 +22,7 @@ export interface UpdateUserData {
     roleCodes?: string[];
     departmentId?: string | null;
     isActive?: boolean;
+    employeeId?: string | null;  // RLS-USER-EMP-001
 }
 
 export async function listUsers(organizationId: string | undefined) {
@@ -49,6 +51,7 @@ export async function listUsers(organizationId: string | undefined) {
         organizationName: user.organization?.shortName || user.organization?.name || 'Unknown',
         departmentId: user.departmentId,
         departmentName: user.department?.name,
+        employeeId: user.employeeId || null,  // RLS-USER-EMP-001
         // @ts-ignore: Prisma include types are sometimes tricky
         roles: user.roles?.map((ur: any) => ur.role.code) || [],
         lastLogin: undefined
@@ -105,7 +108,8 @@ export async function createUser(data: CreateUserData) {
                 fullName: data.fullName,
                 isActive: data.isActive,
                 organizationId: data.organizationId,
-                departmentId: data.departmentId
+                departmentId: data.departmentId,
+                employeeId: data.employeeId || null,  // RLS-USER-EMP-001
             }
         });
 
@@ -158,7 +162,8 @@ export async function updateUser(id: string, organizationId: string | undefined,
                 passwordHash,
                 fullName: data.fullName,
                 isActive: data.isActive,
-                departmentId: data.departmentId
+                departmentId: data.departmentId,
+                employeeId: data.employeeId !== undefined ? (data.employeeId || null) : undefined,  // RLS-USER-EMP-001
             }
         });
 

@@ -6,8 +6,17 @@ import * as routeService from '../services/routeService';
  */
 export async function listRoutes(req: Request, res: Response, next: NextFunction) {
     try {
+        const user = req.user;
         const routes = await routeService.listRoutes();
-        res.json({ data: routes });
+
+        // RLS-ROUTE-010: Drivers get read-only access to route directory
+        const isDriver = user?.role === 'driver';
+        const routesWithAccess = routes.map((route: any) => ({
+            ...route,
+            _canEdit: !isDriver  // Drivers cannot edit global routes
+        }));
+
+        res.json({ data: routesWithAccess });
     } catch (err) {
         next(err);
     }

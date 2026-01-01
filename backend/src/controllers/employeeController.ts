@@ -12,10 +12,27 @@ function logToFile(msg: string) {
 export async function listEmployees(req: Request, res: Response, next: NextFunction) {
     try {
         // Extract organizationId from authenticated user (set by auth middleware)
-        const organizationId = req.user!.organizationId;
+        const user = req.user!;
+        const organizationId = user.organizationId;
         const { departmentId, isActive, page, limit } = req.query;
 
-        logToFile(`🌐 [employeeController] GET /employees - User Org: ${organizationId}, Query: ${JSON.stringify(req.query)}`);
+        logToFile(`🌐 [employeeController] GET /employees - User Org: ${organizationId}, Role: ${user.role}, Query: ${JSON.stringify(req.query)}`);
+
+        // RLS-EMPLOYEE-010: Driver sees only themselves
+        if (user.role === 'driver' && user.employeeId) {
+            const employee = await employeeService.getEmployeeById(user.employeeId);
+            logToFile(`🌐 [employeeController] Driver RLS: returning only self (employeeId: ${user.employeeId})`);
+            return res.json({
+                success: true,
+                data: {
+                    employees: employee ? [employee] : [],
+                    total: employee ? 1 : 0,
+                    page: 1,
+                    limit: 1,
+                    totalPages: 1,
+                },
+            });
+        }
 
         const filters: employeeService.EmployeeFilters = {
             organizationId,  // Always filter by user's organization

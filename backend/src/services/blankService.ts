@@ -22,6 +22,32 @@ export async function createBatch(organizationId: string, userId: string, data: 
         throw new Error('Конечный номер партии не может быть меньше начального');
     }
 
+    // [BUG-FIX] Проверка на пересечение с существующими пачками той же серии
+    const existingBatchOverlap = await prisma.blankBatch.findFirst({
+        where: {
+            organizationId,
+            series: data.series,
+            // Пересечение диапазонов: (numberFrom <= newTo) AND (numberTo >= newFrom)
+            numberFrom: { lte: data.numberTo },
+            numberTo: { gte: data.numberFrom }
+        }
+    });
+    if (existingBatchOverlap) {
+        throw new Error(`Диапазон ${data.series} ${data.numberFrom}-${data.numberTo} пересекается с существующей пачкой ${existingBatchOverlap.series} ${existingBatchOverlap.numberFrom}-${existingBatchOverlap.numberTo}`);
+    }
+
+    // [BUG-FIX] Проверка на существующие бланки с такими номерами (на случай ручного создания)
+    const existingBlank = await prisma.blank.findFirst({
+        where: {
+            organizationId,
+            series: data.series,
+            number: { gte: data.numberFrom, lte: data.numberTo }
+        }
+    });
+    if (existingBlank) {
+        throw new Error(`Бланк ${existingBlank.series} ${existingBlank.number} уже существует в системе`);
+    }
+
     // 1. Create Batch Record
     const batch = await prisma.blankBatch.create({
         data: {

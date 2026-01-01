@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import * as stockLocationService from '../services/stockLocationService';
 import { StockLocationType } from '@prisma/client';
 import { NotFoundError, BadRequestError } from '../utils/errors';
+import { prisma } from '../db/prisma';
 
 /**
  * REL-101: Stock Location Controller
@@ -50,6 +51,46 @@ export async function listLocations(
 
         if (req.query.isActive !== undefined) {
             filters.isActive = req.query.isActive === 'true';
+        }
+
+        // RLS-STOCK-LOC-010: Driver RLS
+        if (req.user && (req.user as any).role === 'driver' && (req.user as any).employeeId) {
+            const employeeId = (req.user as any).employeeId;
+
+            // Get vehicle assigned to driver
+            const vehicle = await prisma.vehicle.findFirst({
+                where: { assignedDriverId: employeeId },
+                select: { id: true }
+            });
+
+            // Get fuel cards assigned to driver
+            const driver = await prisma.driver.findUnique({
+                where: { employeeId },
+                select: { id: true }
+            });
+
+            const fuelCardIds: string[] = [];
+            if (driver) {
+                const cards = await prisma.fuelCard.findMany({
+                    where: { assignedToDriverId: driver.id },
+                    select: { id: true }
+                });
+                cards.forEach(c => fuelCardIds.push(c.id));
+            }
+
+            // Apply filters to limit to driver's locations
+            filters.or = [];
+            if (vehicle) {
+                filters.or.push({ vehicleId: vehicle.id, type: 'VEHICLE_TANK' });
+            }
+            if (fuelCardIds.length > 0) {
+                filters.or.push({ fuelCardId: { in: fuelCardIds } as any, type: 'FUEL_CARD' });
+            }
+
+            // If driver has no assigned vehicles or cards, they see nothing
+            if (filters.or.length === 0) {
+                return res.json({ data: [] });
+            }
         }
 
         const locations = await stockLocationService.listLocations(

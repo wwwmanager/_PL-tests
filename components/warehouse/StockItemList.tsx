@@ -14,7 +14,8 @@ import {
     StockItemUpdateInput
 } from '../../services/stockItemApi';
 import { useToast } from '../../hooks/useToast';
-import { PlusIcon, PencilIcon, ArchiveBoxIcon, FunnelIcon } from '../Icons';
+import { useAuth } from '../../services/auth';  // RLS-STOCK-FE-010
+import { PlusIcon, PencilIcon, ArchiveBoxIcon, FunnelIcon, EyeIcon } from '../Icons';
 import { Button } from '../shared/Button';
 import DataTable from '../shared/DataTable';
 
@@ -58,6 +59,8 @@ const StockItemList: React.FC = () => {
     });
 
     const { showToast } = useToast();
+    const { currentUser } = useAuth();  // RLS-STOCK-FE-010
+    const isDriver = currentUser?.role === 'driver';  // RLS-STOCK-FE-010
 
     // ... (rest of the state and handlers remain same until return)
 
@@ -265,14 +268,17 @@ const StockItemList: React.FC = () => {
                     >
                         Обновить
                     </Button>
-                    <Button
-                        onClick={openCreateModal}
-                        variant="primary"
-                        size="sm"
-                        leftIcon={<PlusIcon className="w-4 h-4" />}
-                    >
-                        Добавить
-                    </Button>
+                    {/* RLS-STOCK-FE-010: Hide Add button for drivers */}
+                    {!isDriver && (
+                        <Button
+                            onClick={openCreateModal}
+                            variant="primary"
+                            size="sm"
+                            leftIcon={<PlusIcon className="w-4 h-4" />}
+                        >
+                            Добавить
+                        </Button>
+                    )}
                 </div>
             </div>
 
@@ -291,14 +297,22 @@ const StockItemList: React.FC = () => {
                             icon: <PencilIcon className="w-4 h-4" />,
                             onClick: (row) => openEditModal(row),
                             title: "Редактировать",
-                            className: "text-blue-600 hover:text-blue-800"
+                            className: "text-blue-600 hover:text-blue-800",
+                            show: (row: any) => row._canEdit !== false  // RLS-STOCK-FE-010
+                        },
+                        {
+                            icon: <EyeIcon className="w-4 h-4" />,
+                            onClick: (row) => openEditModal(row),
+                            title: "Просмотр",
+                            className: "text-gray-400 hover:text-gray-600",
+                            show: (row: any) => row._canEdit === false  // RLS-STOCK-FE-010: View-only for drivers
                         },
                         {
                             icon: <ArchiveBoxIcon className="w-4 h-4" />,
                             onClick: (row) => handleDelete(row),
                             title: "Архивировать",
                             className: "text-red-600 hover:text-red-800",
-                            show: (row) => row.isActive
+                            show: (row: any) => row.isActive && row._canEdit !== false  // RLS-STOCK-FE-010
                         }
                     ]}
                 />

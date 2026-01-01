@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import * as blankService from '../services/blankService';
 import { BlankStatus } from '@prisma/client';
+import { prisma } from '../db/prisma';
 
 export async function listBatches(req: Request, res: Response, next: NextFunction) {
     try {
@@ -30,6 +31,10 @@ export async function createBatch(req: Request, res: Response, next: NextFunctio
         res.status(201).json(batch);
     } catch (err) {
         console.error('❌ [blankController] createBatch error:', err);
+        // Return user-friendly error for validation failures
+        if (err instanceof Error && (err.message.includes('пересекается') || err.message.includes('уже существует') || err.message.includes('не может быть меньше'))) {
+            return res.status(400).json({ error: err.message });
+        }
         next(err);
     }
 }
@@ -110,6 +115,24 @@ export async function issueBlanksRange(req: Request, res: Response, next: NextFu
         // Admin can issue for any org, others only their org
         const orgId = req.user!.role === 'admin' ? undefined : req.user!.organizationId;
         const { batchId, driverId, numberFrom, numberTo } = req.body;
+
+        // RLS: Drivers can only issue blanks to themselves
+        if (req.user!.role === 'driver') {
+            const employeeId = req.user!.employeeId;
+            if (!employeeId) {
+                return res.status(403).json({ error: 'У вас нет связанного сотрудника. Обратитесь к администратору.' });
+            }
+            // Get user's driver record by employeeId
+            const userDriver = await prisma.driver.findFirst({
+                where: { employeeId }
+            });
+            if (!userDriver) {
+                return res.status(403).json({ error: 'У вас нет связанного водителя. Обратитесь к администратору.' });
+            }
+            if (driverId !== userDriver.id) {
+                return res.status(403).json({ error: 'Водитель может выдавать бланки только себе.' });
+            }
+        }
 
         console.log('📝 [blankController] issueBlanksRange:', { batchId, driverId, numberFrom, numberTo });
 

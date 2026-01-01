@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { SavedRoute } from '../../types';
 import { getSavedRoutes, addSavedRoute, updateSavedRoute, deleteSavedRoute } from '../../services/routeApi';
-import { PencilIcon, TrashIcon, PlusIcon, ArrowUpIcon, ArrowDownIcon } from '../Icons';
+import { PencilIcon, TrashIcon, PlusIcon, ArrowUpIcon, ArrowDownIcon, EyeIcon } from '../Icons';
 import useTable from '../../hooks/useTable';
 import Modal from '../shared/Modal';
 import ConfirmationModal from '../shared/ConfirmationModal';
 import { useToast } from '../../hooks/useToast';
+import { useAuth } from '../../services/auth';  // RLS-ROUTE-FE-010
 
 const FormField: React.FC<{ label: string; children: React.ReactNode }> = ({ label, children }) => (
     <div>
@@ -31,6 +32,8 @@ const RouteManagement: React.FC = () => {
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [routeToDelete, setRouteToDelete] = useState<SavedRoute | null>(null);
     const { showToast } = useToast();
+    const { currentUser } = useAuth();  // RLS-ROUTE-FE-010
+    const isDriver = currentUser?.role === 'driver';  // RLS-ROUTE-FE-010
 
     const isDirty = useMemo(() => {
         if (!currentItem || !initialItem) return false;
@@ -173,10 +176,13 @@ const RouteManagement: React.FC = () => {
                 <div className="flex justify-between items-center mb-4">
                     <h3 className="text-xl font-semibold text-gray-800 dark:text-white">Справочник: Маршруты</h3>
                     <div className="flex items-center gap-4">
-                        <button onClick={handleAddNew} className="flex items-center gap-2 bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md hover:bg-blue-700 transition-colors">
-                            <PlusIcon className="h-5 w-5" />
-                            Добавить
-                        </button>
+                        {/* RLS-ROUTE-FE-010: Hide Add button for drivers */}
+                        {!isDriver && (
+                            <button onClick={handleAddNew} className="flex items-center gap-2 bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md hover:bg-blue-700 transition-colors">
+                                <PlusIcon className="h-5 w-5" />
+                                Добавить
+                            </button>
+                        )}
                     </div>
                 </div>
                 <div className="overflow-x-auto">
@@ -219,12 +225,21 @@ const RouteManagement: React.FC = () => {
                                     <td className="px-6 py-4 font-medium text-gray-900 dark:text-white">{r.to}</td>
                                     <td className="px-6 py-4">{r.distanceKm}</td>
                                     <td className="px-6 py-4 text-center">
-                                        <button onClick={() => handleEdit(r)} className="p-2 text-blue-500 transition-all duration-200 transform hover:scale-110 hover:shadow-lg hover:shadow-blue-500/40">
-                                            <PencilIcon className="h-5 w-5 pointer-events-none" />
-                                        </button>
-                                        <button onClick={() => handleRequestDelete(r)} className="p-2 text-red-500 transition-all duration-200 transform hover:scale-110 hover:shadow-lg hover:shadow-red-500/40">
-                                            <TrashIcon className="h-5 w-5 pointer-events-none" />
-                                        </button>
+                                        {/* RLS-ROUTE-FE-010: Show view-only or edit buttons based on _canEdit */}
+                                        {(r as any)._canEdit === false ? (
+                                            <button onClick={() => handleEdit(r)} className="p-2 text-gray-400" title="Просмотр (только чтение)">
+                                                <EyeIcon className="h-5 w-5 pointer-events-none" />
+                                            </button>
+                                        ) : (
+                                            <>
+                                                <button onClick={() => handleEdit(r)} className="p-2 text-blue-500 transition-all duration-200 transform hover:scale-110 hover:shadow-lg hover:shadow-blue-500/40">
+                                                    <PencilIcon className="h-5 w-5 pointer-events-none" />
+                                                </button>
+                                                <button onClick={() => handleRequestDelete(r)} className="p-2 text-red-500 transition-all duration-200 transform hover:scale-110 hover:shadow-lg hover:shadow-red-500/40">
+                                                    <TrashIcon className="h-5 w-5 pointer-events-none" />
+                                                </button>
+                                            </>
+                                        )}
                                     </td>
                                 </tr>
                             ))}

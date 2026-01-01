@@ -34,17 +34,52 @@ export async function getMe(req: Request, res: Response, next: NextFunction) {
             return res.status(401).json({ code: "USER_NOT_FOUND", message: "Пользователь не найден" });
         }
 
-        // Get linked driver if user has employee
+        // RLS-ME-010: Load employee with department for accurate data
+        let employeeData: {
+            id: string;
+            fullName: string;
+            employeeType: string;
+            departmentId: string | null;
+            departmentName: string | null;
+            assignedVehicleIds: string[];
+        } | null = null;
+
         let driverId: string | null = null;
+
         if (user.employeeId) {
-            const driver = await prisma.driver.findUnique({
-                where: { employeeId: user.employeeId }
+            const employee = await prisma.employee.findUnique({
+                where: { id: user.employeeId },
+                select: {
+                    id: true,
+                    fullName: true,
+                    employeeType: true,
+                    departmentId: true,
+                    department: { select: { id: true, name: true } },
+                    assignedVehicles: { select: { id: true } },
+                    driver: { select: { id: true } },
+                }
             });
-            driverId = driver?.id || null;
+
+            if (employee) {
+                employeeData = {
+                    id: employee.id,
+                    fullName: employee.fullName,
+                    employeeType: employee.employeeType,
+                    departmentId: employee.departmentId,
+                    departmentName: employee.department?.name || null,
+                    assignedVehicleIds: employee.assignedVehicles.map(v => v.id),
+                };
+                driverId = employee.driver?.id || null;
+            }
         }
 
         // Role from token (as issued at login, even if DB changed since)
         const roleFromToken = req.user.role;
+
+        // RLS-ME-010: Prefer employee.department over user.department
+        const effectiveDepartment = employeeData?.departmentId
+            ? { id: employeeData.departmentId, name: employeeData.departmentName }
+            : (user.department ? { id: user.department.id, name: user.department.name } : null);
 
         return res.json({
             requestId: (req as any).requestId ?? null,
@@ -56,13 +91,13 @@ export async function getMe(req: Request, res: Response, next: NextFunction) {
                 isActive: user.isActive,
                 employeeId: user.employeeId || null,
                 driverId: driverId,
+                employeeType: employeeData?.employeeType || null,  // RLS-ME-010
             },
             organization: user.organization
                 ? { id: user.organization.id, name: user.organization.shortName ?? user.organization.name }
                 : { id: user.organizationId, name: null },
-            department: user.department
-                ? { id: user.department.id, name: user.department.name }
-                : null,
+            department: effectiveDepartment,
+            employee: employeeData,  // RLS-ME-010: Full employee data
             // Token claims vs DB - useful to detect mismatches
             tokenClaims: {
                 organizationId: req.user.organizationId,

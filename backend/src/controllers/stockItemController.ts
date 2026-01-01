@@ -13,7 +13,7 @@ import { BadRequestError } from '../utils/errors';
  */
 export async function getAll(req: Request, res: Response, next: NextFunction) {
     try {
-        const user = req.user as { organizationId: string };
+        const user = req.user as { organizationId: string; role?: string };
         const { category, isFuel, isActive, search } = req.query;
 
         const items = await stockItemService.getAll({
@@ -24,7 +24,14 @@ export async function getAll(req: Request, res: Response, next: NextFunction) {
             search: search as string,
         });
 
-        res.json({ data: items });
+        // RLS-STOCK-010: Drivers get read-only access
+        const isDriver = user.role === 'driver';
+        const itemsWithAccess = items.map((item: any) => ({
+            ...item,
+            _canEdit: !isDriver  // Drivers cannot edit
+        }));
+
+        res.json({ data: itemsWithAccess });
     } catch (error) {
         next(error);
     }

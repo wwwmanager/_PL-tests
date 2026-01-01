@@ -702,6 +702,42 @@ export const AppSettingsComponent: React.FC = () => {
     <section className="border rounded-lg p-4 dark:border-gray-700 max-w-2xl space-y-4">
       <h3 className="font-semibold text-lg mb-4 text-gray-800 dark:text-white">Общие настройки</h3>
       <div className="space-y-4">
+        {/* Режим работы с путевыми листами */}
+        <div className="p-3 rounded-lg bg-gray-50 dark:bg-gray-700/50 space-y-2">
+          <div className="font-medium text-gray-800 dark:text-white">Режим работы с путевыми листами</div>
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            Определяет доступные переходы статусов для путевых листов.
+          </p>
+          <div className="flex gap-4 mt-2">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input type="radio" name="appMode" value="driver" checked={settings.appMode === 'driver' || !settings.appMode} onChange={() => handleSettingChange('appMode', 'driver')} className="w-4 h-4 text-blue-600" />
+              <span className="text-gray-700 dark:text-gray-200">Driver mode (упрощенный)</span>
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input type="radio" name="appMode" value="central" checked={settings.appMode === 'central'} onChange={() => handleSettingChange('appMode', 'central')} className="w-4 h-4 text-blue-600" />
+              <span className="text-gray-700 dark:text-gray-200">Central mode (с проверкой)</span>
+            </label>
+          </div>
+        </div>
+
+        {/* Настройки бланков ПЛ */}
+        <div className="p-3 rounded-lg bg-gray-50 dark:bg-gray-700/50 space-y-3">
+          <div className="font-medium text-gray-800 dark:text-white">Настройки бланков ПЛ</div>
+          <label className="flex items-center justify-between">
+            <span className="text-gray-700 dark:text-gray-200">Водитель может добавлять пачки</span>
+            <div className="relative inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={blanksSettings.driverCanAddBatches}
+                onChange={e => handleBlanksSettingChange('driverCanAddBatches', e.target.checked)}
+                className="sr-only peer"
+              />
+              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-600 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-500 peer-checked:bg-blue-600"></div>
+            </div>
+          </label>
+        </div>
+
+        {/* Парсер маршрутов */}
         <label className="flex items-center justify-between p-3 rounded-lg bg-gray-50 dark:bg-gray-700/50">
           <div>
             <div className="font-medium text-gray-800 dark:text-white">Включить парсер маршрутов из файла</div>
@@ -709,7 +745,7 @@ export const AppSettingsComponent: React.FC = () => {
               Активирует кнопку "Импорт из файла" в путевом листе для загрузки маршрутов из HTML отчетов.
             </p>
           </div>
-          <div className="relative inline-flex items-center cursor-pointer">
+          <div className="relative inline-flex items-center cursor-pointer ml-4">
             <input
               type="checkbox"
               checked={settings.isParserEnabled}
@@ -719,27 +755,8 @@ export const AppSettingsComponent: React.FC = () => {
             <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-600 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-500 peer-checked:bg-blue-600"></div>
           </div>
         </label>
-        <div className="p-3 rounded-lg bg-gray-50 dark:bg-gray-700/50">
-          <div className="font-medium text-gray-800 dark:text-white">Режим работы с путевыми листами</div>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">
-            Определяет доступные переходы статусов для путевых листов.
-          </p>
-          <div className="flex gap-4">
-            <label className="flex items-center gap-2">
-              <input type="radio" name="appMode" value="driver" checked={settings.appMode === 'driver' || !settings.appMode} onChange={() => handleSettingChange('appMode', 'driver')} />
-              <span>Driver mode (упрощенный)</span>
-            </label>
-            <label className="flex items-center gap-2">
-              <input type="radio" name="appMode" value="central" checked={settings.appMode === 'central'} onChange={() => handleSettingChange('appMode', 'central')} />
-              <span>Central mode (с проверкой)</span>
-            </label>
-          </div>
-        </div>
-        <div className="p-3 rounded-lg bg-gray-50 dark:bg-gray-700/50 space-y-2">
-          <div className="font-medium text-gray-800 dark:text-white">Настройки бланков ПЛ</div>
-          <label className="flex items-center gap-2"><input type="checkbox" checked={blanksSettings.driverCanAddBatches} onChange={e => handleBlanksSettingChange('driverCanAddBatches', e.target.checked)} /><span>Водитель может добавлять пачки</span></label>
-        </div>
-        {/* P0-F: Allow deletion of POSTED waybills */}
+
+        {/* Разрешить удаление проведённых ПЛ */}
         <label className="flex items-center justify-between p-3 rounded-lg bg-gray-50 dark:bg-gray-700/50">
           <div>
             <div className="font-medium text-gray-800 dark:text-white">Разрешить удаление проведённых ПЛ</div>
@@ -747,7 +764,7 @@ export const AppSettingsComponent: React.FC = () => {
               По умолчанию проведённые путевые листы нельзя удалить. Включите для отмены этого ограничения.
             </p>
           </div>
-          <div className="relative inline-flex items-center cursor-pointer">
+          <div className="relative inline-flex items-center cursor-pointer ml-4">
             <input
               type="checkbox"
               checked={settings.allowDeletePostedWaybills || false}
@@ -757,7 +774,8 @@ export const AppSettingsComponent: React.FC = () => {
             <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-600 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-500 peer-checked:bg-blue-600"></div>
           </div>
         </label>
-        {/* P0-2: Allow direct deletion of stock movement documents */}
+
+        {/* Разрешить удаление складских движений */}
         <label className="flex items-center justify-between p-3 rounded-lg bg-gray-50 dark:bg-gray-700/50">
           <div>
             <div className="font-medium text-gray-800 dark:text-white">Разрешить удаление складских движений</div>
@@ -765,7 +783,7 @@ export const AppSettingsComponent: React.FC = () => {
               По умолчанию документы движений удалять нельзя (только сторнировать). Включите для разрешения прямого удаления (опасно!).
             </p>
           </div>
-          <div className="relative inline-flex items-center cursor-pointer">
+          <div className="relative inline-flex items-center cursor-pointer ml-4">
             <input
               type="checkbox"
               checked={settings.allowDirectStockMovementDeletion || false}
@@ -793,12 +811,17 @@ const Admin: React.FC = () => {
   const { showToast } = useToast();
   const { can, currentUser } = useAuth();
   const [skel, setSkel] = useState<any>(null);
+  const [appSettings, setAppSettings] = useState<AppSettings | null>(null);
 
   useEffect(() => {
-    if ((activeTab === 'diag' || activeTab === 'users' || activeTab === 'blanks') && !can('admin.panel')) {
+    if ((activeTab === 'diag' || activeTab === 'users') && !can('admin.panel')) {
       setActiveTab('settings');
     }
-  }, [activeTab, can]);
+    // Driver can access blanks if setting is enabled
+    if (activeTab === 'blanks' && !can('admin.panel') && currentUser?.role === 'driver' && !appSettings?.blanks?.driverCanAddBatches) {
+      setActiveTab('settings');
+    }
+  }, [activeTab, can, currentUser, appSettings]);
 
   useEffect(() => {
     fetch('/context-pack.skeleton.json')
@@ -814,6 +837,11 @@ const Admin: React.FC = () => {
         // showToast('Не удалось загрузить скелет пакета контекста.', 'error');
       });
   }, [showToast]);
+
+  // Load app settings for driver blanks access check
+  useEffect(() => {
+    getAppSettings().then(setAppSettings);
+  }, []);
 
   const canImportFull = can('import.run');
   const canImportLimited = can('import.limited');
@@ -1287,6 +1315,9 @@ const Admin: React.FC = () => {
       t.push({ id: 'users', label: 'Пользователи' });
       t.push({ id: 'roles', label: 'Управление ролями' });
       t.push({ id: 'blanks', label: 'Бланки ПЛ' });
+    } else if (currentUser?.role === 'driver' && appSettings?.blanks?.driverCanAddBatches) {
+      // Driver gets blanks tab if setting is enabled
+      t.push({ id: 'blanks', label: 'Бланки ПЛ' });
     }
     t.push({ id: 'import_audit', label: 'Журнал импорта' });
     if (can('audit.business.read')) {
@@ -1297,7 +1328,7 @@ const Admin: React.FC = () => {
       t.push({ id: 'diag', label: 'Диагностика' });
     }
     return t;
-  }, [can]);
+  }, [can, currentUser, appSettings]);
 
   const renderActiveTab = () => {
     switch (activeTab) {

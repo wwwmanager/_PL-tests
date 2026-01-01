@@ -50,7 +50,7 @@ async function main() {
         'waybill.read', 'waybill.create', 'waybill.submit', 'waybill.post', 'waybill.cancel',
         'waybill.backdate', 'waybill.correct',
         // Blanks
-        'blank.read', 'blank.create', 'blanks.issue', 'blanks.return', 'blanks.spoil.self', 'blanks.spoil.warehouse',
+        'blank.read', 'blank.create', 'blank.update', 'blanks.issue', 'blanks.return', 'blanks.spoil.self', 'blanks.spoil.warehouse',
         'blanks.spoil.override',
         // RBAC
         'rbac.delegate',

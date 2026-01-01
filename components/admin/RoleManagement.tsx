@@ -12,6 +12,8 @@ const RoleManagement: React.FC = () => {
     const { rolePolicies, allCaps, refreshPolicies } = useAuth();
     const [editingRole, setEditingRole] = useState<Role | null>(null);
     const [currentCaps, setCurrentCaps] = useState<Set<Capability>>(new Set());
+    const [filterCode, setFilterCode] = useState('');
+    const [filterDescription, setFilterDescription] = useState('');
     const { showToast } = useToast();
 
     const roles = useMemo(() => (Object.keys(rolePolicies) as Role[]).sort(), [rolePolicies]);
@@ -23,6 +25,8 @@ const RoleManagement: React.FC = () => {
         }
         setEditingRole(role);
         setCurrentCaps(new Set(rolePolicies[role] || []));
+        setFilterCode('');
+        setFilterDescription('');
     };
 
     const handleToggleCapability = (cap: Capability) => {
@@ -64,6 +68,15 @@ const RoleManagement: React.FC = () => {
             return translationA.localeCompare(translationB);
         });
     }, [allCaps]);
+
+    // Filtered capabilities based on search inputs
+    const filteredCaps = useMemo(() => {
+        return sortedCaps.filter(cap => {
+            const codeMatch = cap.toLowerCase().includes(filterCode.toLowerCase());
+            const descMatch = (CAPABILITY_TRANSLATIONS[cap] || cap).toLowerCase().includes(filterDescription.toLowerCase());
+            return codeMatch && descMatch;
+        });
+    }, [sortedCaps, filterCode, filterDescription]);
 
     const handleToggleAll = (checked: boolean) => {
         if (checked) {
@@ -135,9 +148,30 @@ const RoleManagement: React.FC = () => {
                                 <th className="p-2 text-gray-600 dark:text-gray-300 font-semibold">Привилегия</th>
                                 <th className="p-2 text-gray-600 dark:text-gray-300 font-semibold">Описание</th>
                             </tr>
+                            <tr className="bg-gray-100 dark:bg-gray-800">
+                                <th className="p-1"></th>
+                                <th className="p-1">
+                                    <input
+                                        type="text"
+                                        placeholder="Фильтр..."
+                                        value={filterCode}
+                                        onChange={e => setFilterCode(e.target.value)}
+                                        className="w-full px-2 py-1 text-xs border rounded bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200"
+                                    />
+                                </th>
+                                <th className="p-1">
+                                    <input
+                                        type="text"
+                                        placeholder="Фильтр..."
+                                        value={filterDescription}
+                                        onChange={e => setFilterDescription(e.target.value)}
+                                        className="w-full px-2 py-1 text-xs border rounded bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200"
+                                    />
+                                </th>
+                            </tr>
                         </thead>
                         <tbody>
-                            {sortedCaps.map(cap => (
+                            {filteredCaps.map(cap => (
                                 <tr key={cap} className="border-t dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700/50">
                                     <td className="p-2 text-center">
                                         <input

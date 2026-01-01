@@ -10,6 +10,7 @@ export interface AuthUser {
     organizationId: string;
     departmentId: string | null;
     role: string;
+    employeeId?: string | null;
 }
 
 export interface DraftReserveResult {
@@ -34,8 +35,15 @@ export interface UpdateFuelCardDTO {
 }
 
 export async function listFuelCards(user: AuthUser) {
+    const where: any = { organizationId: user.organizationId };
+
+    // RLS-FUEL-CARD-010: Driver RLS
+    if (user.role === 'driver') {
+        where.assignedToDriver = { employeeId: user.employeeId };
+    }
+
     const cards = await prisma.fuelCard.findMany({
-        where: { organizationId: user.organizationId },
+        where,
         orderBy: { createdAt: 'desc' },
         include: {
             organization: true,

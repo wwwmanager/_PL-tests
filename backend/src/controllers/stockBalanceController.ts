@@ -34,16 +34,46 @@ export async function getBalances(
 
         const asOfDate = asOf ? new Date(String(asOf)) : new Date();
 
-        const balances = await stockService.getBalancesAt(
-            user.organizationId,
-            String(stockItemId),
-            asOfDate
-        );
+        // RLS-STOCK-BAL-010: Driver RLS
+        let filteredBalances;
+        if (req.user && (req.user as any).role === 'driver' && (req.user as any).employeeId) {
+            const employeeId = (req.user as any).employeeId;
+
+            const driverLocs = await prisma.stockLocation.findMany({
+                where: {
+                    OR: [
+                        { vehicle: { assignedDriverId: employeeId } },
+                        { fuelCard: { assignedToDriver: { employeeId: employeeId } } }
+                    ]
+                },
+                select: { id: true }
+            });
+
+            const driverLocIds = driverLocs.map(l => l.id);
+
+            if (driverLocIds.length === 0) {
+                return res.json({ asOf: asOfDate.toISOString(), stockItemId, data: [] });
+            }
+
+            const allBalances = await stockService.getBalancesAt(
+                user.organizationId,
+                String(stockItemId),
+                asOfDate
+            );
+
+            filteredBalances = allBalances.filter(b => driverLocIds.includes(b.locationId));
+        } else {
+            filteredBalances = await stockService.getBalancesAt(
+                user.organizationId,
+                String(stockItemId),
+                asOfDate
+            );
+        }
 
         res.json({
             asOf: asOfDate.toISOString(),
             stockItemId,
-            data: balances,
+            data: filteredBalances,
         });
     } catch (error) {
         next(error);
@@ -174,8 +204,42 @@ export async function listMovementsV2(
             }
         }
 
-        // Location filter: match any of stockLocationId, fromStockLocationId, toStockLocationId
-        if (locationId) {
+        // RLS-STOCK-MOV-010: Driver RLS
+        if (req.user && (req.user as any).role === 'driver' && (req.user as any).employeeId) {
+            const employeeId = (req.user as any).employeeId;
+
+            // Get driver's locations
+            const driverLocs = await prisma.stockLocation.findMany({
+                where: {
+                    OR: [
+                        { vehicle: { assignedDriverId: employeeId } },
+                        { fuelCard: { assignedToDriver: { employeeId: employeeId } } }
+                    ]
+                },
+                select: { id: true }
+            });
+
+            const driverLocIds = driverLocs.map(l => l.id);
+
+            if (driverLocIds.length === 0) {
+                return res.json({ success: true, data: [], total: 0, page, pageSize });
+            }
+
+            // If locationId provided, check if it belongs to driver
+            if (locationId) {
+                if (!driverLocIds.includes(String(locationId))) {
+                    return res.json({ success: true, data: [], total: 0, page, pageSize });
+                }
+            } else {
+                // Limit to driver's locations only
+                where.OR = [
+                    { stockLocationId: { in: driverLocIds } },
+                    { fromStockLocationId: { in: driverLocIds } },
+                    { toStockLocationId: { in: driverLocIds } },
+                ];
+            }
+        } else if (locationId) {
+            // Standard location filter for non-drivers
             where.OR = [
                 { stockLocationId: String(locationId) },
                 { fromStockLocationId: String(locationId) },
@@ -482,6 +546,192 @@ export async function createCorrection(
             success: true,
             correctionId: documentId,
             movement,
+        });
+    } catch (error) {
+        next(error);
+    }
+}
+
+/**
+ * GET /stock/movements/my
+ * DRIVER-STOCK-MOVEMENTS-002: Driver sees only their own movements (cards + tanks)
+ * 
+ * Query params:
+ *   - from/occurredFrom, to/occurredTo: ISO date range
+ *   - movementType: INCOME | EXPENSE | ADJUSTMENT | TRANSFER
+ *   - stockItemId: filter by fuel type (auto-detected from vehicle if not provided)
+ *   - page, pageSize: pagination (default 50, max 200)
+ */
+export async function listMyMovementsV2(
+    req: Request,
+    res: Response,
+    next: NextFunction
+) {
+    try {
+        const user = req.user as {
+            id: string;
+            organizationId: string;
+            employeeId: string | null;
+            role: string;
+        };
+
+        // Driver scope guard
+        if (user.role !== 'driver') {
+            return res.status(403).json({
+                error: 'DRIVER_ONLY_ENDPOINT',
+                message: 'Этот endpoint доступен только для водителей'
+            });
+        }
+
+        if (!user.employeeId) {
+            return res.status(403).json({
+                error: 'NO_EMPLOYEE_LINK',
+                message: 'Пользователь не связан с сотрудником'
+            });
+        }
+
+        // Find Driver by employeeId
+        const driver = await prisma.driver.findUnique({
+            where: { employeeId: user.employeeId }
+        });
+
+        if (!driver) {
+            return res.json({ success: true, data: [], total: 0, page: 1, pageSize: 50 });
+        }
+
+        // Determine stockItemId: from query or from first vehicle
+        const vehicles = await prisma.vehicle.findMany({
+            where: {
+                organizationId: user.organizationId,
+                assignedDriverId: user.employeeId
+            },
+            orderBy: { registrationNumber: 'asc' },  // Deterministic order
+            select: { id: true, fuelStockItemId: true }
+        });
+
+        let effectiveStockItemId = req.query.stockItemId
+            ? String(req.query.stockItemId)
+            : null;
+
+        // Auto-detect from first vehicle if not provided
+        if (!effectiveStockItemId && vehicles.length > 0) {
+            effectiveStockItemId = vehicles[0].fuelStockItemId || null;
+        }
+
+        // Collect "own" locationIds
+        const locationIds: string[] = [];
+
+        // Fuel cards assigned to driver
+        const fuelCards = await prisma.fuelCard.findMany({
+            where: {
+                organizationId: user.organizationId,
+                assignedToDriverId: driver.id,
+                isActive: true
+            },
+            select: { id: true }
+        });
+
+        for (const card of fuelCards) {
+            try {
+                const loc = await stockLocationService.getOrCreateFuelCardLocation(card.id);
+                locationIds.push(loc.id);
+            } catch (e) {
+                console.warn(`[listMyMovementsV2] Failed to get location for card ${card.id}`, e);
+            }
+        }
+
+        // Vehicle tanks for assigned vehicles
+        for (const v of vehicles) {
+            try {
+                const loc = await stockLocationService.getOrCreateVehicleTankLocation(v.id);
+                locationIds.push(loc.id);
+            } catch (e) {
+                console.warn(`[listMyMovementsV2] Failed to get location for vehicle ${v.id}`, e);
+            }
+        }
+
+        // Deduplicate
+        const uniqueLocationIds = [...new Set(locationIds)];
+
+        if (uniqueLocationIds.length === 0) {
+            return res.json({ success: true, data: [], total: 0, page: 1, pageSize: 50 });
+        }
+
+        // Parse query params (reuse v2 aliases)
+        const {
+            from,
+            to,
+            occurredFrom: occurredFromAlt,
+            occurredTo: occurredToAlt,
+            movementType,
+            page: pageStr,
+            pageSize: pageSizeStr,
+        } = req.query;
+
+        // Support both from/to and occurredFrom/occurredTo (prefer from/to)
+        const occurredFromStr = (from ?? occurredFromAlt) as string | undefined;
+        const occurredToStr = (to ?? occurredToAlt) as string | undefined;
+
+        const page = Math.max(1, parseInt(String(pageStr || '1'), 10));
+        const pageSize = Math.min(200, Math.max(1, parseInt(String(pageSizeStr || '50'), 10)));
+
+        // Build where clause
+        const where: any = {
+            organizationId: user.organizationId,
+            isVoid: false,
+            OR: [
+                { stockLocationId: { in: uniqueLocationIds } },
+                { fromStockLocationId: { in: uniqueLocationIds } },
+                { toStockLocationId: { in: uniqueLocationIds } },
+            ]
+        };
+
+        if (movementType) {
+            where.movementType = String(movementType);
+        }
+        if (effectiveStockItemId) {
+            where.stockItemId = effectiveStockItemId;
+        }
+
+        // Date range filter
+        if (occurredFromStr || occurredToStr) {
+            where.occurredAt = {};
+            if (occurredFromStr) where.occurredAt.gte = new Date(occurredFromStr);
+            if (occurredToStr) where.occurredAt.lte = new Date(occurredToStr);
+        }
+
+        // Query with same sorting as v2
+        const [total, items] = await Promise.all([
+            prisma.stockMovement.count({ where }),
+            prisma.stockMovement.findMany({
+                where,
+                orderBy: [
+                    { occurredAt: 'desc' },
+                    { occurredSeq: 'desc' },
+                    { createdAt: 'desc' },
+                ],
+                skip: (page - 1) * pageSize,
+                take: pageSize,
+                include: {
+                    stockItem: { select: { id: true, name: true } },
+                    stockLocation: { select: { id: true, name: true, type: true } },
+                    fromStockLocation: { select: { id: true, name: true, type: true } },
+                    toStockLocation: { select: { id: true, name: true, type: true } },
+                    createdByUser: { select: { id: true, email: true } },
+                },
+            }),
+        ]);
+
+        res.json({
+            success: true,
+            data: items,
+            total,
+            page,
+            pageSize,
+            meta: {
+                locationIds: uniqueLocationIds,
+                effectiveStockItemId,
+            }
         });
     } catch (error) {
         next(error);

@@ -7,12 +7,13 @@ import { Organization, Employee, StorageType } from '../../types';
 import { fetchStorages, addStorage, updateStorage, deleteStorage, Storage } from '../../services/warehouseApi';
 import { getOrganizations } from '../../services/organizationApi';
 import { getEmployees } from '../../services/api/employeeApi';
-import { PencilIcon, TrashIcon, PlusIcon, ArrowUpIcon, ArrowDownIcon, ArchiveBoxIcon, ArrowUpTrayIcon } from '../Icons';
+import { PencilIcon, TrashIcon, PlusIcon, ArrowUpIcon, ArrowDownIcon, ArchiveBoxIcon, ArrowUpTrayIcon, EyeIcon } from '../Icons';
 import useTable from '../../hooks/useTable';
 import { STORAGE_TYPE_TRANSLATIONS, STORAGE_STATUS_TRANSLATIONS, STORAGE_STATUS_COLORS } from '../../constants';
 import Modal from '../shared/Modal';
 import ConfirmationModal from '../shared/ConfirmationModal';
 import { useToast } from '../../hooks/useToast';
+import { useAuth } from '../../services/auth';  // RLS-WAREHOUSE-FE-010
 
 const FormField: React.FC<{ label: string; children: React.ReactNode; error?: string }> = ({ label, children, error }) => (
     <div>
@@ -52,6 +53,8 @@ const StorageManagement = () => {
     const [showArchived, setShowArchived] = useState(false);
     const [actionModal, setActionModal] = useState<{ isOpen: boolean; type?: 'delete' | 'archive' | 'unarchive'; item?: Storage }>({ isOpen: false });
     const { showToast } = useToast();
+    const { currentUser } = useAuth();  // RLS-WAREHOUSE-FE-010
+    const isDriver = currentUser?.role === 'driver';  // RLS-WAREHOUSE-FE-010
 
     const {
         register,
@@ -231,9 +234,12 @@ const StorageManagement = () => {
             <div>
                 <div className="flex justify-between items-center mb-4">
                     <h3 className="text-xl font-semibold text-gray-800 dark:text-white">Справочник: Места хранения</h3>
-                    <button onClick={handleAddNew} className="flex items-center gap-2 bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md hover:bg-blue-700 transition-colors">
-                        <PlusIcon className="h-5 w-5" /> Добавить
-                    </button>
+                    {/* RLS-WAREHOUSE-FE-010: Hide Add button for drivers */}
+                    {!isDriver && (
+                        <button onClick={handleAddNew} className="flex items-center gap-2 bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md hover:bg-blue-700 transition-colors">
+                            <PlusIcon className="h-5 w-5" /> Добавить
+                        </button>
+                    )}
                 </div>
                 <label className="flex items-center text-sm text-gray-600 dark:text-gray-300 cursor-pointer my-4">
                     <input type="checkbox" checked={showArchived} onChange={e => setShowArchived(e.target.checked)} className="h-4 w-4 rounded border-gray-300 dark:border-gray-500 text-blue-600 focus:ring-blue-500" />
@@ -261,9 +267,18 @@ const StorageManagement = () => {
                                         <td className="px-6 py-4">{s.address}</td>
                                         <td className="px-6 py-4"><span className={`px-2 py-1 text-xs font-semibold rounded-full ${s.status ? STORAGE_STATUS_COLORS[s.status] : ''}`}>{s.status ? STORAGE_STATUS_TRANSLATIONS[s.status] : ''}</span></td>
                                         <td className="px-6 py-4 text-center">
-                                            <button onClick={() => handleEdit(s)} className="p-2 text-blue-500" title="Редактировать"><PencilIcon className="h-5 w-5" /></button>
-                                            {s.status === 'active' ? <button onClick={() => openActionModal('archive', s)} className="p-2 text-purple-500" title="Архивировать"><ArchiveBoxIcon className="h-5 w-5" /></button> : <button onClick={() => openActionModal('unarchive', s)} className="p-2 text-green-500" title="Восстановить"><ArrowUpTrayIcon className="h-5 w-5" /></button>}
-                                            <button onClick={() => openActionModal('delete', s)} className="p-2 text-red-500" title="Удалить"><TrashIcon className="h-5 w-5" /></button>
+                                            {/* RLS-WAREHOUSE-FE-010: Show view-only or edit buttons based on _canEdit */}
+                                            {(s as any)._canEdit === false ? (
+                                                <button onClick={() => handleEdit(s)} className="p-2 text-gray-400" title="Просмотр (только чтение)">
+                                                    <EyeIcon className="h-5 w-5" />
+                                                </button>
+                                            ) : (
+                                                <>
+                                                    <button onClick={() => handleEdit(s)} className="p-2 text-blue-500" title="Редактировать"><PencilIcon className="h-5 w-5" /></button>
+                                                    {s.status === 'active' ? <button onClick={() => openActionModal('archive', s)} className="p-2 text-purple-500" title="Архивировать"><ArchiveBoxIcon className="h-5 w-5" /></button> : <button onClick={() => openActionModal('unarchive', s)} className="p-2 text-green-500" title="Восстановить"><ArrowUpTrayIcon className="h-5 w-5" /></button>}
+                                                    <button onClick={() => openActionModal('delete', s)} className="p-2 text-red-500" title="Удалить"><TrashIcon className="h-5 w-5" /></button>
+                                                </>
+                                            )}
                                         </td>
                                     </tr>
                                 ))}
