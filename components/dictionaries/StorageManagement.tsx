@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -7,7 +7,7 @@ import { Organization, Employee, StorageType } from '../../types';
 import { fetchStorages, addStorage, updateStorage, deleteStorage, Storage } from '../../services/warehouseApi';
 import { getOrganizations } from '../../services/organizationApi';
 import { getEmployees } from '../../services/api/employeeApi';
-import { PencilIcon, TrashIcon, PlusIcon, ArrowUpIcon, ArrowDownIcon, ArchiveBoxIcon, ArrowUpTrayIcon, EyeIcon } from '../Icons';
+import { PencilIcon, TrashIcon, PlusIcon, ArrowUpIcon, ArrowDownIcon, ArchiveBoxIcon, ArrowUpTrayIcon, EyeIcon, HomeModernIcon } from '../Icons';
 import useTable from '../../hooks/useTable';
 import { STORAGE_TYPE_TRANSLATIONS, STORAGE_STATUS_TRANSLATIONS, STORAGE_STATUS_COLORS } from '../../constants';
 import Modal from '../shared/Modal';
@@ -181,9 +181,9 @@ const StorageManagement = () => {
         if (!type || !item) return { title: '', message: '', confirmText: '', confirmButtonClass: '' };
 
         switch (type) {
-            case 'delete': return { title: 'Подтвердить удаление', message: `Удалить место хранения "${item.name}"?`, confirmText: 'Удалить', confirmButtonClass: 'bg-red-600 hover:bg-red-700' };
-            case 'archive': return { title: 'Подтвердить архивацию', message: `Архивировать "${item.name}"?`, confirmText: 'Архивировать', confirmButtonClass: 'bg-purple-600 hover:bg-purple-700' };
-            case 'unarchive': return { title: 'Подтвердить восстановление', message: `Восстановить "${item.name}" из архива?`, confirmText: 'Восстановить', confirmButtonClass: 'bg-green-600 hover:bg-green-700' };
+            case 'delete': return { title: 'Подтвердить удаление', message: `Удалить место хранения "${item.name}" ? `, confirmText: 'Удалить', confirmButtonClass: 'bg-red-600 hover:bg-red-700' };
+            case 'archive': return { title: 'Подтвердить архивацию', message: `Архивировать "${item.name}" ? `, confirmText: 'Архивировать', confirmButtonClass: 'bg-purple-600 hover:bg-purple-700' };
+            case 'unarchive': return { title: 'Подтвердить восстановление', message: `Восстановить "${item.name}" из архива ? `, confirmText: 'Восстановить', confirmButtonClass: 'bg-green-600 hover:bg-green-700' };
             default: return { title: '', message: '', confirmText: '', confirmButtonClass: '' };
         }
     }, [actionModal]);
@@ -195,7 +195,7 @@ const StorageManagement = () => {
                 isOpen={isModalOpen}
                 onClose={handleCancel}
                 isDirty={isDirty}
-                title={currentId ? `Редактирование: ${currentName}` : 'Добавить место хранения'}
+                title={currentId ? `Редактирование: ${currentName} ` : 'Добавить место хранения'}
                 footer={
                     <>
                         <button onClick={handleCancel} className="bg-gray-200 dark:bg-gray-600 text-gray-800 dark:text-white font-semibold py-2 px-4 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-500">Отмена</button>
@@ -233,7 +233,10 @@ const StorageManagement = () => {
 
             <div>
                 <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-xl font-semibold text-gray-800 dark:text-white">Справочник: Места хранения</h3>
+                    <div className="flex items-center gap-3">
+                        <HomeModernIcon className="h-6 w-6 text-gray-600 dark:text-gray-400" />
+                        <h3 className="text-xl font-semibold text-gray-800 dark:text-white">Справочник: Места хранения</h3>
+                    </div>
                     {/* RLS-WAREHOUSE-FE-010: Hide Add button for drivers */}
                     {!isDriver && (
                         <button onClick={handleAddNew} className="flex items-center gap-2 bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md hover:bg-blue-700 transition-colors">
@@ -253,7 +256,7 @@ const StorageManagement = () => {
                                 <th scope="col" className="px-6 py-3 text-center">Действия</th>
                             </tr>
                             <tr>
-                                {columns.map(col => (<th key={`${col.key}-filter`} className="px-2 py-1"><input type="text" value={filters[col.key] || ''} onChange={e => handleFilterChange(col.key, e.target.value)} placeholder={`Поиск...`} className="w-full text-xs p-1 bg-gray-100 dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded" /></th>))}
+                                {columns.map(col => (<th key={`${col.key} -filter`} className="px-2 py-1"><input type="text" value={filters[col.key] || ''} onChange={e => handleFilterChange(col.key, e.target.value)} placeholder={`Поиск...`} className="w-full text-xs p-1 bg-gray-100 dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded" /></th>))}
                                 <th className="px-2 py-1"></th>
                             </tr>
                         </thead>
@@ -265,7 +268,7 @@ const StorageManagement = () => {
                                         <td className="px-6 py-4">{s.typeName}</td>
                                         <td className="px-6 py-4">{s.organizationName}</td>
                                         <td className="px-6 py-4">{s.address}</td>
-                                        <td className="px-6 py-4"><span className={`px-2 py-1 text-xs font-semibold rounded-full ${s.status ? STORAGE_STATUS_COLORS[s.status] : ''}`}>{s.status ? STORAGE_STATUS_TRANSLATIONS[s.status] : ''}</span></td>
+                                        <td className="px-6 py-4"><span className={`px - 2 py - 1 text - xs font - semibold rounded - full ${s.status ? STORAGE_STATUS_COLORS[s.status] : ''} `}>{s.status ? STORAGE_STATUS_TRANSLATIONS[s.status] : ''}</span></td>
                                         <td className="px-6 py-4 text-center">
                                             {/* RLS-WAREHOUSE-FE-010: Show view-only or edit buttons based on _canEdit */}
                                             {(s as any)._canEdit === false ? (

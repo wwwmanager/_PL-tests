@@ -8,7 +8,7 @@ import { getEmployees } from '../../services/api/employeeApi';
 import { getStockItems, StockItem } from '../../services/stockItemApi';
 import { getOrganizations } from '../../services/organizationApi';
 import { validation } from '../../services/faker';
-import { PencilIcon, TrashIcon, PlusIcon, ArrowUpIcon, ArrowDownIcon, ArchiveBoxIcon, ArrowUpTrayIcon } from '../Icons';
+import { PencilIcon, TrashIcon, PlusIcon, ArrowUpIcon, ArrowDownIcon, ArchiveBoxIcon, ArrowUpTrayIcon, TruckIcon } from '../Icons';
 import useTable from '../../hooks/useTable';
 import Modal from '../shared/Modal';
 import ConfirmationModal from '../shared/ConfirmationModal';
@@ -345,7 +345,10 @@ export const VehicleList: React.FC = () => {
 
             <div>
                 <div className="flex justify-between items-center mb-6">
-                    <h2 className="text-xl font-bold text-gray-900 dark:text-white">Транспортные средства</h2>
+                    <div className="flex items-center gap-3">
+                        <TruckIcon className="h-6 w-6 text-gray-600 dark:text-gray-400" />
+                        <h2 className="text-xl font-bold text-gray-900 dark:text-white">Транспортные средства</h2>
+                    </div>
                     <div className="flex items-center gap-4">
                         <label className="flex items-center text-sm text-gray-600 dark:text-gray-300 cursor-pointer select-none">
                             <input

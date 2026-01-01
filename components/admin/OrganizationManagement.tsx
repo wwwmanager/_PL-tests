@@ -7,7 +7,7 @@ import { Organization, OrganizationStatus } from '../../types';
 import { getOrganizations, addOrganization, updateOrganization, deleteOrganization } from '../../services/organizationApi';
 import { lockStockPeriod, unlockStockPeriod } from '../../services/adminApi';
 import { validation } from '../../services/faker'; // Валидация все еще нужна для схемы
-import { PencilIcon, TrashIcon, PlusIcon, ArrowUpIcon, ArrowDownIcon, ArchiveBoxIcon, ArrowUpTrayIcon, EyeIcon } from '../Icons';
+import { PencilIcon, TrashIcon, PlusIcon, ArrowUpIcon, ArrowDownIcon, ArchiveBoxIcon, ArrowUpTrayIcon, EyeIcon, BuildingOffice2Icon } from '../Icons';
 import useTable from '../../hooks/useTable';
 import { ORGANIZATION_STATUS_COLORS, ORGANIZATION_STATUS_TRANSLATIONS } from '../../constants';
 import Modal from '../shared/Modal';
@@ -406,7 +406,10 @@ const OrganizationManagement = () => {
 
             <div>
                 <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-xl font-semibold text-gray-800 dark:text-white">Справочник: Организации</h3>
+                    <div className="flex items-center gap-3">
+                        <BuildingOffice2Icon className="h-6 w-6 text-gray-600 dark:text-gray-400" />
+                        <h3 className="text-xl font-semibold text-gray-800 dark:text-white">Справочник: Организации</h3>
+                    </div>
                     {/* RLS-ORG-FE-010: Hide Add button for drivers */}
                     {!isDriver && (
                         <button onClick={handleAddNew} className="flex items-center gap-2 bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md hover:bg-blue-700 transition-colors">

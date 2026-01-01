@@ -1,3 +1,20 @@
+# UI Enhancement: Dictionary Icons
+- [x] Add icons to all dictionary headers [x]
+    - [x] Icons.tsx: Add new SVGs [x]
+    - [x] EmployeeList.tsx: Add UserGroupIcon [x]
+    - [x] VehicleList.tsx: Add TruckIcon [x]
+    - [x] OrganizationManagement.tsx: Add BuildingOffice2Icon [x]
+    - [x] FuelTypeManagement.tsx: Add FireIcon [x]
+    - [x] StorageManagement.tsx: Add HomeModernIcon [x]
+    - [x] RouteList.tsx: Add GlobeAltIcon [x]
+- [x] Add icons to dictionary navigation tabs [x]
+    - [x] TabsNavigation.tsx: Support icon prop [x]
+    - [x] Dictionaries.tsx: Pass icons to tabs [x]
+- [x] Add icons to Warehouse section [x]
+    - [x] Icons.tsx: Add new SVGs for Warehouse [x]
+    - [x] Warehouse.tsx: Refactor to TabsNavigation and add icons [x]
+    - [x] Add headers with icons to: Nomenclature, Balances, Movements, Fuel Cards, Rules [x]
+
 # STOCK-LEDGER-EPIC-001 — Soft Void + Period Lock + Immutable System Movements
 
 **Стратегия:** B+C (Controlled Mutability + Soft Void) ✅  

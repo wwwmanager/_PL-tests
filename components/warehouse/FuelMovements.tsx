@@ -3,7 +3,7 @@ import { getStockMovements, getStockItems, getStockLocations, deleteStockMovemen
 import { getOrganizations } from '../../services/organizationApi';
 import { StockMovementV2, GarageStockItem, StockLocation, Organization } from '../../types';
 import { useToast } from '../../hooks/useToast';
-import { PlusIcon, TrashIcon, PencilIcon, FunnelIcon } from '../Icons';
+import { PlusIcon, TrashIcon, PencilIcon, FunnelIcon, MovementsIcon } from '../Icons';
 import { useAuth } from '../../services/auth';
 import MovementCreateModal from './MovementCreateModal';
 import ConfirmationModal from '../shared/ConfirmationModal';
@@ -216,6 +216,10 @@ const FuelMovements: React.FC = () => {
 
     return (
         <div className="p-0 space-y-6">
+            <div className="flex items-center gap-3 mb-2">
+                <MovementsIcon className="h-6 w-6 text-gray-600 dark:text-gray-400" />
+                <h3 className="text-xl font-semibold text-gray-800 dark:text-white">Журнал движений</h3>
+            </div>
             {/* Filters */}
             <div className="flex flex-wrap gap-4 items-end bg-gray-50 dark:bg-gray-800/50 p-4 rounded-xl border border-gray-100 dark:border-gray-700">
                 <div className="flex items-center gap-2 text-gray-500 text-sm font-medium mr-2 self-center">

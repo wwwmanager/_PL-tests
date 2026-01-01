@@ -5,7 +5,7 @@ import { LocationBalance, GarageStockItem, StockLocation, Vehicle } from '../../
 import { useToast } from '../../hooks/useToast';
 import DataTable from '../shared/DataTable';
 import { Button } from '../shared/Button';
-import { FunnelIcon } from '../Icons';
+import { FunnelIcon, BalancesIcon } from '../Icons';
 
 const FuelBalances: React.FC = () => {
     // ... (state declarations remain same)
@@ -166,6 +166,10 @@ const FuelBalances: React.FC = () => {
 
     return (
         <div className="p-0 space-y-6">
+            <div className="flex items-center gap-3 mb-2">
+                <BalancesIcon className="h-6 w-6 text-gray-600 dark:text-gray-400" />
+                <h3 className="text-xl font-semibold text-gray-800 dark:text-white">Остатки по локациям</h3>
+            </div>
             {/* Filters */}
             <div className="flex flex-wrap gap-4 items-end bg-gray-50 dark:bg-gray-800/50 p-4 rounded-xl border border-gray-100 dark:border-gray-700">
                 <div className="flex items-center gap-2 text-gray-500 text-sm font-medium mr-2 self-center">

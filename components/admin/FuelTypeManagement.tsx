@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { FuelType } from '../../types';
 import { getFuelTypes, createFuelType, updateFuelType, deleteFuelType } from '../../services/api/fuelTypeApi';
-import { PencilIcon, TrashIcon, PlusIcon, ArrowUpIcon, ArrowDownIcon, EyeIcon } from '../Icons';
+import { PencilIcon, TrashIcon, PlusIcon, ArrowUpIcon, ArrowDownIcon, EyeIcon, FireIcon } from '../Icons';
 import useTable from '../../hooks/useTable';
 import Modal from '../shared/Modal';
 import ConfirmationModal from '../shared/ConfirmationModal';
@@ -169,7 +169,7 @@ const FuelTypeManagement = () => {
         onClose={() => setIsDeleteModalOpen(false)}
         onConfirm={handleConfirmDelete}
         title="Подтвердить удаление"
-        message={`Вы уверены, что хотите удалить тип топлива "${fuelTypeToDelete?.name}"? Это действие нельзя будет отменить.`}
+        message={`Вы уверены, что хотите удалить тип топлива "${fuelTypeToDelete?.name}" ? Это действие нельзя будет отменить.`}
         confirmText="Удалить"
         confirmButtonClass="bg-red-600 hover:bg-red-700 focus:ring-red-500"
       />
@@ -178,7 +178,7 @@ const FuelTypeManagement = () => {
         isOpen={!!currentItem}
         onClose={handleCancel}
         isDirty={isDirty}
-        title={currentItem?.id ? `Редактирование: ${initialItem?.name}` : 'Добавить новый тип топлива'}
+        title={currentItem?.id ? `Редактирование: ${initialItem?.name} ` : 'Добавить новый тип топлива'}
         footer={
           <>
             <button
@@ -221,7 +221,10 @@ const FuelTypeManagement = () => {
 
       <div>
         <div className="flex justify-between items-center mb-4">
-          <h3 className="text-xl font-semibold text-gray-800 dark:text-white">Справочник: Типы топлива</h3>
+          <div className="flex items-center gap-3">
+            <FireIcon className="h-6 w-6 text-gray-600 dark:text-gray-400" />
+            <h3 className="text-xl font-semibold text-gray-800 dark:text-white">Справочник: Типы топлива</h3>
+          </div>
           {/* RLS-FUEL-FE-010: Hide Add button for drivers */}
           {!isDriver && (
             <button
@@ -243,7 +246,7 @@ const FuelTypeManagement = () => {
                     type="button"
                     onClick={() => handleSort(col.key)}
                     className="flex items-center gap-1 cursor-pointer"
-                    aria-label={`Сортировать по: ${col.label}`}
+                    aria-label={`Сортировать по: ${col.label} `}
                   >
                     {col.label}
                     {sortColumn === col.key &&
@@ -261,7 +264,7 @@ const FuelTypeManagement = () => {
             </tr>
             <tr>
               {columns.map(col => (
-                <th key={`${String(col.key)}-filter`} className="px-2 py-1">
+                <th key={`${String(col.key)} -filter`} className="px-2 py-1">
                   <input
                     type="text"
                     value={filters[col.key as string] || ''}
@@ -299,7 +302,7 @@ const FuelTypeManagement = () => {
                       <button
                         onClick={() => handleEdit(ft)}
                         className="p-2 text-gray-400"
-                        aria-label={`Просмотр ${ft.name}`}
+                        aria-label={`Просмотр ${ft.name} `}
                         title="Просмотр (только чтение)"
                       >
                         <EyeIcon className="h-5 w-5 pointer-events-none" />
@@ -309,14 +312,14 @@ const FuelTypeManagement = () => {
                         <button
                           onClick={() => handleEdit(ft)}
                           className="p-2 text-blue-500 transition-all duration-200 transform hover:scale-110 hover:shadow-lg hover:shadow-blue-500/40"
-                          aria-label={`Редактировать ${ft.name}`}
+                          aria-label={`Редактировать ${ft.name} `}
                         >
                           <PencilIcon className="h-5 w-5 pointer-events-none" />
                         </button>
                         <button
                           onClick={() => handleRequestDelete(ft)}
                           className="p-2 text-red-500 transition-all duration-200 transform hover:scale-110 hover:shadow-lg hover:shadow-red-500/40"
-                          aria-label={`Удалить ${ft.name}`}
+                          aria-label={`Удалить ${ft.name} `}
                         >
                           <TrashIcon className="h-5 w-5 pointer-events-none" />
                         </button>

@@ -15,7 +15,7 @@ import {
 } from '../../services/stockItemApi';
 import { useToast } from '../../hooks/useToast';
 import { useAuth } from '../../services/auth';  // RLS-STOCK-FE-010
-import { PlusIcon, PencilIcon, ArchiveBoxIcon, FunnelIcon, EyeIcon } from '../Icons';
+import { PlusIcon, PencilIcon, TrashIcon, ArchiveBoxIcon, EyeIcon, FunnelIcon, NomenclatureIcon } from '../Icons';
 import { Button } from '../shared/Button';
 import DataTable from '../shared/DataTable';
 
@@ -219,6 +219,10 @@ const StockItemList: React.FC = () => {
 
     return (
         <div className="p-0 space-y-6">
+            <div className="flex items-center gap-3 mb-2">
+                <NomenclatureIcon className="h-6 w-6 text-gray-600 dark:text-gray-400" />
+                <h3 className="text-xl font-semibold text-gray-800 dark:text-white">Номенклатура</h3>
+            </div>
             {/* Filters */}
             <div className="flex flex-wrap gap-4 items-center bg-gray-50 dark:bg-gray-800/50 p-4 rounded-xl border border-gray-100 dark:border-gray-700">
                 <div className="flex items-center gap-2 text-gray-500 text-sm font-medium mr-2">

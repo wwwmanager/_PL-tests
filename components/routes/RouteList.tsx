@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { getRoutes, createRoute, updateRoute, deleteRoute, Route } from '../../services/api/routeApi';
-import { PencilIcon, TrashIcon, PlusIcon } from '../Icons';
+import { PencilIcon, TrashIcon, PlusIcon, GlobeAltIcon } from '../Icons';
 import Modal from '../shared/Modal';
 import ConfirmationModal from '../shared/ConfirmationModal';
 import { useToast } from '../../hooks/useToast';
@@ -141,7 +141,10 @@ const RouteList: React.FC = () => {
 
             <div>
                 <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-xl font-semibold text-gray-800 dark:text-white">Справочник: Маршруты</h3>
+                    <div className="flex items-center gap-3">
+                        <GlobeAltIcon className="h-6 w-6 text-gray-600 dark:text-gray-400" />
+                        <h3 className="text-xl font-semibold text-gray-800 dark:text-white">Справочник: Маршруты</h3>
+                    </div>
                     <button onClick={handleAddNew} className="flex items-center gap-2 bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md hover:bg-blue-700 transition-colors">
                         <PlusIcon className="h-5 w-5" />
                         Добавить маршрут

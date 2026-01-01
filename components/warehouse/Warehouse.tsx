@@ -1,5 +1,13 @@
 import React, { useState } from 'react';
-import { CubeIcon } from '../Icons';
+import {
+    WarehouseIcon,
+    NomenclatureIcon,
+    BalancesIcon,
+    MovementsIcon,
+    FuelCardIcon,
+    RulesIcon
+} from '../Icons';
+import { TabsNavigation } from '../shared/TabsNavigation';
 import FuelBalances from './FuelBalances';
 import FuelMovements from './FuelMovements';
 import StockItemList from './StockItemList';
@@ -17,7 +25,7 @@ const Warehouse: React.FC = () => {
             <div className="flex items-center justify-between bg-white dark:bg-gray-800 p-5 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700">
                 <div className="flex items-center space-x-4">
                     <div className="p-3 bg-blue-50 dark:bg-blue-900/40 rounded-xl transition-all duration-300">
-                        <CubeIcon className="w-8 h-8 text-blue-600 dark:text-blue-400" />
+                        <WarehouseIcon className="w-8 h-8 text-blue-600 dark:text-blue-400" />
                     </div>
                     <div>
                         <h1 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">Склад</h1>
@@ -27,28 +35,19 @@ const Warehouse: React.FC = () => {
             </div>
 
             <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
-                <div className="border-b border-gray-100 dark:border-gray-700">
-                    <nav className="flex px-4 -mb-px overflow-x-auto">
-                        {[
-                            { id: 'nomenclature', label: '📖 Номенклатура' },
-                            { id: 'balances', label: '📊 Остатки' },
-                            { id: 'movements', label: '📝 Движения' },
-                            { id: 'fuel-cards', label: '💳 Топливные карты' },
-                            { id: 'rules', label: '⚙️ Правила' },
-                        ].map((tab) => (
-                            <button
-                                key={tab.id}
-                                data-testid={`tab-${tab.id}`}
-                                onClick={() => setActiveTab(tab.id as Tab)}
-                                className={`px-5 py-4 text-sm font-semibold border-b-2 transition-all duration-200 whitespace-nowrap ${activeTab === tab.id
-                                    ? 'border-blue-600 text-blue-600 dark:text-blue-400 bg-blue-50/50 dark:bg-blue-900/20'
-                                    : 'border-transparent text-gray-500 hover:text-gray-900 dark:hover:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700/50'
-                                    }`}
-                            >
-                                {tab.label}
-                            </button>
-                        ))}
-                    </nav>
+                <div className="px-4">
+                    <TabsNavigation
+                        tabs={[
+                            { id: 'nomenclature', label: 'Номенклатура', icon: NomenclatureIcon },
+                            { id: 'balances', label: 'Остатки', icon: BalancesIcon },
+                            { id: 'movements', label: 'Движения', icon: MovementsIcon },
+                            { id: 'fuel-cards', label: 'Топливные карты', icon: FuelCardIcon },
+                            { id: 'rules', label: 'Правила', icon: RulesIcon },
+                        ]}
+                        activeTab={activeTab}
+                        onTabChange={(id) => setActiveTab(id as Tab)}
+                        className="border-none"
+                    />
                 </div>
 
                 <div className="p-4">

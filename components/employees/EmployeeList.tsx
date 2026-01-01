@@ -4,7 +4,7 @@ import { Employee, Organization, EmployeeType, EMPLOYEE_TYPE_TRANSLATIONS, Waybi
 import { getEmployees, createEmployee, updateEmployee, deleteEmployee } from '../../services/api/employeeApi';
 import { getOrganizations } from '../../services/organizationApi';
 import { getFuelCardsForDriver } from '../../services/stockApi'; // Import added
-import { PencilIcon, TrashIcon, PlusIcon, XIcon } from '../Icons';
+import { PencilIcon, TrashIcon, PlusIcon, XIcon, UserGroupIcon } from '../Icons';
 import DataTable, { Column } from '../shared/DataTable';
 import { Badge } from '../shared/Badge';
 import { Button } from '../shared/Button';
@@ -547,6 +547,7 @@ const EmployeeList: React.FC = () => {
             <div className="space-y-6">
                 <div className="flex justify-between items-center mb-6">
                     <div className="flex items-center gap-3">
+                        <UserGroupIcon className="h-6 w-6 text-gray-600 dark:text-gray-400" />
                         <h2 className="text-xl font-bold text-gray-900 dark:text-white tracking-tight">Сотрудники</h2>
                         <span className="px-2.5 py-0.5 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 text-xs font-semibold">
                             {employees.length}

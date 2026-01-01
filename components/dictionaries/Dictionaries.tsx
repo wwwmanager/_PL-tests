@@ -9,6 +9,14 @@ import EmployeeList from '../employees/EmployeeList';
 import RouteList from '../routes/RouteList';
 import { DictionaryType } from '../../types';
 import { TabsNavigation } from '../shared/TabsNavigation';
+import {
+    TruckIcon,
+    UserGroupIcon,
+    BuildingOffice2Icon,
+    FireIcon,
+    HomeModernIcon,
+    GlobeAltIcon
+} from '../Icons';
 
 const GarageManagement = lazy(() => import('./GarageManagement'));
 const StorageManagement = lazy(() => import('./StorageManagement'));
@@ -19,13 +27,13 @@ interface DictionariesProps {
 
 const Dictionaries: React.FC<DictionariesProps> = ({ subViewToOpen }) => {
 
-    const allDicts: { id: DictionaryType; label: string; }[] = [
-        { id: 'vehicles', label: 'Транспорт' },
-        { id: 'employees', label: 'Сотрудники' },
-        { id: 'organizations', label: 'Организации' },
-        { id: 'fuelTypes', label: 'Топливо' }, // Changed label to match design (Топливо instead of Типы топлива)
-        { id: 'storageLocations', label: 'Склады' }, // Changed label to match design (Склады instead of Места хранения)
-        { id: 'routes', label: 'Маршруты' },
+    const allDicts: { id: DictionaryType; label: string; icon: React.FC<React.SVGProps<SVGSVGElement>>; }[] = [
+        { id: 'vehicles', label: 'Транспорт', icon: TruckIcon },
+        { id: 'employees', label: 'Сотрудники', icon: UserGroupIcon },
+        { id: 'organizations', label: 'Организации', icon: BuildingOffice2Icon },
+        { id: 'fuelTypes', label: 'Топливо', icon: FireIcon },
+        { id: 'storageLocations', label: 'Склады', icon: HomeModernIcon },
+        { id: 'routes', label: 'Маршруты', icon: GlobeAltIcon },
     ];
     // Calendar is missing in original list but present in design, keeping existing for now or adding placeholder?
     // Design has: Transport, Employees, Organizations, Fuel, Stock, Routes, Calendar.

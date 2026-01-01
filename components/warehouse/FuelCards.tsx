@@ -21,7 +21,11 @@ import Modal from '../shared/Modal';
 import { useToast } from '../../hooks/useToast';
 import { Button } from '../shared/Button';
 import { Badge } from '../shared/Badge';
-import { PlusIcon, ArrowUturnLeftIcon, BanknotesIcon, UserGroupIcon, TrashIcon } from '../Icons';
+import { PlusIcon, ArrowUturnLeftIcon, BanknotesIcon, UserGroupIcon, TrashIcon, FuelCardIcon } from '../Icons';
+
+// ... (in the return of FuelCards)
+// I'll place the header inside the return below line 751
+
 
 // ==================== MANUAL TOP-UP MODAL ====================
 
@@ -749,6 +753,10 @@ const FuelCards: React.FC = () => {
 
     return (
         <div className="p-0 space-y-6">
+            <div className="flex items-center gap-3 mb-2">
+                <FuelCardIcon className="h-6 w-6 text-gray-600 dark:text-gray-400" />
+                <h3 className="text-xl font-semibold text-gray-800 dark:text-white">Топливные карты</h3>
+            </div>
             <div className="flex justify-end items-center">
                 <div className="flex gap-2">
                     <Button

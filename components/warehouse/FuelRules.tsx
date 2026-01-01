@@ -15,7 +15,7 @@ import Modal from '../shared/Modal';
 import { useToast } from '../../hooks/useToast';
 import { Button } from '../shared/Button';
 import { Badge } from '../shared/Badge';
-import { PlusIcon, ArrowUturnLeftIcon, StatusActiveIcon } from '../Icons';
+import { PlusIcon, ArrowUturnLeftIcon, StatusActiveIcon, RulesIcon } from '../Icons';
 
 // ==================== CREATE TOPUP RULE MODAL ====================
 
@@ -276,6 +276,10 @@ const FuelRules: React.FC = () => {
 
     return (
         <div className="p-0 space-y-8">
+            <div className="flex items-center gap-3 mb-2">
+                <RulesIcon className="h-6 w-6 text-gray-600 dark:text-gray-400" />
+                <h3 className="text-xl font-semibold text-gray-800 dark:text-white">Правила автоматизации</h3>
+            </div>
             {/* Top-Up Rules */}
             <section className="space-y-4">
                 <div className="flex justify-between items-center">
