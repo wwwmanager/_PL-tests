@@ -60,6 +60,7 @@ const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpene
   const [waybills, setWaybills] = useState<EnrichedWaybill[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [drivers, setDrivers] = useState<DriverListItem[]>([]);
+  const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<HttpError | Error | null>(null);
   const [selectedVehicleId, setSelectedVehicleIdState] = useState<string>(() => {
@@ -152,7 +153,7 @@ const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpene
     setLoading(true);
     setError(null);
     try {
-      const [waybillsResponse, vehiclesData, driversData] = await Promise.all([
+      const [waybillsResponse, vehiclesData, driversData, organizationsData] = await Promise.all([
         getWaybills({
           page: currentPage,
           limit: pageSize,
@@ -161,7 +162,8 @@ const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpene
           endDate: topLevelFilter.dateTo || undefined,
         }),
         getVehicles(),
-        listDrivers()
+        listDrivers(),
+        getOrganizations()
       ]);
 
       setWaybills(waybillsResponse.waybills);
@@ -171,6 +173,7 @@ const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpene
       }
       setVehicles(vehiclesData);
       setDrivers(driversData);
+      setOrganizations(organizationsData);
     } catch (err: any) {
       console.error('Failed to fetch waybills:', err);
       setError(err);
@@ -231,6 +234,30 @@ const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpene
     return preFilteredWaybills.map((w, index) => {
       const driver = drivers.find(d => d.id === w.driverId);
       const vehicle = vehicles.find(v => v.id === w.vehicleId);
+      const organization = organizations.find(o => o.id === w.organizationId);
+
+      // Determine what to display in Organization column:
+      // 1. If driver has departmentId (subdivision), show it
+      // 2. Else if vehicle has organizationId that is a subdivision (has parentOrganizationId), show it
+      // 3. Else show main organization shortName
+      let organizationDisplay = organization?.shortName || w.organizationId;
+
+      // Priority 1: Driver's department (subdivision)
+      if (driver?.departmentId) {
+        const subdivision = organizations.find(o => o.id === driver.departmentId);
+        if (subdivision) {
+          organizationDisplay = subdivision.shortName;
+        }
+      }
+      // Priority 2: Vehicle's organization if it's a subdivision
+      else if (vehicle?.organizationId) {
+        const vehicleOrg = organizations.find(o => o.id === vehicle.organizationId);
+        if (vehicleOrg?.parentOrganizationId) {
+          // This is a subdivision
+          organizationDisplay = vehicleOrg.shortName;
+        }
+      }
+
       // WB-REG-001 FIX E: Map fuelLines to display columns
       const firstFuel = (w as any).fuelLines?.[0];
 
@@ -240,13 +267,14 @@ const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpene
         mileage: (w.odometerEnd ?? w.odometerStart) - w.odometerStart,
         driver: driver?.fullName || w.driverId,
         vehicle: vehicle ? `${vehicle.brand} ${vehicle.registrationNumber}` : w.vehicleId,
+        organizationId: organizationDisplay,
         // WB-REG-001: Use fuelLines data if available
         fuelAtStart: firstFuel?.fuelStart ?? w.fuelAtStart,
         fuelReceived: firstFuel?.fuelReceived ?? (w as any).fuelReceived ?? 0,
         fuelAtEnd: firstFuel?.fuelEnd ?? w.fuelAtEnd,
       };
     });
-  }, [preFilteredWaybills, drivers, vehicles]);
+  }, [preFilteredWaybills, drivers, vehicles, organizations]);
 
 
   const {
