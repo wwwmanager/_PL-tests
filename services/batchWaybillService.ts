@@ -1,9 +1,10 @@
 import { parseAndPreviewRouteFile, RouteSegment } from './routeParserService';
 import { isWorkingDayStandard, getHolidayName, getWorkingWeekRange, calendarApi } from './productionCalendarService';
-import { Waybill, WaybillStatus, Vehicle, Employee, SeasonSettings, CalendarEvent } from '../types';
+import { Waybill, WaybillStatus, Vehicle, Employee, SeasonSettings, CalendarEvent, Route } from '../types';
 import { addWaybill } from './api/waybillApi';
 import { getAvailableBlanksForDriver } from './blankApi';
 import { calculateDistance, WaybillCalculationMethod } from './waybillCalculations';
+import { calculatePlannedFuelByMethod, FuelCalculationMethod, mapLegacyMethod } from './fuelCalculationService';
 import { isWinterDate } from './dateUtils';
 
 export interface BatchPreviewItem {
@@ -145,18 +146,42 @@ export const generateBatchPreview = async (
     return items;
 };
 
-const calculateGroupConsumption = (group: BatchPreviewItem[], vehicle: Vehicle, seasonSettings: SeasonSettings | null) => {
-    let totalDist = 0;
-    let totalConsumption = 0;
-
+/**
+ * WB-BATCH-002: Use unified fuelCalculationService for fuel calculations
+ * Converts BatchPreviewItem[] to Route[] and calls calculateBoiler
+ */
+const calculateGroupConsumption = (group: BatchPreviewItem[], vehicle: Vehicle, seasonSettings: SeasonSettings | null, method: FuelCalculationMethod) => {
+    // Convert BatchPreviewItems to Routes for unified calculation
+    const allRoutes: Route[] = [];
     for (const item of group) {
-        const itemDist = Number(item.totalDistance) || 0;  // Ensure numeric
-        totalDist += itemDist;
-        const isWinter = isWinterDate(item.dateStr, seasonSettings);
-        const rate = isWinter ? vehicle.fuelConsumptionRates?.winterRate : vehicle.fuelConsumptionRates?.summerRate;
-        totalConsumption += (itemDist / 100) * (rate || 10);
+        for (const seg of item.routes) {
+            allRoutes.push({
+                id: seg.id || '',
+                from: seg.from || '',
+                to: seg.to || '',
+                fromPoint: seg.from || '',
+                toPoint: seg.to || '',
+                distanceKm: seg.distanceKm || 0,
+                isCityDriving: false,
+                isWarming: false,
+                date: item.dateStr,
+            } as Route);
+        }
     }
-    return { distance: totalDist, consumption: totalConsumption };
+
+    // Use first date of group as base dateOr fallback
+    const baseDate = group[0]?.dateStr || new Date().toISOString().split('T')[0];
+
+    const result = calculatePlannedFuelByMethod({
+        method,
+        routes: allRoutes,
+        vehicleRates: vehicle.fuelConsumptionRates,
+        seasonSettings,
+        baseDate,
+        dayMode: 'multi'
+    });
+
+    return { distance: result.totalDistance, consumption: result.plannedFuel };
 };
 
 const getISOWeek = (date: Date) => {
@@ -225,7 +250,7 @@ const createWaybillFromGroup = async (
         validToStr = toLocalISO(finalEnd);
     }
 
-    const { distance, consumption } = calculateGroupConsumption(group, vehicle, seasonSettings || null);
+    const { distance, consumption } = calculateGroupConsumption(group, vehicle, seasonSettings || null, mapLegacyMethod(config.calculationMethod));
     const endOdo = Number(startOdo) + Number(distance);
     const endFuel = startFuel + fuelFilledSum - consumption;
 
@@ -437,7 +462,7 @@ export const saveBatchWaybills = async (
             );
 
             const groupDist = currentGroup.reduce((sum, it) => sum + (Number(it.totalDistance) || 0), 0);
-            const { consumption } = calculateGroupConsumption(currentGroup, vehicle, seasonSettings || null);
+            const { consumption } = calculateGroupConsumption(currentGroup, vehicle, seasonSettings || null, mapLegacyMethod(config.calculationMethod));
 
             runningOdometer += groupDist;
             runningFuel = runningFuel + groupFuelFilled - consumption;

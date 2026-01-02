@@ -1,9 +1,8 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { getVehicles } from '../../services/vehicleApiFacade';
 import { getWaybills } from '../../services/waybillApi';
 import { getSeasonSettings } from '../../services/settingsApi';
-import { isWinterDate } from '../../services/dateUtils';
+import { calculatePlannedFuelByMethod, calculateOdometerEnd, FuelCalculationMethod, mapLegacyMethod } from '../../services/fuelCalculationService';
 import { Vehicle, Waybill } from '../../types';
 import { XIcon, CheckCircleIcon, ExclamationCircleIcon, FunnelIcon } from '../Icons';
 
@@ -121,21 +120,14 @@ const WaybillCheckModal: React.FC<WaybillCheckModalProps> = ({ isOpen, onClose, 
 
         // Get consumption rates from vehicle
         const rates = vehicle.fuelConsumptionRates as any || { summerRate: 10, winterRate: 12 };
-        const { summerRate = 10, winterRate = 12, cityIncreasePercent = 0, warmingIncreasePercent = 0 } = rates;
-        const isWinter = isWinterDate(currentWaybill.date, seasonSettings);
-        const baseRate = isWinter ? winterRate : summerRate;
 
         // Calculate odometer values
         const odometerStart = Number(currentWaybill.odometerStart) || 0;
         const odometerEnd = Number(currentWaybill.odometerEnd) || 0;
         const odometerDistance = odometerEnd - odometerStart;
 
-        // Calculate distance from routes (if available)
-        const routesDistance = (currentWaybill.routes || []).reduce((sum, r) => sum + (Number(r.distanceKm) || 0), 0);
-
-        // Use routes distance if available, otherwise use odometer distance
-        const hasRoutes = currentWaybill.routes && currentWaybill.routes.length > 0 && routesDistance > 0;
-        const totalDistance = hasRoutes ? routesDistance : odometerDistance;
+        // Check if waybill has routes
+        const hasRoutes = currentWaybill.routes && currentWaybill.routes.length > 0;
 
         // Calculate fuel from fuelLines if available (new structure)
         const fuelStart = Number((currentWaybill as any).fuelLines?.[0]?.fuelStart ?? currentWaybill.fuelAtStart ?? 0);
@@ -143,81 +135,51 @@ const WaybillCheckModal: React.FC<WaybillCheckModalProps> = ({ isOpen, onClose, 
         const fuelReceived = Number((currentWaybill as any).fuelLines?.[0]?.fuelReceived ?? currentWaybill.fuelFilled ?? 0);
         const fuelConsumed = Number((currentWaybill as any).fuelLines?.[0]?.fuelConsumed ?? currentWaybill.fuelPlanned ?? 0);
 
-        // Calculate expected consumption by norm based on selected method
-        let consumption = 0;
+        // WB-CHECK-006: Use unified fuelCalculationService for all calculations
+        // Determine the method from the waybill or fallback to dropdown
+        const rawMethod = (currentWaybill as any).fuelCalculationMethod || calculationMethod;
+        const waybillMethod = mapLegacyMethod(rawMethod) as FuelCalculationMethod;
 
-        switch (calculationMethod) {
-          case 'BOILER':
-            // BOILER: simple calculation - distance * base rate, no modifiers
-            consumption = (totalDistance / 100) * baseRate;
-            break;
+        // Calculate using unified service
+        const calcResult = calculatePlannedFuelByMethod({
+          method: waybillMethod,
+          routes: currentWaybill.routes || [],
+          vehicleRates: rates,
+          seasonSettings,
+          odometerDistanceKm: odometerDistance,
+          baseDate: currentWaybill.date,
+          dayMode: 'multi',
+        });
 
-          case 'SEGMENTS':
-            // SEGMENTS: calculate each route with modifiers
-            if (hasRoutes) {
-              for (const route of currentWaybill.routes) {
-                let effectiveRate = baseRate;
-                if (route.isCityDriving && vehicle.useCityModifier) {
-                  effectiveRate *= (1 + cityIncreasePercent / 100);
-                }
-                if (route.isWarming && vehicle.useWarmingModifier) {
-                  effectiveRate *= (1 + warmingIncreasePercent / 100);
-                }
-                consumption += ((route.distanceKm || 0) / 100) * effectiveRate;
-              }
-            } else {
-              // Fallback to BOILER if no routes
-              consumption = (totalDistance / 100) * baseRate;
-            }
-            break;
-
-          case 'MIXED':
-            // MIXED: average rate from routes, apply to odometer distance
-            if (hasRoutes && routesDistance > 0) {
-              let totalConsExact = 0;
-              for (const route of currentWaybill.routes) {
-                let effectiveRate = baseRate;
-                if (route.isCityDriving && vehicle.useCityModifier) {
-                  effectiveRate *= (1 + cityIncreasePercent / 100);
-                }
-                if (route.isWarming && vehicle.useWarmingModifier) {
-                  effectiveRate *= (1 + warmingIncreasePercent / 100);
-                }
-                totalConsExact += ((route.distanceKm || 0) / 100) * effectiveRate;
-              }
-              const avgRate = totalConsExact / (routesDistance / 100);
-              consumption = (odometerDistance / 100) * avgRate;
-            } else {
-              // Fallback to BOILER if no routes
-              consumption = (totalDistance / 100) * baseRate;
-            }
-            break;
-        }
-
-        consumption = Math.round(consumption * 100) / 100;
+        const { totalDistance, plannedFuel: consumption, baseRateUsed } = calcResult;
+        const baseRate = baseRateUsed || rates.summerRate || 10;  // Use actual used rate or fallback
 
         // --- BLOCK 1: Internal Document Consistency ---
 
         // Check: Odometer (Start + Routes = End) - ONLY if routes are filled
+        // WB-CHECK-005: Use unified calculateOdometerEnd from fuelCalculationService
         if (hasRoutes) {
-          // Sum all route segments first, then round the total (not each segment individually)
-          const calcOdometerEnd = Math.round(odometerStart + routesDistance);
-          if (odometerEnd > 0 && Math.abs(odometerEnd - calcOdometerEnd) > 2) {
+          const calcOdometerEnd = calculateOdometerEnd(odometerStart, currentWaybill.routes || []);
+          if (odometerEnd > 0 && odometerEnd !== calcOdometerEnd) {
             errors.push(`Не сходится пробег внутри ПЛ. Расчет: ${calcOdometerEnd}, В документе: ${odometerEnd}. Разница: ${(odometerEnd - calcOdometerEnd)} км.`);
           }
         }
 
         // Check: Fuel arithmetic (Start + Filled - Consumed = End)
         const calculatedFuelEnd = fuelStart + fuelReceived - fuelConsumed;
+        const fuelEndRounded = Math.round(fuelEnd * 100) / 100;
+        const calculatedFuelEndRounded = Math.round(calculatedFuelEnd * 100) / 100;
 
-        if (fuelEnd !== 0 && Math.abs(fuelEnd - calculatedFuelEnd) > 0.1) {
-          errors.push(`Ошибка арифметики топлива. Должно быть: ${calculatedFuelEnd.toFixed(2)}, Записано: ${fuelEnd.toFixed(2)}.`);
+        if (fuelEnd !== 0 && fuelEndRounded !== calculatedFuelEndRounded) {
+          errors.push(`Ошибка арифметики топлива. Должно быть: ${calculatedFuelEndRounded.toFixed(2)}, Записано: ${fuelEndRounded.toFixed(2)}.`);
         }
 
-        // Check: Planned/consumed consumption vs norm (allow 5% tolerance)
-        const consumptionTolerance = consumption * 0.05; // 5% tolerance
-        if (consumption > 0 && fuelConsumed > 0 && Math.abs(fuelConsumed - consumption) > Math.max(consumptionTolerance, 0.5)) {
-          errors.push(`Нормативный расход не совпадает. По норме: ${consumption.toFixed(2)}, В документе: ${fuelConsumed.toFixed(2)}.`);
+        // Check: Planned/consumed consumption vs norm
+        // Calculate -> round to hundredths -> compare exactly
+        const consumptionRounded = Math.round(consumption * 100) / 100;
+        const fuelConsumedRounded = Math.round(fuelConsumed * 100) / 100;
+        if (consumption > 0 && fuelConsumed > 0 && consumptionRounded !== fuelConsumedRounded) {
+          errors.push(`Нормативный расход не совпадает. По норме: ${consumptionRounded.toFixed(2)}, В документе: ${fuelConsumedRounded.toFixed(2)}.`);
         }
 
         // Check: Negative fuel

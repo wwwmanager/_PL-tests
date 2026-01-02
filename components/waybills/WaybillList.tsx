@@ -4,17 +4,21 @@
 
 
 
-import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { deleteWaybill, getWaybills, updateWaybill, getLatestWaybill, bulkDeleteWaybills, bulkChangeWaybillStatus } from '../../services/api/waybillApi';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { deleteWaybill, getWaybills, updateWaybill, getLatestWaybill, bulkDeleteWaybills, bulkChangeWaybillStatus, getWaybillById } from '../../services/api/waybillApi';
 import { getVehicles } from '../../services/api/vehicleApi';
-import { Waybill, WaybillStatus, Vehicle } from '../../types';
+import { Waybill, WaybillStatus, Vehicle, Employee, Organization } from '../../types';
 import { listDrivers, DriverListItem } from '../../services/driverApi';
+import { getEmployees } from '../../services/api/employeeApi';
+import { getOrganizations } from '../../services/organizationApi';
+import { getStockItems, StockItem } from '../../services/stockItemApi';
 import { WAYBILL_STATUS_COLORS, WAYBILL_STATUS_TRANSLATIONS } from '../../constants';
-import { PlusIcon, PencilIcon, TrashIcon, ArrowUpIcon, ArrowDownIcon, StatusCompletedIcon, CalendarDaysIcon, DocumentArrowUpIcon, ClipboardCheckIcon, FunnelIcon, CheckCircleIcon } from '../Icons';
+import { PlusIcon, PencilIcon, TrashIcon, ArrowUpIcon, ArrowDownIcon, StatusCompletedIcon, CalendarDaysIcon, DocumentArrowUpIcon, ClipboardCheckIcon, FunnelIcon, CheckCircleIcon, PrintIcon } from '../Icons';
 import { Button } from '../shared/Button';
 import { WaybillStatusBadge } from '../shared/StatusBadges';
 // FIX: Changed import to a named import to resolve module resolution error.
 import { WaybillDetail } from './WaybillDetail';
+import PrintableWaybill from './PrintableWaybill';
 import useTable from '../../hooks/useTable';
 import ConfirmationModal from '../shared/ConfirmationModal';
 import { useToast } from '../../hooks/useToast';
@@ -75,6 +79,19 @@ const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpene
   const [isBatchModalOpen, setIsBatchModalOpen] = useState(false);
   const [isCheckModalOpen, setIsCheckModalOpen] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
+
+  // Print modal state
+  const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
+  const [printData, setPrintData] = useState<{
+    waybill: Waybill;
+    vehicle: Vehicle | undefined;
+    driver: Employee | undefined;
+    dispatcher: Employee | undefined;
+    controller: Employee | undefined;
+    organization: Organization | undefined;
+    fuelType: StockItem | undefined;
+    allOrganizations: Organization[];
+  } | null>(null);
 
   // Column Definitions
   const waybillColumns: Column<EnrichedWaybill>[] = useMemo(() => {
@@ -599,9 +616,58 @@ const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpene
     // P0-F: Check if delete should be hidden for POSTED waybills
     const canDelete = waybill.status !== WaybillStatus.POSTED || appSettings?.allowDeletePostedWaybills;
 
+    const handlePrint = async () => {
+      try {
+        // Fetch full waybill data
+        const fullWaybill = await getWaybillById(waybill.id);
+
+        // Fetch related data
+        const [employees, orgsData, stockItemsData] = await Promise.all([
+          getEmployees({}),
+          getOrganizations(),
+          getStockItems()
+        ]);
+
+        // Find vehicle from local state
+        const vehicle = vehicles.find(v => v.id === fullWaybill.vehicleId);
+
+        // Find driver (need to match Driver.id to Employee via drivers list)
+        const driverItem = drivers.find(d => d.id === fullWaybill.driverId);
+        const driver = driverItem ? employees.find(e => e.id === driverItem.employeeId) : undefined;
+
+        // Find dispatcher/controller
+        const dispatcher = employees.find(e => e.id === fullWaybill.dispatcherEmployeeId);
+        const controller = employees.find(e => e.id === fullWaybill.controllerEmployeeId);
+
+        // Find organization
+        const organization = orgsData.find(o => o.id === fullWaybill.organizationId);
+
+        // Find fuel type from vehicle's fuelStockItemId
+        const fuelType = vehicle?.fuelStockItemId
+          ? stockItemsData.find(si => si.id === vehicle.fuelStockItemId)
+          : undefined;
+
+        setPrintData({
+          waybill: fullWaybill,
+          vehicle,
+          driver,
+          dispatcher,
+          controller,
+          organization,
+          fuelType,
+          allOrganizations: orgsData
+        });
+        setIsPrintModalOpen(true);
+      } catch (err) {
+        showToast('Ошибка загрузки данных для печати', 'error');
+        console.error('Print data fetch error:', err);
+      }
+    };
+
     return (
       <div className="px-6 py-4 flex justify-center gap-1 whitespace-nowrap">
         <button onClick={() => handleEdit(waybill)} className="p-2 text-blue-500 transition-all duration-200 transform hover:scale-110" title="Редактировать"><PencilIcon className="h-5 w-5" /></button>
+        <button onClick={handlePrint} className="p-2 text-teal-600 hover:text-teal-700 dark:text-teal-500 dark:hover:text-teal-400 transition-all duration-200 transform hover:scale-110" title="Печать"><PrintIcon className="h-5 w-5" /></button>
         {canDelete && (
           <button onClick={() => handleRequestDelete(waybill)} className="p-2 text-red-500 transition-all duration-200 transform hover:scale-110" title="Удалить"><TrashIcon className="h-5 w-5" /></button>
         )}
@@ -631,6 +697,19 @@ const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpene
           isOpen={isCheckModalOpen}
           onClose={() => setIsCheckModalOpen(false)}
           onOpenWaybill={(id) => { setIsCheckModalOpen(false); handleEdit({ id } as any); }}
+        />
+      )}
+      {isPrintModalOpen && printData && (
+        <PrintableWaybill
+          waybill={printData.waybill}
+          vehicle={printData.vehicle}
+          driver={printData.driver}
+          organization={printData.organization}
+          dispatcher={printData.dispatcher}
+          controller={printData.controller}
+          fuelType={printData.fuelType as any}
+          allOrganizations={printData.allOrganizations}
+          onClose={() => { setIsPrintModalOpen(false); setPrintData(null); }}
         />
       )}
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-5">

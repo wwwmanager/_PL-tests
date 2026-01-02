@@ -13,6 +13,7 @@ import { isWinterDate } from '../../services/dateUtils';
 import { generateId } from '../../services/api/core';
 // Stock API facade
 import { getAvailableFuelExpenses, updateStockTransaction, getStockTransactions, getGarageStockItems, getNextWaybillNumber, getFuelCardsForDriver, getFuelCardDraftReserve } from '../../services/stockApi';
+import { calculatePlannedFuelByMethod } from '../../services/fuelCalculationService';
 import { getVehicles } from '../../services/vehicleApiFacade';
 import { getEmployees } from '../../services/employeeApiFacade';
 import { listDrivers, DriverListItem } from '../../services/driverApi';
@@ -549,64 +550,21 @@ export const WaybillDetail: React.FC<WaybillDetailProps> = ({ waybill, isPrefill
       return;
     }
 
-    const rates = selectedVehicle.fuelConsumptionRates || { winterRate: 0, summerRate: 0, cityIncreasePercent: 0, warmingIncreasePercent: 0 };
-    const method = formData.fuelCalculationMethod || 'BOILER';
-    const isWaybillWinter = isWinterDate(formData.date, seasonSettings);
-
-    let totalPlanned = 0;
-
-    if (method === 'BOILER') {
-      const baseRate = isWaybillWinter ? (rates.winterRate || rates.summerRate || 0) : (rates.summerRate || rates.winterRate || 0);
-      const distance = totalDistance;
-      totalPlanned = (distance / 100) * baseRate;
-    }
-    else if (method === 'SEGMENTS') {
-      for (const route of (formData.routes || [])) {
-        const routeDate = dayMode === 'multi' && route.date ? route.date : formData.date;
-        const isWinter = isWinterDate(routeDate, seasonSettings);
-        const baseRate = isWinter ? (rates.winterRate || rates.summerRate || 0) : (rates.summerRate || rates.winterRate || 0);
-        let effectiveRate = baseRate;
-
-        if (route.isCityDriving && (rates.cityIncreasePercent || 0) > 0) {
-          effectiveRate *= (1 + (rates.cityIncreasePercent || 0) / 100);
-        }
-        if (route.isWarming && (rates.warmingIncreasePercent || 0) > 0) {
-          effectiveRate *= (1 + (rates.warmingIncreasePercent || 0) / 100);
-        }
-        totalPlanned += ((Number(route.distanceKm) || 0) / 100) * effectiveRate;
-      }
-    }
-    else if (method === 'MIXED') {
-      let totalConsRaw = 0;
-      let segmentsKm = 0;
-
-      for (const route of (formData.routes || [])) {
-        const routeDate = dayMode === 'multi' && route.date ? route.date : formData.date;
-        const isWinter = isWinterDate(routeDate, seasonSettings);
-        const baseRate = isWinter ? (rates.winterRate || rates.summerRate || 0) : (rates.summerRate || rates.winterRate || 0);
-
-        let coeffTotal = 0;
-        if (route.isCityDriving && (rates.cityIncreasePercent || 0) > 0) {
-          coeffTotal += (rates.cityIncreasePercent || 0) / 100;
-        }
-        if (route.isWarming && (rates.warmingIncreasePercent || 0) > 0) {
-          coeffTotal += (rates.warmingIncreasePercent || 0) / 100;
-        }
-
-        const dist = Number(route.distanceKm) || 0;
-        totalConsRaw += (dist / 100) * baseRate * (1 + coeffTotal);
-        segmentsKm += dist;
-      }
-
-      if (segmentsKm > 0) {
-        const avgRate = totalConsRaw / (segmentsKm / 100);
-        totalPlanned = (totalDistance / 100) * avgRate;
-      }
-    }
-
     const startOdo = Number(formData.odometerStart) || 0;
-    const newOdoEnd = startOdo + totalDistance;
-    const newFuelPlanned = Math.round(totalPlanned * 100) / 100;
+
+    // WB-1002: Use unified fuel calculation service
+    const { plannedFuel, totalDistance: calculatedDist } = calculatePlannedFuelByMethod({
+      method: formData.fuelCalculationMethod || 'BOILER',
+      routes: formData.routes || [],
+      vehicleRates: selectedVehicle.fuelConsumptionRates,
+      seasonSettings,
+      odometerDistanceKm: totalDistance, // Pass pre-calculated total distance based on routes
+      baseDate: formData.date,
+      dayMode
+    });
+
+    const newOdoEnd = startOdo + calculatedDist;
+    const newFuelPlanned = plannedFuel;
 
     const startFuel = Number(formData.fuelAtStart) || 0;
     const filledFuel = Number(formData.fuelFilled) || 0;

@@ -15,8 +15,11 @@ import {
     BuildingOffice2Icon,
     FireIcon,
     HomeModernIcon,
-    GlobeAltIcon
+    GlobeAltIcon,
+    NomenclatureIcon
 } from '../Icons';
+
+import StockItemList from '../warehouse/StockItemList';
 
 const GarageManagement = lazy(() => import('./GarageManagement'));
 const StorageManagement = lazy(() => import('./StorageManagement'));
@@ -28,6 +31,7 @@ interface DictionariesProps {
 const Dictionaries: React.FC<DictionariesProps> = ({ subViewToOpen }) => {
 
     const allDicts: { id: DictionaryType; label: string; icon: React.FC<React.SVGProps<SVGSVGElement>>; }[] = [
+        { id: 'nomenclature', label: 'Номенклатура', icon: NomenclatureIcon },
         { id: 'vehicles', label: 'Транспорт', icon: TruckIcon },
         { id: 'employees', label: 'Сотрудники', icon: UserGroupIcon },
         { id: 'organizations', label: 'Организации', icon: BuildingOffice2Icon },
@@ -62,6 +66,7 @@ const Dictionaries: React.FC<DictionariesProps> = ({ subViewToOpen }) => {
 
     const renderActiveDictionary = () => {
         switch (activeDictionary) {
+            case 'nomenclature': return <StockItemList />;
             case 'fuelTypes': return <FuelTypeManagement />;
             case 'organizations': return <OrganizationManagement />;
             case 'vehicles': return <VehicleList />;

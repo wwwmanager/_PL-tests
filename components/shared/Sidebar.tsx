@@ -32,7 +32,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, currentPage, 
         { id: 'dashboard', label: 'Панель управления', icon: DashboardIcon },
         { id: 'waybills', label: 'Путевые листы', icon: DocumentTextIcon },
         { id: 'dictionaries', label: 'Справочники', icon: BookOpenIcon },
-        { id: 'warehouse', label: 'Номенклатура и Склад', icon: ArchiveBoxIcon },
+        { id: 'warehouse', label: 'Склад', icon: ArchiveBoxIcon },
         { id: 'reports', label: 'Отчеты', icon: ChartBarIcon },
         { id: 'admin', label: 'Настройки', icon: CogIcon },
     ];

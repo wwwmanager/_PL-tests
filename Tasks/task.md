@@ -14,6 +14,21 @@
     - [x] Icons.tsx: Add new SVGs for Warehouse [x]
     - [x] Warehouse.tsx: Refactor to TabsNavigation and add icons [x]
     - [x] Add headers with icons to: Nomenclature, Balances, Movements, Fuel Cards, Rules [x]
+- [x] Git Synchronization [x]
+    - [x] Create commit with Russian message [x]
+    - [x] Push changes to remote origin [x]
+
+
+# Fuel Calculation Unification (WB-1002)
+- [x] Create unified calculation service `calculatePlannedFuelByMethod` in `fuelCalculationService.ts` [x]
+- [x] Refactor `WaybillDetail.tsx` to use unified service [x]
+- [x] Refactor `batchWaybillService.ts` to use unified service [x]
+- [x] Refactor `WaybillCheckModal.tsx` to use unified service [x]
+
+# UI Refactoring (Warehouse & Dictionaries)
+- [x] Rename Sidebar item to "Склад" [x]
+- [x] Remove Header and Nomenclature tab from Warehouse [x]
+- [x] Move Nomenclature to Dictionaries (First Tab) [x]
 
 # STOCK-LEDGER-EPIC-001 — Soft Void + Period Lock + Immutable System Movements
 

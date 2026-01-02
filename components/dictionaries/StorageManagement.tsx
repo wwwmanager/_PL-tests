@@ -268,7 +268,7 @@ const StorageManagement = () => {
                                         <td className="px-6 py-4">{s.typeName}</td>
                                         <td className="px-6 py-4">{s.organizationName}</td>
                                         <td className="px-6 py-4">{s.address}</td>
-                                        <td className="px-6 py-4"><span className={`px - 2 py - 1 text - xs font - semibold rounded - full ${s.status ? STORAGE_STATUS_COLORS[s.status] : ''} `}>{s.status ? STORAGE_STATUS_TRANSLATIONS[s.status] : ''}</span></td>
+                                        <td className="px-6 py-4"><span className={`px-2.5 py-1 text-xs font-medium rounded-full ${s.status === 'active' ? 'bg-teal-600 text-white' : 'bg-gray-500 text-white'}`}>{s.status === 'active' ? 'Активна' : 'Архив'}</span></td>
                                         <td className="px-6 py-4 text-center">
                                             {/* RLS-WAREHOUSE-FE-010: Show view-only or edit buttons based on _canEdit */}
                                             {(s as any)._canEdit === false ? (
