@@ -7,8 +7,10 @@ import { Organization, Employee, StorageType } from '../../types';
 import { fetchStorages, addStorage, updateStorage, deleteStorage, Storage } from '../../services/warehouseApi';
 import { getOrganizations } from '../../services/organizationApi';
 import { getEmployees } from '../../services/api/employeeApi';
-import { PencilIcon, TrashIcon, PlusIcon, ArrowUpIcon, ArrowDownIcon, ArchiveBoxIcon, ArrowUpTrayIcon, EyeIcon, HomeModernIcon } from '../Icons';
-import useTable from '../../hooks/useTable';
+import { PencilIcon, TrashIcon, PlusIcon, ArchiveBoxIcon, ArrowUpTrayIcon, EyeIcon, HomeModernIcon } from '../Icons';
+import DataTable, { Column } from '../shared/DataTable';
+import { Badge } from '../shared/Badge';
+import { Button } from '../shared/Button';
 import { STORAGE_TYPE_TRANSLATIONS, STORAGE_STATUS_TRANSLATIONS, STORAGE_STATUS_COLORS } from '../../constants';
 import Modal from '../shared/Modal';
 import ConfirmationModal from '../shared/ConfirmationModal';
@@ -50,7 +52,6 @@ const StorageManagement = () => {
     const [employees, setEmployees] = useState<Employee[]>([]);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
-    const [showArchived, setShowArchived] = useState(false);
     const [actionModal, setActionModal] = useState<{ isOpen: boolean; type?: 'delete' | 'archive' | 'unarchive'; item?: Storage }>({ isOpen: false });
     const { showToast } = useToast();
     const { currentUser } = useAuth();  // RLS-WAREHOUSE-FE-010
@@ -89,28 +90,37 @@ const StorageManagement = () => {
 
     useEffect(() => { fetchData(); }, []);
 
-    const enrichedData = useMemo(() => {
-        return storages
-            .filter(s => showArchived || s.status !== 'archived')
-            .map(s => ({
-                ...s,
-                organizationName: organizations.find(o => o.id === s.organizationId)?.shortName || 'N/A',
-                typeName: s.type ? STORAGE_TYPE_TRANSLATIONS[s.type] : '',
-            }));
-    }, [storages, organizations, showArchived]);
+    type EnrichedStorage = Storage & {
+        organizationName: string;
+        typeName: string;
+        _canEdit?: boolean;
+    };
 
-    type EnrichedStorage = typeof enrichedData[0];
-    type EnrichedStorageKey = Extract<keyof EnrichedStorage, string>;
+    const enrichedData: EnrichedStorage[] = useMemo(() => {
+        return storages.map(s => ({
+            ...s,
+            organizationName: organizations.find(o => o.id === s.organizationId)?.shortName || 'N/A',
+            typeName: s.type ? STORAGE_TYPE_TRANSLATIONS[s.type] : '',
+        }));
+    }, [storages, organizations]);
 
-    const columns: { key: EnrichedStorageKey; label: string }[] = [
-        { key: 'name', label: 'Наименование' },
-        { key: 'typeName', label: 'Тип' },
-        { key: 'organizationName', label: 'Организация' },
-        { key: 'address', label: 'Адрес' },
-        { key: 'status', label: 'Статус' },
-    ];
-
-    const { rows, sortColumn, sortDirection, handleSort, filters, handleFilterChange } = useTable(enrichedData, columns);
+    const columns: Column<EnrichedStorage>[] = useMemo(() => [
+        { key: 'name', label: 'Наименование', sortable: true, align: 'center' },
+        { key: 'typeName', label: 'Тип', sortable: true, align: 'center' },
+        { key: 'organizationName', label: 'Организация', sortable: true, align: 'center' },
+        { key: 'address', label: 'Адрес', sortable: true },
+        {
+            key: 'status',
+            label: 'Статус',
+            sortable: true,
+            align: 'center',
+            render: (s) => (
+                <Badge variant={s.status === 'active' ? 'success' : 'neutral'}>
+                    {s.status === 'active' ? 'Активна' : 'Архив'}
+                </Badge>
+            )
+        },
+    ], []);
 
     const handleAddNew = () => {
         reset({
@@ -231,63 +241,68 @@ const StorageManagement = () => {
                 </form>
             </Modal>
 
-            <div>
-                <div className="flex justify-between items-center mb-4">
+            <div className="space-y-6">
+                <div className="flex justify-between items-center mb-6">
                     <div className="flex items-center gap-3">
                         <HomeModernIcon className="h-6 w-6 text-gray-600 dark:text-gray-400" />
-                        <h3 className="text-xl font-semibold text-gray-800 dark:text-white">Справочник: Места хранения</h3>
+                        <h2 className="text-xl font-bold text-gray-900 dark:text-white tracking-tight">Места хранения</h2>
+                        <span className="px-2.5 py-0.5 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 text-xs font-semibold">
+                            {storages.length}
+                        </span>
                     </div>
                     {/* RLS-WAREHOUSE-FE-010: Hide Add button for drivers */}
                     {!isDriver && (
-                        <button onClick={handleAddNew} className="flex items-center gap-2 bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md hover:bg-blue-700 transition-colors">
-                            <PlusIcon className="h-5 w-5" /> Добавить
-                        </button>
+                        <Button onClick={handleAddNew} variant="primary" leftIcon={<PlusIcon className="h-5 w-5" />}>
+                            Добавить место хранения
+                        </Button>
                     )}
                 </div>
-                <label className="flex items-center text-sm text-gray-600 dark:text-gray-300 cursor-pointer my-4">
-                    <input type="checkbox" checked={showArchived} onChange={e => setShowArchived(e.target.checked)} className="h-4 w-4 rounded border-gray-300 dark:border-gray-500 text-blue-600 focus:ring-blue-500" />
-                    <span className="ml-2">Показать архивные</span>
-                </label>
-                <div className="overflow-x-auto">
-                    <table className="w-full text-sm text-left text-gray-500 dark:text-gray-400">
-                        <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
-                            <tr>
-                                {columns.map(col => (<th key={col.key} scope="col" className="px-6 py-3 cursor-pointer" onClick={() => handleSort(col.key)}><div className="flex items-center gap-1">{col.label}{sortColumn === col.key && (sortDirection === 'asc' ? <ArrowUpIcon className="h-4 w-4" /> : <ArrowDownIcon className="h-4 w-4" />)}</div></th>))}
-                                <th scope="col" className="px-6 py-3 text-center">Действия</th>
-                            </tr>
-                            <tr>
-                                {columns.map(col => (<th key={`${col.key} -filter`} className="px-2 py-1"><input type="text" value={filters[col.key] || ''} onChange={e => handleFilterChange(col.key, e.target.value)} placeholder={`Поиск...`} className="w-full text-xs p-1 bg-gray-100 dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded" /></th>))}
-                                <th className="px-2 py-1"></th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {isLoading ? (<tr><td colSpan={columns.length + 1} className="text-center p-4">Загрузка...</td></tr>)
-                                : rows.map(s => (
-                                    <tr key={s.id} className="bg-white dark:bg-gray-800 border-b dark:border-gray-700">
-                                        <td className="px-6 py-4 font-medium text-gray-900 dark:text-white">{s.name}</td>
-                                        <td className="px-6 py-4">{s.typeName}</td>
-                                        <td className="px-6 py-4">{s.organizationName}</td>
-                                        <td className="px-6 py-4">{s.address}</td>
-                                        <td className="px-6 py-4"><span className={`px-2.5 py-1 text-xs font-medium rounded-full ${s.status === 'active' ? 'bg-teal-600 text-white' : 'bg-gray-500 text-white'}`}>{s.status === 'active' ? 'Активна' : 'Архив'}</span></td>
-                                        <td className="px-6 py-4 text-center">
-                                            {/* RLS-WAREHOUSE-FE-010: Show view-only or edit buttons based on _canEdit */}
-                                            {(s as any)._canEdit === false ? (
-                                                <button onClick={() => handleEdit(s)} className="p-2 text-gray-400" title="Просмотр (только чтение)">
-                                                    <EyeIcon className="h-5 w-5" />
-                                                </button>
-                                            ) : (
-                                                <>
-                                                    <button onClick={() => handleEdit(s)} className="p-2 text-blue-500" title="Редактировать"><PencilIcon className="h-5 w-5" /></button>
-                                                    {s.status === 'active' ? <button onClick={() => openActionModal('archive', s)} className="p-2 text-purple-500" title="Архивировать"><ArchiveBoxIcon className="h-5 w-5" /></button> : <button onClick={() => openActionModal('unarchive', s)} className="p-2 text-green-500" title="Восстановить"><ArrowUpTrayIcon className="h-5 w-5" /></button>}
-                                                    <button onClick={() => openActionModal('delete', s)} className="p-2 text-red-500" title="Удалить"><TrashIcon className="h-5 w-5" /></button>
-                                                </>
-                                            )}
-                                        </td>
-                                    </tr>
-                                ))}
-                        </tbody>
-                    </table>
-                </div>
+
+                <DataTable
+                    tableId="storage-list"
+                    columns={columns}
+                    data={enrichedData}
+                    keyField="id"
+                    searchable={true}
+                    isLoading={isLoading}
+                    actions={[
+                        {
+                            icon: <EyeIcon className="h-4 w-4" />,
+                            onClick: (s) => handleEdit(s),
+                            title: "Просмотр (только чтение)",
+                            className: "text-gray-600 hover:text-gray-800",
+                            show: (s: any) => s._canEdit === false
+                        },
+                        {
+                            icon: <PencilIcon className="h-4 w-4" />,
+                            onClick: (s) => handleEdit(s),
+                            title: "Редактировать",
+                            className: "text-blue-600 hover:text-blue-800",
+                            show: (s: any) => s._canEdit !== false
+                        },
+                        {
+                            icon: <ArchiveBoxIcon className="h-4 w-4" />,
+                            onClick: (s) => openActionModal('archive', s),
+                            title: "Архивировать",
+                            className: "text-purple-600 hover:text-purple-800",
+                            show: (s: any) => s._canEdit !== false && s.status === 'active'
+                        },
+                        {
+                            icon: <ArrowUpTrayIcon className="h-4 w-4" />,
+                            onClick: (s) => openActionModal('unarchive', s),
+                            title: "Восстановить",
+                            className: "text-green-600 hover:text-green-800",
+                            show: (s: any) => s._canEdit !== false && s.status === 'archived'
+                        },
+                        {
+                            icon: <TrashIcon className="h-4 w-4" />,
+                            onClick: (s) => openActionModal('delete', s),
+                            title: "Удалить",
+                            className: "text-red-600 hover:text-red-800",
+                            show: (s: any) => s._canEdit !== false
+                        }
+                    ]}
+                />
             </div>
         </>
     );

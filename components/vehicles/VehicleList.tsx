@@ -8,8 +8,10 @@ import { getEmployees } from '../../services/api/employeeApi';
 import { getStockItems, StockItem } from '../../services/stockItemApi';
 import { getOrganizations } from '../../services/organizationApi';
 import { validation } from '../../services/faker';
-import { PencilIcon, TrashIcon, PlusIcon, ArrowUpIcon, ArrowDownIcon, ArchiveBoxIcon, ArrowUpTrayIcon, TruckIcon } from '../Icons';
-import useTable from '../../hooks/useTable';
+import { PencilIcon, TrashIcon, PlusIcon, ArchiveBoxIcon, ArrowUpTrayIcon, TruckIcon } from '../Icons';
+import DataTable, { Column } from '../shared/DataTable';
+import { Badge } from '../shared/Badge';
+import { Button } from '../shared/Button';
 import Modal from '../shared/Modal';
 import ConfirmationModal from '../shared/ConfirmationModal';
 import { useToast } from '../../hooks/useToast';
@@ -158,17 +160,25 @@ export const VehicleList: React.FC = () => {
             }));
     }, [vehicles, employees, showArchived]);
 
+
     type EnrichedVehicle = typeof enrichedData[0];
-    type EnrichedVehicleKey = Extract<keyof EnrichedVehicle, string>;
 
-    const columns: { key: EnrichedVehicleKey; label: string }[] = [
-        { key: 'registrationNumber', label: 'Гос. номер' },
-        { key: 'brand', label: 'Марка и модель' },
-        { key: 'driverName', label: 'Водитель' },
-        { key: 'status', label: 'Статус' },
-    ];
-
-    const { rows, sortColumn, sortDirection, handleSort, filters, handleFilterChange } = useTable(enrichedData, columns);
+    const columns: Column<EnrichedVehicle>[] = useMemo(() => [
+        { key: 'registrationNumber', label: 'Гос. номер', sortable: true, align: 'center' },
+        { key: 'brand', label: 'Марка и модель', sortable: true, align: 'center' },
+        { key: 'driverName', label: 'Водитель', sortable: true, align: 'center' },
+        {
+            key: 'status',
+            label: 'Статус',
+            sortable: true,
+            align: 'center',
+            render: (v) => (
+                <Badge variant={v.status === VehicleStatus.ACTIVE ? 'success' : v.status === VehicleStatus.ARCHIVED ? 'neutral' : 'warning'}>
+                    {VEHICLE_STATUS_TRANSLATIONS[v.status]}
+                </Badge>
+            )
+        },
+    ], []);
 
     const handleAddNew = () => {
         reset({
@@ -343,85 +353,58 @@ export const VehicleList: React.FC = () => {
                 </form>
             </Modal>
 
-            <div>
+            <div className="space-y-6">
                 <div className="flex justify-between items-center mb-6">
                     <div className="flex items-center gap-3">
                         <TruckIcon className="h-6 w-6 text-gray-600 dark:text-gray-400" />
-                        <h2 className="text-xl font-bold text-gray-900 dark:text-white">Транспортные средства</h2>
+                        <h2 className="text-xl font-bold text-gray-900 dark:text-white tracking-tight">Транспорт</h2>
+                        <span className="px-2.5 py-0.5 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 text-xs font-semibold">
+                            {enrichedData.length}
+                        </span>
                     </div>
-                    <div className="flex items-center gap-4">
-                        <label className="flex items-center text-sm text-gray-600 dark:text-gray-300 cursor-pointer select-none">
-                            <input
-                                type="checkbox"
-                                checked={showArchived}
-                                onChange={e => setShowArchived(e.target.checked)}
-                                className="h-4 w-4 rounded border-gray-300 dark:border-gray-500 text-blue-600 focus:ring-blue-500"
-                            />
-                            <span className="ml-2">Показать архивные</span>
-                        </label>
-                        <button
-                            onClick={handleAddNew}
-                            className="flex items-center gap-2 bg-blue-600 text-white font-medium py-2 px-4 rounded-lg shadow-sm hover:bg-blue-700 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-                        >
-                            <PlusIcon className="h-5 w-5" /> Добавить
-                        </button>
-                    </div>
+                    <Button onClick={handleAddNew} variant="primary" leftIcon={<PlusIcon className="h-5 w-5" />}>
+                        Добавить ТС
+                    </Button>
                 </div>
 
-                <div className="overflow-x-auto border rounded-lg">
-                    <table className="w-full text-sm text-left text-gray-500 dark:text-gray-400">
-                        <thead className="text-xs text-gray-500 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400 border-b dark:border-gray-600">
-                            <tr>
-                                {columns.map(col => (
-                                    <th key={col.key} scope="col" className="px-6 py-3 font-medium cursor-pointer hover:text-gray-700 dark:hover:text-gray-200" onClick={() => handleSort(col.key)}>
-                                        <div className="flex items-center gap-1">
-                                            {col.label}
-                                            {sortColumn === col.key && (
-                                                sortDirection === 'asc' ? <ArrowUpIcon className="h-4 w-4" /> : <ArrowDownIcon className="h-4 w-4" />
-                                            )}
-                                        </div>
-                                    </th>
-                                ))}
-                                <th scope="col" className="px-6 py-3 font-medium text-center">Действия</th>
-                            </tr>
-                            <tr className="bg-white dark:bg-gray-800 border-b dark:border-gray-600">
-                                {columns.map(col => (
-                                    <th key={`${col.key}-filter`} className="px-6 py-2">
-                                        <input
-                                            type="text"
-                                            value={filters[col.key] || ''}
-                                            onChange={e => handleFilterChange(col.key, e.target.value)}
-                                            placeholder={`Поиск...`}
-                                            className="w-full text-sm font-normal px-3 py-1.5 bg-white bordered border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400"
-                                        />
-                                    </th>
-                                ))}
-                                <th className="px-6 py-2"></th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {isLoading ? (
-                                <tr><td colSpan={columns.length + 1}><EmptyState reason={{ type: 'loading' }} /></td></tr>
-                            ) : loadError ? (
-                                <tr><td colSpan={columns.length + 1}><EmptyState reason={loadError} entityName="транспорт" onRetry={fetchData} /></td></tr>
-                            ) : rows.length === 0 ? (
-                                <tr><td colSpan={columns.length + 1}><EmptyState reason={{ type: 'empty', entityName: 'транспорт' }} onRetry={fetchData} /></td></tr>
-                            ) : rows.map(v => (
-                                <tr key={v.id} className="bg-white dark:bg-gray-800 border-b dark:border-gray-700">
-                                    <td className="px-6 py-4 font-medium text-gray-900 dark:text-white">{v.registrationNumber}</td>
-                                    <td className="px-6 py-4">{v.brand}</td>
-                                    <td className="px-6 py-4">{v.driverName}</td>
-                                    <td className="px-6 py-4"><span className={`px-2 py-1 text-xs font-semibold rounded-full ${VEHICLE_STATUS_COLORS[v.status]}`}>{VEHICLE_STATUS_TRANSLATIONS[v.status]}</span></td>
-                                    <td className="px-6 py-4 text-center">
-                                        <button onClick={() => handleEdit(v)} className="p-2 text-blue-500" title="Редактировать"><PencilIcon className="h-5 w-5" /></button>
-                                        {v.status === VehicleStatus.ACTIVE ? <button onClick={() => openActionModal('archive', v)} className="p-2 text-purple-500" title="Архивировать"><ArchiveBoxIcon className="h-5 w-5" /></button> : <button onClick={() => openActionModal('unarchive', v)} className="p-2 text-green-500" title="Восстановить"><ArrowUpTrayIcon className="h-5 w-5" /></button>}
-                                        <button onClick={() => openActionModal('delete', v)} className="p-2 text-red-500" title="Удалить"><TrashIcon className="h-5 w-5" /></button>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
+                <DataTable
+                    tableId="vehicle-list"
+                    columns={columns}
+                    data={enrichedData}
+                    keyField="id"
+                    searchable={true}
+                    isLoading={isLoading}
+                    error={loadError}
+                    onRetry={fetchData}
+                    actions={[
+                        {
+                            icon: <PencilIcon className="h-4 w-4" />,
+                            onClick: (v) => handleEdit(v),
+                            title: "Редактировать",
+                            className: "text-blue-600 hover:text-blue-800"
+                        },
+                        {
+                            icon: <ArchiveBoxIcon className="h-4 w-4" />,
+                            onClick: (v) => openActionModal('archive', v),
+                            title: "Архивировать",
+                            className: "text-purple-600 hover:text-purple-800",
+                            show: (v: any) => v.status === VehicleStatus.ACTIVE
+                        },
+                        {
+                            icon: <ArrowUpTrayIcon className="h-4 w-4" />,
+                            onClick: (v) => openActionModal('unarchive', v),
+                            title: "Восстановить",
+                            className: "text-green-600 hover:text-green-800",
+                            show: (v: any) => v.status === VehicleStatus.ARCHIVED
+                        },
+                        {
+                            icon: <TrashIcon className="h-4 w-4" />,
+                            onClick: (v) => openActionModal('delete', v),
+                            title: "Удалить",
+                            className: "text-red-600 hover:text-red-800"
+                        }
+                    ]}
+                />
             </div>
         </>
     );

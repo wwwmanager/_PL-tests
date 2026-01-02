@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { getRoutes, createRoute, updateRoute, deleteRoute, Route } from '../../services/api/routeApi';
 import { PencilIcon, TrashIcon, PlusIcon, GlobeAltIcon } from '../Icons';
+import DataTable, { Column } from '../shared/DataTable';
+import { Button } from '../shared/Button';
 import Modal from '../shared/Modal';
 import ConfirmationModal from '../shared/ConfirmationModal';
 import { useToast } from '../../hooks/useToast';
@@ -13,6 +15,14 @@ const RouteList: React.FC = () => {
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [routeToDelete, setRouteToDelete] = useState<Route | null>(null);
     const { showToast } = useToast();
+
+    const columns: Column<Route>[] = React.useMemo(() => [
+        { key: 'name', label: 'Название', sortable: true },
+        { key: 'startPoint', label: 'Начало', sortable: true, render: (r) => r.startPoint || '—' },
+        { key: 'endPoint', label: 'Конец', sortable: true, render: (r) => r.endPoint || '—' },
+        { key: 'distance', label: 'Расстояние, км', sortable: true, align: 'center', render: (r) => r.distance?.toFixed(1) || '—' },
+        { key: 'estimatedTime', label: 'Время, мин', sortable: true, align: 'center', render: (r) => r.estimatedTime?.toString() || '—' },
+    ], []);
 
     const fetchData = async () => {
         try {
@@ -139,55 +149,42 @@ const RouteList: React.FC = () => {
                 )}
             </Modal>
 
-            <div>
-                <div className="flex justify-between items-center mb-4">
+            <div className="space-y-6">
+                <div className="flex justify-between items-center mb-6">
                     <div className="flex items-center gap-3">
                         <GlobeAltIcon className="h-6 w-6 text-gray-600 dark:text-gray-400" />
-                        <h3 className="text-xl font-semibold text-gray-800 dark:text-white">Справочник: Маршруты</h3>
+                        <h2 className="text-xl font-bold text-gray-900 dark:text-white tracking-tight">Маршруты</h2>
+                        <span className="px-2.5 py-0.5 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 text-xs font-semibold">
+                            {routes.length}
+                        </span>
                     </div>
-                    <button onClick={handleAddNew} className="flex items-center gap-2 bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md hover:bg-blue-700 transition-colors">
-                        <PlusIcon className="h-5 w-5" />
+                    <Button onClick={handleAddNew} variant="primary" leftIcon={<PlusIcon className="h-5 w-5" />}>
                         Добавить маршрут
-                    </button>
+                    </Button>
                 </div>
 
-                <div className="overflow-x-auto">
-                    <table className="w-full text-sm text-left text-gray-500 dark:text-gray-400">
-                        <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
-                            <tr>
-                                <th scope="col" className="px-6 py-3">Название</th>
-                                <th scope="col" className="px-6 py-3">Начало</th>
-                                <th scope="col" className="px-6 py-3">Конец</th>
-                                <th scope="col" className="px-6 py-3">Расстояние, км</th>
-                                <th scope="col" className="px-6 py-3">Время, мин</th>
-                                <th scope="col" className="px-6 py-3 text-center">Действия</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {isLoading ? (
-                                <tr><td colSpan={6} className="text-center p-4">Загрузка...</td></tr>
-                            ) : routes.length === 0 ? (
-                                <tr><td colSpan={6} className="text-center p-4">Нет данных</td></tr>
-                            ) : routes.map(route => (
-                                <tr key={route.id} className="bg-white dark:bg-gray-800 border-b dark:border-gray-700">
-                                    <td className="px-6 py-4 font-medium text-gray-900 dark:text-white">{route.name}</td>
-                                    <td className="px-6 py-4">{route.startPoint || '—'}</td>
-                                    <td className="px-6 py-4">{route.endPoint || '—'}</td>
-                                    <td className="px-6 py-4">{route.distance?.toFixed(1) || '—'}</td>
-                                    <td className="px-6 py-4">{route.estimatedTime || '—'}</td>
-                                    <td className="px-6 py-4 text-center">
-                                        <button onClick={() => handleEdit(route)} className="p-2 text-blue-500 transition-all duration-200 transform hover:scale-110">
-                                            <PencilIcon className="h-5 w-5" />
-                                        </button>
-                                        <button onClick={() => handleRequestDelete(route)} className="p-2 text-red-500 transition-all duration-200 transform hover:scale-110">
-                                            <TrashIcon className="h-5 w-5" />
-                                        </button>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
+                <DataTable
+                    tableId="route-list"
+                    columns={columns}
+                    data={routes}
+                    keyField="id"
+                    searchable={true}
+                    isLoading={isLoading}
+                    actions={[
+                        {
+                            icon: <PencilIcon className="h-4 w-4" />,
+                            onClick: (route) => handleEdit(route),
+                            title: "Редактировать",
+                            className: "text-blue-600 hover:text-blue-800"
+                        },
+                        {
+                            icon: <TrashIcon className="h-4 w-4" />,
+                            onClick: (route) => handleRequestDelete(route),
+                            title: "Удалить",
+                            className: "text-red-600 hover:text-red-800"
+                        }
+                    ]}
+                />
             </div>
         </>
     );

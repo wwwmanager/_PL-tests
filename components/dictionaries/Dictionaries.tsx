@@ -36,7 +36,7 @@ const Dictionaries: React.FC<DictionariesProps> = ({ subViewToOpen }) => {
         { id: 'employees', label: 'Сотрудники', icon: UserGroupIcon },
         { id: 'organizations', label: 'Организации', icon: BuildingOffice2Icon },
         { id: 'fuelTypes', label: 'Топливо', icon: FireIcon },
-        { id: 'storageLocations', label: 'Склады', icon: HomeModernIcon },
+        { id: 'storageLocations', label: 'Места хранения', icon: HomeModernIcon },
         { id: 'routes', label: 'Маршруты', icon: GlobeAltIcon },
     ];
     // Calendar is missing in original list but present in design, keeping existing for now or adding placeholder?

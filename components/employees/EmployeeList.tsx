@@ -214,18 +214,20 @@ const EmployeeList: React.FC = () => {
     type EnrichedEmployeeKey = Extract<keyof EnrichedEmployee, string>;
 
     const columns: Column<EnrichedEmployee>[] = useMemo(() => [
-        { key: 'shortName', label: 'ФИО (сокращ.)' },
-        { key: 'personnelNumber', label: 'Таб. номер' },
-        { key: 'position', label: 'Должность' },
+        { key: 'shortName', label: 'ФИО (сокращ.)', align: 'center' },
+        { key: 'personnelNumber', label: 'Таб. номер', align: 'center' },
+        { key: 'position', label: 'Должность', align: 'center' },
         {
             key: 'fuelCardBalance',
             label: 'Баланс ТК, л',
+            align: 'center',
             render: (e) => <span className="font-mono">{e.fuelCardBalance?.toFixed(2) ?? '0.00'}</span>
         },
-        { key: 'organizationName', label: 'Организация' },
+        { key: 'organizationName', label: 'Организация', align: 'center' },
         {
             key: 'status',
             label: 'Статус',
+            align: 'center',
             render: (e) => (
                 <Badge variant={e.status === 'Active' ? 'success' : 'danger'}>
                     {e.status === 'Active' ? 'Активен' : 'Неактивен'}

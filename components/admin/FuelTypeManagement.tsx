@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { FuelType } from '../../types';
 import { getFuelTypes, createFuelType, updateFuelType, deleteFuelType } from '../../services/api/fuelTypeApi';
-import { PencilIcon, TrashIcon, PlusIcon, ArrowUpIcon, ArrowDownIcon, EyeIcon, FireIcon } from '../Icons';
-import useTable from '../../hooks/useTable';
+import { PencilIcon, TrashIcon, PlusIcon, EyeIcon, FireIcon } from '../Icons';
+import DataTable, { Column } from '../shared/DataTable';
+import { Badge } from '../shared/Badge';
+import { Button } from '../shared/Button';
 import Modal from '../shared/Modal';
 import ConfirmationModal from '../shared/ConfirmationModal';
 import { useToast } from '../../hooks/useToast';
@@ -41,13 +43,17 @@ const FuelTypeManagement = () => {
     return JSON.stringify(currentItem) !== JSON.stringify(initialItem);
   }, [currentItem, initialItem]);
 
-  const columns: { key: keyof FuelType; label: string }[] = [
-    { key: 'name', label: 'Название' },
-    { key: 'code', label: 'Код' },
-    { key: 'density', label: 'Плотность' },
-  ];
-
-  const { rows, sortColumn, sortDirection, handleSort, filters, handleFilterChange } = useTable(fuelTypes, columns);
+  const columns: Column<FuelType>[] = useMemo(() => [
+    { key: 'name', label: 'Название', sortable: true, align: 'center' as const },
+    { key: 'code', label: 'Код', sortable: true, align: 'center' as const },
+    {
+      key: 'density',
+      label: 'Плотность',
+      sortable: true,
+      align: 'center' as const,
+      render: (ft) => typeof ft.density === 'number' ? ft.density.toFixed(3) : ''
+    },
+  ], []);
 
   const fetchFuelTypes = useCallback(async () => {
     try {
@@ -219,118 +225,56 @@ const FuelTypeManagement = () => {
         )}
       </Modal>
 
-      <div>
-        <div className="flex justify-between items-center mb-4">
+      <div className="space-y-6">
+        <div className="flex justify-between items-center mb-6">
           <div className="flex items-center gap-3">
             <FireIcon className="h-6 w-6 text-gray-600 dark:text-gray-400" />
-            <h3 className="text-xl font-semibold text-gray-800 dark:text-white">Справочник: Типы топлива</h3>
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white tracking-tight">Типы топлива</h2>
+            <span className="px-2.5 py-0.5 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 text-xs font-semibold">
+              {fuelTypes.length}
+            </span>
           </div>
           {/* RLS-FUEL-FE-010: Hide Add button for drivers */}
           {!isDriver && (
-            <button
-              onClick={handleAddNew}
-              className="flex items-center gap-2 bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md hover:bg-blue-700 transition-colors"
-            >
-              <PlusIcon className="h-5 w-5" />
-              Добавить
-            </button>
+            <Button onClick={handleAddNew} variant="primary" leftIcon={<PlusIcon className="h-5 w-5" />}>
+              Добавить тип топлива
+            </Button>
           )}
         </div>
 
-        <table className="w-full text-sm text-left text-gray-500 dark:text-gray-400">
-          <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
-            <tr>
-              {columns.map(col => (
-                <th key={String(col.key)} scope="col" className="px-6 py-3">
-                  <button
-                    type="button"
-                    onClick={() => handleSort(col.key)}
-                    className="flex items-center gap-1 cursor-pointer"
-                    aria-label={`Сортировать по: ${col.label} `}
-                  >
-                    {col.label}
-                    {sortColumn === col.key &&
-                      (sortDirection === 'asc' ? (
-                        <ArrowUpIcon className="h-4 w-4" />
-                      ) : (
-                        <ArrowDownIcon className="h-4 w-4" />
-                      ))}
-                  </button>
-                </th>
-              ))}
-              <th scope="col" className="px-6 py-3 text-center">
-                Действия
-              </th>
-            </tr>
-            <tr>
-              {columns.map(col => (
-                <th key={`${String(col.key)} -filter`} className="px-2 py-1">
-                  <input
-                    type="text"
-                    value={filters[col.key as string] || ''}
-                    onChange={e => handleFilterChange(col.key, e.target.value)}
-                    placeholder={`Поиск...`}
-                    className="w-full text-xs p-1 bg-gray-100 dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded"
-                  />
-                </th>
-              ))}
-              <th className="px-2 py-1"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {isLoading ? (
-              <tr>
-                <td colSpan={columns.length + 1} className="text-center p-4">
-                  Загрузка...
-                </td>
-              </tr>
-            ) : error ? (
-              <tr>
-                <td colSpan={columns.length + 1} className="text-center p-4 text-red-500">
-                  {error}
-                </td>
-              </tr>
-            ) : (
-              rows.map(ft => (
-                <tr key={ft.id} className="bg-white dark:bg-gray-800 border-b dark:border-gray-700">
-                  <td className="px-6 py-4 font-medium text-gray-900 dark:text-white">{ft.name}</td>
-                  <td className="px-6 py-4">{ft.code}</td>
-                  <td className="px-6 py-4">{typeof ft.density === 'number' ? ft.density.toFixed(3) : ''}</td>
-                  <td className="px-6 py-4 text-center">
-                    {/* RLS-FUEL-FE-010: Show view-only or edit buttons based on role */}
-                    {isDriver ? (
-                      <button
-                        onClick={() => handleEdit(ft)}
-                        className="p-2 text-gray-400"
-                        aria-label={`Просмотр ${ft.name} `}
-                        title="Просмотр (только чтение)"
-                      >
-                        <EyeIcon className="h-5 w-5 pointer-events-none" />
-                      </button>
-                    ) : (
-                      <>
-                        <button
-                          onClick={() => handleEdit(ft)}
-                          className="p-2 text-blue-500 transition-all duration-200 transform hover:scale-110 hover:shadow-lg hover:shadow-blue-500/40"
-                          aria-label={`Редактировать ${ft.name} `}
-                        >
-                          <PencilIcon className="h-5 w-5 pointer-events-none" />
-                        </button>
-                        <button
-                          onClick={() => handleRequestDelete(ft)}
-                          className="p-2 text-red-500 transition-all duration-200 transform hover:scale-110 hover:shadow-lg hover:shadow-red-500/40"
-                          aria-label={`Удалить ${ft.name} `}
-                        >
-                          <TrashIcon className="h-5 w-5 pointer-events-none" />
-                        </button>
-                      </>
-                    )}
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+        <DataTable
+          tableId="fuel-type-list"
+          columns={columns}
+          data={fuelTypes}
+          keyField="id"
+          searchable={true}
+          isLoading={isLoading}
+          error={error ? { type: 'error', message: error } : undefined}
+          onRetry={fetchFuelTypes}
+          actions={[
+            {
+              icon: <EyeIcon className="h-4 w-4" />,
+              onClick: (ft) => handleEdit(ft),
+              title: "Просмотр (только чтение)",
+              className: "text-gray-600 hover:text-gray-800",
+              show: () => isDriver
+            },
+            {
+              icon: <PencilIcon className="h-4 w-4" />,
+              onClick: (ft) => handleEdit(ft),
+              title: "Редактировать",
+              className: "text-blue-600 hover:text-blue-800",
+              show: () => !isDriver
+            },
+            {
+              icon: <TrashIcon className="h-4 w-4" />,
+              onClick: (ft) => handleRequestDelete(ft),
+              title: "Удалить",
+              className: "text-red-600 hover:text-red-800",
+              show: () => !isDriver
+            }
+          ]}
+        />
       </div>
     </>
   );

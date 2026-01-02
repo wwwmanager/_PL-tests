@@ -7,8 +7,10 @@ import { Organization, OrganizationStatus } from '../../types';
 import { getOrganizations, addOrganization, updateOrganization, deleteOrganization } from '../../services/organizationApi';
 import { lockStockPeriod, unlockStockPeriod } from '../../services/adminApi';
 import { validation } from '../../services/faker'; // Валидация все еще нужна для схемы
-import { PencilIcon, TrashIcon, PlusIcon, ArrowUpIcon, ArrowDownIcon, ArchiveBoxIcon, ArrowUpTrayIcon, EyeIcon, BuildingOffice2Icon } from '../Icons';
-import useTable from '../../hooks/useTable';
+import { PencilIcon, TrashIcon, PlusIcon, ArchiveBoxIcon, ArrowUpTrayIcon, EyeIcon, BuildingOffice2Icon } from '../Icons';
+import DataTable, { Column } from '../shared/DataTable';
+import { Badge } from '../shared/Badge';
+import { Button } from '../shared/Button';
 import { ORGANIZATION_STATUS_COLORS, ORGANIZATION_STATUS_TRANSLATIONS } from '../../constants';
 import Modal from '../shared/Modal';
 import ConfirmationModal from '../shared/ConfirmationModal';
@@ -93,7 +95,6 @@ const OrganizationManagement = () => {
     const [organizations, setOrganizations] = useState<(Organization & { _canEdit?: boolean })[]>([]);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
-    const [showArchived, setShowArchived] = useState(false);
     const [actionModal, setActionModal] = useState<{ isOpen: boolean; type?: 'delete' | 'archive' | 'unarchive'; item?: Organization }>({ isOpen: false });
     const [lockDate, setLockDate] = useState<string>('');
     const { showToast } = useToast();
@@ -143,18 +144,38 @@ const OrganizationManagement = () => {
         }));
     };
 
-    const filteredOrganizations = useMemo(() => {
-        return organizations.filter(o => showArchived || o.status !== OrganizationStatus.ARCHIVED);
-    }, [organizations, showArchived]);
+    type EnrichedOrganization = Organization & { _canEdit?: boolean };
 
-    const columns: { key: keyof Organization; label: string }[] = [
-        { key: 'shortName', label: 'Краткое наименование' },
-        { key: 'inn', label: 'ИНН' },
-        { key: 'address', label: 'Адрес' },
-        { key: 'status', label: 'Статус' },
-    ];
-
-    const { rows, sortColumn, sortDirection, handleSort, filters, handleFilterChange } = useTable(filteredOrganizations, columns);
+    const columns: Column<EnrichedOrganization>[] = useMemo(() => [
+        {
+            key: 'shortName',
+            label: 'Краткое наименование',
+            sortable: true,
+            render: (o) => (
+                <>
+                    {o.shortName}
+                    {o.isOwn && (
+                        <span className="ml-2 px-2 py-0.5 text-xs font-bold bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-200 rounded-full">
+                            СВОЯ
+                        </span>
+                    )}
+                </>
+            )
+        },
+        { key: 'inn', label: 'ИНН', sortable: true, align: 'center' },
+        { key: 'address', label: 'Адрес', sortable: true },
+        {
+            key: 'status',
+            label: 'Статус',
+            sortable: true,
+            align: 'center',
+            render: (o) => (
+                <Badge variant={o.status === OrganizationStatus.ACTIVE ? 'success' : 'neutral'}>
+                    {ORGANIZATION_STATUS_TRANSLATIONS[o.status]}
+                </Badge>
+            )
+        },
+    ], []);
 
     const fetchData = async () => {
         setIsLoading(true);
@@ -404,69 +425,68 @@ const OrganizationManagement = () => {
                 </form>
             </Modal>
 
-            <div>
-                <div className="flex justify-between items-center mb-4">
+            <div className="space-y-6">
+                <div className="flex justify-between items-center mb-6">
                     <div className="flex items-center gap-3">
                         <BuildingOffice2Icon className="h-6 w-6 text-gray-600 dark:text-gray-400" />
-                        <h3 className="text-xl font-semibold text-gray-800 dark:text-white">Справочник: Организации</h3>
+                        <h2 className="text-xl font-bold text-gray-900 dark:text-white tracking-tight">Организации</h2>
+                        <span className="px-2.5 py-0.5 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 text-xs font-semibold">
+                            {organizations.length}
+                        </span>
                     </div>
                     {/* RLS-ORG-FE-010: Hide Add button for drivers */}
                     {!isDriver && (
-                        <button onClick={handleAddNew} className="flex items-center gap-2 bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md hover:bg-blue-700 transition-colors">
-                            <PlusIcon className="h-5 w-5" /> Добавить
-                        </button>
+                        <Button onClick={handleAddNew} variant="primary" leftIcon={<PlusIcon className="h-5 w-5" />}>
+                            Добавить организацию
+                        </Button>
                     )}
                 </div>
-                <label className="flex items-center text-sm text-gray-600 dark:text-gray-300 cursor-pointer my-4">
-                    <input type="checkbox" checked={showArchived} onChange={e => setShowArchived(e.target.checked)} className="h-4 w-4 rounded border-gray-300 dark:border-gray-500 text-blue-600 focus:ring-blue-500" />
-                    <span className="ml-2">Показать архивные</span>
-                </label>
-                <div className="overflow-x-auto">
-                    <table className="w-full text-sm text-left text-gray-500 dark:text-gray-400">
-                        <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
-                            <tr>
-                                {columns.map(col => (<th key={col.key} scope="col" className="px-6 py-3 cursor-pointer" onClick={() => handleSort(col.key)}><div className="flex items-center gap-1">{col.label}{sortColumn === col.key && (sortDirection === 'asc' ? <ArrowUpIcon className="h-4 w-4" /> : <ArrowDownIcon className="h-4 w-4" />)}</div></th>))}
-                                <th scope="col" className="px-6 py-3 text-center">Действия</th>
-                            </tr>
-                            <tr>
-                                {columns.map(col => (<th key={`${col.key}-filter`} className="px-2 py-1"><input type="text" value={filters[col.key] || ''} onChange={e => handleFilterChange(col.key, e.target.value)} placeholder={`Поиск...`} className="w-full text-xs p-1 bg-gray-100 dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded" /></th>))}
-                                <th className="px-2 py-1"></th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {isLoading ? (<tr><td colSpan={columns.length + 1} className="text-center p-4">Загрузка...</td></tr>)
-                                : rows.map(o => (
-                                    <tr key={o.id} className="bg-white dark:bg-gray-800 border-b dark:border-gray-700">
-                                        <td className="px-6 py-4 font-medium text-gray-900 dark:text-white">
-                                            {o.shortName}
-                                            {o.isOwn && (
-                                                <span className="ml-2 px-2 py-0.5 text-xs font-bold bg-blue-100 text-blue-800 rounded-full">
-                                                    СВОЯ
-                                                </span>
-                                            )}
-                                        </td>
-                                        <td className="px-6 py-4">{o.inn}</td>
-                                        <td className="px-6 py-4">{o.address}</td>
-                                        <td className="px-6 py-4"><span className={`px-2 py-1 text-xs font-semibold rounded-full ${ORGANIZATION_STATUS_COLORS[o.status]}`}>{ORGANIZATION_STATUS_TRANSLATIONS[o.status]}</span></td>
-                                        <td className="px-6 py-4 text-center">
-                                            {/* RLS-ORG-FE-010: Show view-only icon or edit buttons based on _canEdit */}
-                                            {o._canEdit === false ? (
-                                                <button onClick={() => handleEdit(o)} className="p-2 text-gray-400" title="Просмотр (только чтение)">
-                                                    <EyeIcon className="h-5 w-5" />
-                                                </button>
-                                            ) : (
-                                                <>
-                                                    <button onClick={() => handleEdit(o)} className="p-2 text-blue-500" title="Редактировать"><PencilIcon className="h-5 w-5" /></button>
-                                                    {o.status === OrganizationStatus.ACTIVE ? <button onClick={() => openActionModal('archive', o)} className="p-2 text-purple-500" title="Архивировать"><ArchiveBoxIcon className="h-5 w-5" /></button> : <button onClick={() => openActionModal('unarchive', o)} className="p-2 text-green-500" title="Восстановить"><ArrowUpTrayIcon className="h-5 w-5" /></button>}
-                                                    <button onClick={() => openActionModal('delete', o)} className="p-2 text-red-500" title="Удалить"><TrashIcon className="h-5 w-5" /></button>
-                                                </>
-                                            )}
-                                        </td>
-                                    </tr>
-                                ))}
-                        </tbody>
-                    </table>
-                </div>
+
+                <DataTable
+                    tableId="organization-list"
+                    columns={columns}
+                    data={organizations}
+                    keyField="id"
+                    searchable={true}
+                    isLoading={isLoading}
+                    actions={[
+                        {
+                            icon: <EyeIcon className="h-4 w-4" />,
+                            onClick: (o) => handleEdit(o),
+                            title: "Просмотр (только чтение)",
+                            className: "text-gray-600 hover:text-gray-800",
+                            show: (o: any) => o._canEdit === false
+                        },
+                        {
+                            icon: <PencilIcon className="h-4 w-4" />,
+                            onClick: (o) => handleEdit(o),
+                            title: "Редактировать",
+                            className: "text-blue-600 hover:text-blue-800",
+                            show: (o: any) => o._canEdit !== false
+                        },
+                        {
+                            icon: <ArchiveBoxIcon className="h-4 w-4" />,
+                            onClick: (o) => openActionModal('archive', o),
+                            title: "Архивировать",
+                            className: "text-purple-600 hover:text-purple-800",
+                            show: (o: any) => o._canEdit !== false && o.status === OrganizationStatus.ACTIVE
+                        },
+                        {
+                            icon: <ArrowUpTrayIcon className="h-4 w-4" />,
+                            onClick: (o) => openActionModal('unarchive', o),
+                            title: "Восстановить",
+                            className: "text-green-600 hover:text-green-800",
+                            show: (o: any) => o._canEdit !== false && o.status === OrganizationStatus.ARCHIVED
+                        },
+                        {
+                            icon: <TrashIcon className="h-4 w-4" />,
+                            onClick: (o) => openActionModal('delete', o),
+                            title: "Удалить",
+                            className: "text-red-600 hover:text-red-800",
+                            show: (o: any) => o._canEdit !== false
+                        }
+                    ]}
+                />
             </div>
         </>
     );

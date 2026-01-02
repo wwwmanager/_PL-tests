@@ -23,6 +23,7 @@ export interface Column<T = any> {
     label: string;
     sortable?: boolean;
     render?: (row: T) => React.ReactNode;
+    align?: 'left' | 'center' | 'right';
 }
 
 export interface TableAction<T> {
@@ -93,17 +94,17 @@ function DataTable<T extends Record<string, any>>({
             <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                     <thead className="bg-gray-50 dark:bg-gray-800">
-                        <tr className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
+                        <tr className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400 text-center">
                             <SortableContext items={columns.map(c => c.key)} strategy={horizontalListSortingStrategy}>
                                 {columns.map((col) => (
                                     <SortableHeader
                                         key={col.key}
                                         id={col.key}
                                         asTh
-                                        className={`px-6 py-4 text-left font-bold tracking-tight ${col.sortable ? 'cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors' : ''}`}
+                                        className={`px-6 py-4 text-center font-bold tracking-tight ${col.sortable ? 'cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors' : ''}`}
                                         onClick={() => col.sortable && handleSort(col.key)}
                                     >
-                                        <div className="flex items-center gap-1">
+                                        <div className="flex items-center justify-center gap-1 text-center w-full">
                                             {col.label}
                                             {col.sortable && sortColumn === col.key && (
                                                 <span className="text-blue-500 font-bold">{sortDirection === 'asc' ? '↑' : '↓'}</span>
@@ -125,7 +126,7 @@ function DataTable<T extends Record<string, any>>({
                                             placeholder={`Поиск...`}
                                             value={filters[col.key] || ''}
                                             onChange={(e) => handleFilterChange(col.key, e.target.value)}
-                                            className="w-full text-xs px-3 py-1.5 border rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all font-normal"
+                                            className="w-full text-xs px-3 py-1.5 border rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all font-normal text-center"
                                         />
                                     </th>
                                 ))}
@@ -143,11 +144,14 @@ function DataTable<T extends Record<string, any>>({
                         ) : (
                             rows.map((row) => (
                                 <tr key={row[keyField]} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
-                                    {columns.map((col) => (
-                                        <td key={col.key} className="px-6 py-4 text-sm text-gray-700 dark:text-gray-300">
-                                            {col.render ? col.render(row) : row[col.key]}
-                                        </td>
-                                    ))}
+                                    {columns.map((col) => {
+                                        const alignClass = col.align === 'center' ? 'text-center' : col.align === 'right' ? 'text-right' : 'text-left';
+                                        return (
+                                            <td key={col.key} className={`px-6 py-4 text-sm text-gray-700 dark:text-gray-300 ${alignClass}`}>
+                                                {col.render ? col.render(row) : row[col.key]}
+                                            </td>
+                                        );
+                                    })}
                                     {actions.length > 0 && (
                                         <td className="px-6 py-4 text-center">
                                             <div className="flex justify-center gap-2">

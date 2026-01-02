@@ -15,7 +15,7 @@ import {
 } from '../../services/stockItemApi';
 import { useToast } from '../../hooks/useToast';
 import { useAuth } from '../../services/auth';  // RLS-STOCK-FE-010
-import { PlusIcon, PencilIcon, TrashIcon, ArchiveBoxIcon, EyeIcon, FunnelIcon, NomenclatureIcon } from '../Icons';
+import { PlusIcon, PencilIcon, TrashIcon, ArchiveBoxIcon, EyeIcon, NomenclatureIcon } from '../Icons';
 import { Button } from '../shared/Button';
 import DataTable from '../shared/DataTable';
 
@@ -51,12 +51,6 @@ const StockItemList: React.FC = () => {
         density: '',
     });
 
-    // Keeping filters for server-side filtering as well
-    const [filters, setFilters] = useState({
-        categoryEnum: '' as StockItemCategory | '',
-        isActive: 'true',
-        search: '',
-    });
 
     const { showToast } = useToast();
     const { currentUser } = useAuth();  // RLS-STOCK-FE-010
@@ -67,28 +61,19 @@ const StockItemList: React.FC = () => {
     const loadData = useCallback(async () => {
         setLoading(true);
         try {
-            const filter: any = {};
-            if (filters.categoryEnum) filter.categoryEnum = filters.categoryEnum;
-            if (filters.isActive) filter.isActive = filters.isActive === 'true';
-            if (filters.search) filter.search = filters.search;
-
-            const data = await getStockItems(filter);
+            const data = await getStockItems({});
             setItems(data);
         } catch (err: any) {
             showToast('Ошибка загрузки: ' + err.message, 'error');
         } finally {
             setLoading(false);
         }
-    }, [filters, showToast]);
+    }, [showToast]);
 
     useEffect(() => {
         loadData();
     }, [loadData]);
 
-    const handleFilterChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-        const { name, value } = e.target;
-        setFilters(prev => ({ ...prev, [name]: value }));
-    };
 
     const openCreateModal = () => {
         setEditingItem(null);
@@ -183,12 +168,14 @@ const StockItemList: React.FC = () => {
             key: 'code',
             label: 'Код',
             sortable: true,
+            align: 'center' as const,
             render: (row: StockItem) => <span className="font-mono">{row.code || '—'}</span>
         },
         {
             key: 'name',
             label: 'Название',
             sortable: true,
+            align: 'center' as const,
             render: (row: StockItem) => (
                 <div className="font-medium text-gray-900 dark:text-white">
                     {row.name}
@@ -202,13 +189,15 @@ const StockItemList: React.FC = () => {
             key: 'categoryEnum',
             label: 'Категория',
             sortable: true,
+            align: 'center' as const,
             render: (row: StockItem) => row.categoryEnum ? CATEGORY_LABELS[row.categoryEnum] : row.category || '—'
         },
-        { key: 'unit', label: 'Ед. изм.', sortable: true },
+        { key: 'unit', label: 'Ед. изм.', sortable: true, align: 'center' as const },
         {
             key: 'balance',
             label: 'Остаток',
             sortable: true,
+            align: 'center' as const,
             render: (row: StockItem) => (
                 <span className={`font-bold ${Number(row.balance) < 0 ? 'text-red-600' : 'text-green-600'}`}>
                     {Number(row.balance).toLocaleString('ru-RU', { minimumFractionDigits: 2 })}
@@ -219,71 +208,24 @@ const StockItemList: React.FC = () => {
 
     return (
         <div className="p-0 space-y-6">
-            <div className="flex items-center gap-3 mb-2">
-                <NomenclatureIcon className="h-6 w-6 text-gray-600 dark:text-gray-400" />
-                <h3 className="text-xl font-semibold text-gray-800 dark:text-white">Номенклатура</h3>
-            </div>
-            {/* Filters */}
-            <div className="flex flex-wrap gap-4 items-center bg-gray-50 dark:bg-gray-800/50 p-4 rounded-xl border border-gray-100 dark:border-gray-700">
-                <div className="flex items-center gap-2 text-gray-500 text-sm font-medium mr-2">
-                    <FunnelIcon className="h-4 w-4" /> Фильтры:
+            <div className="flex justify-between items-center mb-6">
+                <div className="flex items-center gap-3">
+                    <NomenclatureIcon className="h-6 w-6 text-gray-600 dark:text-gray-400" />
+                    <h2 className="text-xl font-bold text-gray-900 dark:text-white tracking-tight">Номенклатура</h2>
+                    <span className="px-2.5 py-0.5 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 text-xs font-semibold">
+                        {items.length}
+                    </span>
                 </div>
-                <div className="min-w-[150px]">
-                    <select
-                        name="categoryEnum"
-                        value={filters.categoryEnum}
-                        onChange={handleFilterChange}
-                        className="w-full p-2 text-sm border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                    >
-                        <option value="">Все категории</option>
-                        {Object.entries(CATEGORY_LABELS).map(([key, label]) => (
-                            <option key={key} value={key}>{label}</option>
-                        ))}
-                    </select>
-                </div>
-                <div className="min-w-[150px]">
-                    <select
-                        name="isActive"
-                        value={filters.isActive}
-                        onChange={handleFilterChange}
-                        className="w-full p-2 text-sm border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                    >
-                        <option value="true">Активные</option>
-                        <option value="false">Архивные</option>
-                        <option value="">Все статусы</option>
-                    </select>
-                </div>
-                <div className="flex-1 min-w-[200px]">
-                    <input
-                        type="text"
-                        name="search"
-                        value={filters.search}
-                        onChange={handleFilterChange}
-                        placeholder="Поиск по названию или коду..."
-                        className="w-full p-2 text-sm border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                    />
-                </div>
-                <div className="flex items-center gap-2">
+                {/* RLS-STOCK-FE-010: Hide Add button for drivers */}
+                {!isDriver && (
                     <Button
-                        onClick={loadData}
-                        disabled={loading}
-                        variant="ghost"
-                        size="sm"
+                        onClick={openCreateModal}
+                        variant="primary"
+                        leftIcon={<PlusIcon className="w-5 h-5" />}
                     >
-                        Обновить
+                        Добавить номенклатуру
                     </Button>
-                    {/* RLS-STOCK-FE-010: Hide Add button for drivers */}
-                    {!isDriver && (
-                        <Button
-                            onClick={openCreateModal}
-                            variant="primary"
-                            size="sm"
-                            leftIcon={<PlusIcon className="w-4 h-4" />}
-                        >
-                            Добавить
-                        </Button>
-                    )}
-                </div>
+                )}
             </div>
 
             {/* Table */}
