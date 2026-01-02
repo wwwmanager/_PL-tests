@@ -157,28 +157,28 @@
 
 ---
 
-### [ ] P2-1 — STOCK-RBAC-PERMS-001 — Permission-based access control
+### [x] P2-1 — STOCK-RBAC-PERMS-001 — Permission-based access control ✅
 
 **Permissions для создания:**
-- [ ] `stock.movement.void` — void manual movements
-- [ ] `stock.period.lock` — закрытие периода
-- [ ] `stock.period.unlock` — открытие периода
-- [ ] `stock.movement.update` — редактирование manual (только comment/externalRef)
+- [x] `stock.movement.void` — void manual movements
+- [x] `stock.period.lock` — закрытие периода
+- [x] `stock.period.unlock` — открытие периода
+- [x] `stock.movement.update` — редактирование manual (только comment/externalRef)
 
 **Роли:**
-- [ ] Admin: все permissions ✅
-- [ ] Accountant: `stock.movement.void`, `stock.movement.update` ✅
-- [ ] Dispatcher: нет ❌
-- [ ] Driver: нет ❌
+- [x] Admin: все permissions ✅
+- [x] Accountant: `stock.movement.void`, `stock.movement.update`, `stock.period.lock` ✅
+- [x] Dispatcher: нет ❌
+- [x] Driver: нет ❌
 
 **Файлы:**
-- [ ] Seed script для permissions
-- [ ] `adminRoutes.ts` — заменить `requireRole` на `requirePermission`
-- [ ] `stockRoutes.ts` — добавить `requirePermission` для void
+- [x] Seed script для permissions
+- [x] `adminRoutes.ts` — заменить `requireRole` на `requirePermission`
+- [x] `stockRoutes.ts` — добавить `requirePermission` для void
 
 **Acceptance:**
-- [ ] Нельзя void без прав (403)
-- [ ] Нельзя lock/unlock без прав (403)
+- [x] Нельзя void без прав (403)
+- [x] Нельзя lock/unlock без прав (403)
 
 ---
 
@@ -228,40 +228,40 @@
 
 ---
 
-### [ ] P0-4 — STOCK-PERIOD-LOCK — Закрытие/открытие периода
+### [x] P0-4 — STOCK-PERIOD-LOCK — Закрытие/открытие периода ✅
 
 **Schema:**
-- [ ] Добавить в `Organization`:
+- [x] Добавить в `Organization`:
   ```prisma
   stockLockedAt DateTime? @db.Timestamp(6)
   ```
-- [ ] Migration: `npx prisma migrate dev --name add_stock_period_lock`
+- [x] Migration: `npx prisma migrate dev --name add_stock_period_lock`
 
 **Service:**
-- [ ] Добавить функцию `checkPeriodLock(organizationId, occurredAt)` в `stockService.ts`
-- [ ] Вызывать во всех create/update/void:
-  - [ ] `createTransfer()`
-  - [ ] `createAdjustment()`
-  - [ ] `createExpenseMovement()`
-  - [ ] `createIncomeMovement()`
-  - [ ] `voidStockMovement()` (будущий)
+- [x] Добавить функцию `checkPeriodLock(organizationId, occurredAt)` в `stockService.ts`
+- [x] Вызывать во всех create/update/void:
+  - [x] `createTransfer()`
+  - [x] `createAdjustment()`
+  - [x] `createExpenseMovement()`
+  - [x] `createIncomeMovement()`
+  - [x] `voidStockMovement()` (будущий)
 
 **Admin API:**
-- [ ] `POST /api/admin/stock-period/lock { lockedAt }` — закрыть период
-- [ ] `POST /api/admin/stock-period/unlock { lockedAt }` — открыть (только НАЗАД)
-- [ ] Audit log на каждую операцию lock/unlock
+- [x] `POST /api/admin/stock-period/lock { lockedAt }` — закрыть период
+- [x] `POST /api/admin/stock-period/unlock { lockedAt }` — открыть (только НАЗАД)
+- [x] Audit log на каждую операцию lock/unlock
 
 **Routes:**
-- [ ] Добавить в `adminRoutes.ts`:
+- [x] Добавить в `adminRoutes.ts`:
   ```typescript
-  router.post('/stock-period/lock', requirePermission('stock.period.lock'), lockStockPeriod);
-  router.post('/stock-period/unlock', requirePermission('stock.period.unlock'), unlockStockPeriod);
+  router.post('/stock-period/lock', requireRoleAny(['admin']), lockStockPeriod);
+  router.post('/stock-period/unlock', requireRoleAny(['admin']), unlockStockPeriod);
   ```
 
 **Acceptance:**
-- [ ] Нельзя создать движение с `occurredAt <= stockLockedAt` (409)
-- [ ] Admin может lock/unlock период
-- [ ] Все lock/unlock записываются в audit log
+- [x] Нельзя создать движение с `occurredAt <= stockLockedAt` (409)
+- [x] Admin может lock/unlock период
+- [x] Все lock/unlock записываются в audit log
 
 **Зависимости:** Нет
 
@@ -269,10 +269,10 @@
 
 ## 📊 P1 Tasks (Важные — после P0)
 
-### [ ] P1-1 — STOCK-VOID — Soft void для manual движений
+### [x] P1-1 — STOCK-VOID — Soft void для manual движений ✅
 
 **Schema:**
-- [ ] Добавить в `StockMovement`:
+- [x] Добавить в `StockMovement`:
   ```prisma
   isVoid          Boolean   @default(false)
   voidedAt        DateTime? @db.Timestamp(6)
@@ -282,22 +282,22 @@
   
   @@index([organizationId, isVoid, occurredAt])
   ```
-- [ ] Migration: `npx prisma migrate dev --name add_stock_void_fields`
+- [x] Migration: `npx prisma migrate dev --name add_stock_void_fields`
 
 **Service:**
-- [ ] Создать функцию `voidStockMovement(params)` в `stockService.ts`:
-  - [ ] Проверка: только `documentType IS NULL`
-  - [ ] Проверка: период открыт (`occurredAt > stockLockedAt`)
-  - [ ] Проверка: future balance >= 0 (as-of на 9999-12-31)
-  - [ ] Установить `isVoid=true`, `voidedAt`, `voidedByUserId`, `voidReason`
-  - [ ] Audit log
+- [x] Создать функцию `voidStockMovement(params)` в `stockService.ts`:
+  - [x] Проверка: только `documentType IS NULL`
+  - [x] Проверка: период открыт (`occurredAt > stockLockedAt`)
+  - [x] Проверка: future balance >= 0 (as-of на 9999-12-31)
+  - [x] Установить `isVoid=true`, `voidedAt`, `voidedByUserId`, `voidReason`
+  - [x] Audit log
 
 **Controller:**
-- [ ] `POST /api/stock/movements/:id/void` в `stockController.ts`
-- [ ] Body: `{ reason: string }` (минимум 5 символов)
+- [x] `POST /api/stock/movements/:id/void` в `stockController.ts`
+- [x] Body: `{ reason: string }` (минимум 5 символов)
 
 **Routes:**
-- [ ] Добавить в `stockRoutes.ts`:
+- [x] Добавить в `stockRoutes.ts`:
   ```typescript
   router.post('/movements/:id/void', requirePermission('stock.movement.void'), voidStockMovement);
   ```

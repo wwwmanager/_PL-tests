@@ -2,6 +2,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { resetDatabase, getDataPreview, selectiveDelete, importData, transferUser, transferOrganizationData, lockStockPeriod, unlockStockPeriod } from '../controllers/adminController';
 import { runRecalculation } from '../controllers/recalculationController';
 import { authMiddleware } from '../middleware/authMiddleware';
+import { checkPermission } from '../middleware/checkPermission';
 import { runFuelCardTopUps } from '../jobs/fuelCardTopUpJob';
 import { prisma } from '../db/prisma';
 
@@ -46,8 +47,8 @@ router.post('/transfer-user', authMiddleware, requireRole('admin'), transferUser
 router.post('/transfer-organization', authMiddleware, requireRole('admin'), transferOrganizationData);
 
 // P0-4: STOCK-PERIOD-LOCK - Lock/Unlock stock movements for organization
-router.post('/stock-period/lock', authMiddleware, requireRole('admin'), lockStockPeriod);
-router.post('/stock-period/unlock', authMiddleware, requireRole('admin'), unlockStockPeriod);
+router.post('/stock-period/lock', authMiddleware, checkPermission('stock.period.lock'), lockStockPeriod);
+router.post('/stock-period/unlock', authMiddleware, checkPermission('stock.period.unlock'), unlockStockPeriod);
 
 // POST /api/admin/recalculate - Helper for recalculating balances
 router.post('/recalculate', authMiddleware, requireRole('admin'), runRecalculation);

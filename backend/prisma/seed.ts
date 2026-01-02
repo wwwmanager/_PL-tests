@@ -62,6 +62,8 @@ async function main() {
         'import.run', 'import.limited', 'export.run',
         // Stock (BE-003: stock.manage needed for create-movement button)
         'stock.read', 'stock.create', 'stock.update', 'stock.delete', 'stock.manage',
+        // P2-1: Stock Ledger Permissions
+        'stock.movement.void', 'stock.period.lock', 'stock.period.unlock',
         // Vehicles
         'vehicle.view', 'vehicle.create', 'vehicle.update', 'vehicle.delete',
         // Drivers
@@ -97,7 +99,7 @@ async function main() {
         ],
         driver: ['waybill.create', 'waybill.submit', 'blanks.spoil.self'],
         reviewer: ['waybill.submit', 'audit.business.read', 'waybill.view'],
-        accountant: ['waybill.post', 'audit.business.read', 'export.run'],
+        accountant: ['waybill.post', 'audit.business.read', 'export.run', 'stock.movement.void', 'stock.period.lock'],
         auditor: ['audit.read', 'audit.diff', 'audit.business.read'],
         viewer: ['audit.read'],
     };

@@ -2,6 +2,7 @@
 import { Router } from 'express';
 import { authMiddleware } from '../middleware/authMiddleware';
 import { requireRoleAny } from '../middleware/requireRole';
+import { checkPermission } from '../middleware/checkPermission';
 import { validateDto } from '../middleware/validateDto';
 import { createMovementSchema } from '../dto/stockMovementDto';
 import {
@@ -38,7 +39,7 @@ router.get('/movements/v2', listMovementsV2);     // GET /api/stock/movements/v2
 router.post('/movements/v2', validateDto(createMovementSchema), createMovement);
 router.put('/movements/:id', updateStockMovement);// PUT /api/stock/movements/:id
 router.delete('/movements/:id', deleteStockMovement); // DELETE /api/stock/movements/:id
-router.post('/movements/:id/void', requireRoleAny(['admin', 'accountant']), voidStockMovementController); // P1-1: STOCK-VOID + RBAC
+router.post('/movements/:id/void', checkPermission('stock.movement.void'), voidStockMovementController); // P1-1: STOCK-VOID + RBAC
 
 // LEDGER-DOCS-BE-020: Storno API
 router.post('/documents/:documentType/:documentId/storno', requireRoleAny(['admin', 'accountant']), stornoDocument);
