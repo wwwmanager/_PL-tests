@@ -10,6 +10,7 @@ async function main() {
         { code: 'stock.movement.void', description: 'Permission to void manual stock movements' },
         { code: 'stock.period.lock', description: 'Permission to lock stock periods' },
         { code: 'stock.period.unlock', description: 'Permission to unlock stock periods' },
+        { code: 'waybill.update', description: 'Permission to update waybills (edit drafts)' },
     ];
 
     // 2. Upsert permissions
@@ -24,6 +25,14 @@ async function main() {
         });
         permissionMap.set(p.code, upserted.id);
         console.log(`   - ${p.code}: ${upserted.id}`);
+    }
+
+    // Fix: Fetch existing permissions needed for Driver
+    const existingPerms = await prisma.permission.findMany({
+        where: { code: { in: ['stock.read', 'stock.create', 'stock.update', 'stock.delete', 'stock.manage'] } }
+    });
+    for (const p of existingPerms) {
+        permissionMap.set(p.code, p.id);
     }
 
     // 3. Assign to Roles
@@ -62,6 +71,14 @@ async function main() {
     await assign('accountant', 'stock.movement.void');
     await assign('accountant', 'stock.period.lock');
     // Note: stock.period.unlock is for ADMIN only by default
+
+    // C. Assign Stock permissions to Driver (User Request)
+    await assign('driver', 'stock.read');
+    await assign('driver', 'stock.create');
+    await assign('driver', 'stock.update');
+    await assign('driver', 'waybill.update');
+
+    await assign('dispatcher', 'waybill.update');
 
     console.log('✅ Permissions updated successfully!');
 }

@@ -133,7 +133,7 @@ const AppContent: React.FC = () => {
           </button>
           <div className="flex items-center gap-4">
             <h1 className="text-xl font-semibold text-gray-800 dark:text-white hidden sm:block">
-              Waybill Management {!isDriverMode && <span className="ml-2 text-sm text-blue-600 font-normal">(Central Mode)</span>}
+              СИСТЕМА УПРАВЛЕНИЯ {!isDriverMode && <span className="ml-2 text-sm text-blue-600 font-normal">(Central Mode)</span>}
             </h1>
           </div>
           <div className="flex items-center gap-3">

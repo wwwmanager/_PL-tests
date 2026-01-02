@@ -169,7 +169,7 @@
 - [x] Admin: все permissions ✅
 - [x] Accountant: `stock.movement.void`, `stock.movement.update`, `stock.period.lock` ✅
 - [x] Dispatcher: нет ❌
-- [x] Driver: нет ❌
+- [x] Driver: `stock.create`, `stock.update`, `stock.read` (Added per request) ✅
 
 **Файлы:**
 - [x] Seed script для permissions

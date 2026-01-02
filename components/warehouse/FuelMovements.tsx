@@ -307,7 +307,7 @@ const FuelMovements: React.FC = () => {
                         Найдено записей: {total}
                     </span>
                 </div>
-                {can('stock.manage') && (
+                {can('stock.create') && (
                     <Button
                         data-testid="btn-create-movement"
                         onClick={() => setIsCreateModalOpen(true)}
@@ -339,14 +339,14 @@ const FuelMovements: React.FC = () => {
                             },
                             title: "Редактировать",
                             className: "text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20",
-                            show: () => can('stock.manage')
+                            show: () => can('stock.update')
                         },
                         {
                             icon: <TrashIcon className="h-4 w-4" />,
                             onClick: (row) => setMovementToDelete(row),
                             title: "Удалить",
                             className: "text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20",
-                            show: () => can('stock.manage')
+                            show: () => can('stock.delete') || can('stock.manage')
                         }
                     ]}
                 />

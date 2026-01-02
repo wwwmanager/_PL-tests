@@ -47,7 +47,7 @@ async function main() {
 
     const permissionCodes = [
         // Waybills
-        'waybill.read', 'waybill.create', 'waybill.submit', 'waybill.post', 'waybill.cancel',
+        'waybill.read', 'waybill.create', 'waybill.update', 'waybill.submit', 'waybill.post', 'waybill.cancel',
         'waybill.backdate', 'waybill.correct',
         // Blanks
         'blank.read', 'blank.create', 'blank.update', 'blanks.issue', 'blanks.return', 'blanks.spoil.self', 'blanks.spoil.warehouse',
@@ -88,7 +88,7 @@ async function main() {
     const rolePolicies: Record<string, string[]> = {
         admin: permissionCodes, // все права
         dispatcher: [
-            'waybill.read', 'waybill.create', 'waybill.submit', 'waybill.cancel',
+            'waybill.read', 'waybill.create', 'waybill.update', 'waybill.submit', 'waybill.cancel',
             'vehicle.view', 'vehicle.create', 'vehicle.update',
             'driver.view', 'driver.create', 'driver.update',
             'stock.read', 'blank.read', 'blank.create', 'blanks.issue', 'blanks.return',
@@ -97,7 +97,7 @@ async function main() {
             'blanks.issue', 'blanks.return', 'blanks.spoil.warehouse',
             'stock.read', 'stock.create', 'stock.update',
         ],
-        driver: ['waybill.create', 'waybill.submit', 'blanks.spoil.self'],
+        driver: ['waybill.create', 'waybill.update', 'waybill.submit', 'blanks.spoil.self', 'stock.read', 'stock.create', 'stock.update'],
         reviewer: ['waybill.submit', 'audit.business.read', 'waybill.view'],
         accountant: ['waybill.post', 'audit.business.read', 'export.run', 'stock.movement.void', 'stock.period.lock'],
         auditor: ['audit.read', 'audit.diff', 'audit.business.read'],
