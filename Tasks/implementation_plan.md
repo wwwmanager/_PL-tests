@@ -1,31 +1,53 @@
-# Implement Draft Fuel Reserve Display
+# Реализация расширенного экспорта данных через Бэкенд
 
-## Goal
-Display the amount of fuel reserved by other DRAFT waybills for the selected fuel card, to give the dispatcher a complete picture of available fuel.
+## Цель
+Реализовать "Расширенный экспорт данных" в Админ-панели, который повторяет функциональность и интерфейс "Выборочного удаления данных".
+Экспорт должен выполняться на стороне Бэкенда (совместимость с Central Mode) и позволять гранулярный выбор данных (Таблицы -> Категории -> Элементы).
 
-## Proposed Changes
+## Предлагаемые изменения
 
-### Backend
+### Бэкенд (Backend)
 
-#### [MODIFY] [fuelCardRoutes.ts](file:///c:/_PL-tests/backend/src/routes/fuelCardRoutes.ts)
-- [x] Add `GET /:id/reserve` endpoint.
+#### [MODIFY] [adminRoutes.ts](file:///c:/_PL-tests/backend/src/routes/adminRoutes.ts)
+- [x] Добавить маршрут `POST /export`, защищенный ролью `admin`.
 
-#### [MODIFY] [fuelCardService.ts](file:///c:/_PL-tests/backend/src/services/fuelCardService.ts)
-- [x] Implement `getDraftReserve(fuelCardId, excludeWaybillId)`:
-    - [x] Find all DRAFT waybills for this card.
-    - [x] Sum `fuelReceived` from their `WaybillFuel` lines.
+#### [MODIFY] [adminController.ts](file:///c:/_PL-tests/backend/src/controllers/adminController.ts)
+- [x] Реализовать контроллер `exportData(req, res)`.
+    -   Принимает `SelectiveExportRequest` (список таблиц, карта элементов).
+    -   Получает полные данные для выбранных сущностей из Prisma.
+    -   Формирует JSON "Export Bundle" (совместимый с `FormatVersion: 2`).
+    -   Возвращает JSON ответ.
+    -   Логика должна зеркально отражать `selectiveDelete`, но выбирать данные вместо удаления и форматировать их.
 
-### Frontend
+### Фронтенд (Frontend)
 
-#### [MODIFY] [fuelCardApi.ts](file:///c:/_PL-tests/services/api/fuelCardApi.ts)
-- [x] Add `getFuelCardReserve(id, excludeWaybillId)` method. (Implemented in `stockApi.ts`)
+#### [MODIFY] [adminApi.ts](file:///c:/_PL-tests/services/adminApi.ts)
+- [x] Добавить метод `exportData(request: SelectiveDeleteRequest): Promise<Blob>` (используя тип `SelectiveDeleteRequest` или похожую структуру).
 
-#### [MODIFY] [WaybillDetail.tsx](file:///c:/_PL-tests/components/waybills/WaybillDetail.tsx)
-- [x] Add `fuelCardReserved` state.
-- [x] Fetch reserve amount when fuel card is identified.
-- [x] Display: "Available: X (Reserved: Y)".
+#### [MODIFY] [DataExportModal.tsx](file:///c:/_PL-tests/components/admin/DataExportModal.tsx)
+- [x] Рефакторинг для использования `getDataPreview()` для загрузки дерева данных (вместо `loadJSON`).
+- [x] Адоптировать структуру `CATEGORIES` и маппинг из `DataDeletionModal.tsx` (или использовать совместно, если возможно, но дублирование безопаснее, чтобы не сломать удаление).
+- [x] Реализовать логику выбора (Категории/Таблицы/Элементы), идентичную `DataDeletionModal`.
+- [x] Заменить действие "Export" на вызов `adminApi.exportData` и инициирование скачивания файла.
 
-## Verification
-- [x] Create a DRAFT waybill with 50L.
-- [x] Open a new waybill with same driver/card.
-- [x] Verify "Reserved: 50.00 л" is displayed.
+#### [MODIFY] [Admin.tsx](file:///c:/_PL-tests/components/admin/Admin.tsx)
+- [x] Убедиться, что в `DataExportModal` передаются правильные пропсы (если изменятся).
+- [x] (Опционально) Обновить "Export All" для использования бэкенд-эндпоинта.
+
+## План проверки (Verification Plan)
+
+### Автоматизированные тесты
+- Запустить `npm run test` для проверки регрессий в компонентах Админки.
+
+### Ручная проверка
+1.  **Открыть Админ-панель**: Настройки -> Экспорт.
+2.  **Открыть Расширенный экспорт**: Нажать кнопку "Export..." (убедиться, что открывается новое модальное окно).
+3.  **Проверка UI**: Проверить аккордеоны (Документы, Справочники и т.д.), чтобы они визуально совпадали с "Очисткой данных".
+4.  **Выбор**: Выбрать конкретные элементы (например, 2 путевых листа, 1 организацию).
+5.  **Экспорт**: Нажать "Export Selected".
+6.  **Проверка файла**: Открыть скачанный JSON.
+    -   Проверить структуру (`meta`, `data`).
+    -   Проверить, что присутствуют только выбранные элементы.
+    -   Проверить целостность данных.
+7.  **Выбрать все**: Выбрать целую категорию (например, Справочники).
+8.  **Экспорт и проверка**: Убедиться, что все справочники попали в JSON.

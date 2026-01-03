@@ -1,14 +1,18 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { XIcon, DownloadIcon, ArrowDownIcon, ArrowUpIcon } from '../Icons';
 import { useToast } from '../../hooks/useToast';
-import { loadJSON } from '../../services/storage';
+import { getDataPreview, exportData, DataPreviewResponse, TablePreview } from '../../services/adminApi';
 
-// Category configuration - same structure as DataDeletionModal
+interface DataExportModalProps {
+    isOpen: boolean;
+    onClose: () => void;
+}
+
 interface CategoryConfig {
     key: string;
     label: string;
     icon: string;
-    tables: { key: string; label: string; dbKey?: string }[];
+    tables: { key: string; label: string }[];
 }
 
 const CATEGORIES: CategoryConfig[] = [
@@ -18,8 +22,8 @@ const CATEGORIES: CategoryConfig[] = [
         icon: '📄',
         tables: [
             { key: 'waybills', label: 'Путевые листы' },
-            { key: 'waybillBlanks', label: 'Бланки' },
-            { key: 'waybillBlankBatches', label: 'Партии бланков' }
+            { key: 'blanks', label: 'Бланки' },
+            { key: 'blankBatches', label: 'Партии бланков' }
         ]
     },
     {
@@ -29,10 +33,12 @@ const CATEGORIES: CategoryConfig[] = [
         tables: [
             { key: 'organizations', label: 'Организации' },
             { key: 'employees', label: 'Сотрудники' },
+            { key: 'drivers', label: 'Водители' },
             { key: 'vehicles', label: 'Транспортные средства' },
-            { key: 'savedRoutes', label: 'Маршруты' },
+            { key: 'routes', label: 'Маршруты' },
             { key: 'fuelTypes', label: 'Типы топлива' },
-            { key: 'fuelCards', label: 'Топливные карты' }
+            { key: 'fuelCards', label: 'Топливные карты' },
+            { key: 'warehouses', label: 'Склады' }
         ]
     },
     {
@@ -40,8 +46,8 @@ const CATEGORIES: CategoryConfig[] = [
         label: 'Склад',
         icon: '📦',
         tables: [
-            { key: 'garageStockItems', label: 'Номенклатура' },
-            { key: 'stockTransactions', label: 'Операции склада' }
+            { key: 'stockItems', label: 'Номенклатура' },
+            { key: 'stockMovements', label: 'Движения' }
         ]
     },
     {
@@ -49,173 +55,68 @@ const CATEGORIES: CategoryConfig[] = [
         label: 'Настройки',
         icon: '⚙️',
         tables: [
-            { key: 'seasonSettings', label: 'Сезонные настройки' },
-            { key: 'printPositions_v4_layout', label: 'Позиции печати' },
-            { key: 'appSettings', label: 'Общие настройки' }
+            { key: 'departments', label: 'Подразделения' },
+            { key: 'settings', label: 'Системные настройки' }
+        ]
+    },
+    {
+        key: 'logs',
+        label: 'Журналы',
+        icon: '📋',
+        tables: [
+            { key: 'auditLogs', label: 'Аудит' }
         ]
     }
 ];
 
-interface ExportItem {
-    id: string;
-    label: string;
-    subLabel?: string;
-    data: any;
-}
-
-interface TableExportData {
-    key: string;
-    items: ExportItem[];
-    totalCount: number;
-}
-
-interface DataExportModalProps {
-    isOpen: boolean;
-    onClose: () => void;
-    onExport: (selectedData: Record<string, any[]>) => void;
-}
-
 type SelectionState = Record<string, Record<string, Set<string>>>;
 
-// Helper to extract entity ID field
-function getEntityIdField(items: any[]): string {
-    if (!items?.length) return 'id';
-    const first = items[0];
-    if (first?.id) return 'id';
-    if (first?.code) return 'code';
-    if (first?.key) return 'key';
-    return 'id';
-}
-
-// Helper to create label for an item
-function makeItemLabel(item: any, tableKey: string): { label: string; subLabel?: string } {
-    if (!item) return { label: 'Unknown' };
-
-    switch (tableKey) {
-        case 'waybills':
-            return {
-                label: item.number || item.id,
-                subLabel: item.date ? new Date(item.date).toLocaleDateString('ru-RU') : undefined
-            };
-        case 'employees':
-            return {
-                label: item.fullName || item.name || item.id,
-                subLabel: item.position
-            };
-        case 'vehicles':
-            return {
-                label: item.registrationNumber || item.code || item.id,
-                subLabel: `${item.brand || ''} ${item.model || ''}`.trim() || undefined
-            };
-        case 'organizations':
-            return {
-                label: item.shortName || item.name || item.id,
-                subLabel: item.inn
-            };
-        case 'fuelTypes':
-            return {
-                label: item.name || item.code,
-                subLabel: item.code
-            };
-        case 'savedRoutes':
-            return {
-                label: item.name || item.id
-            };
-        case 'fuelCards':
-            return {
-                label: item.cardNumber || item.id,
-                subLabel: item.provider
-            };
-        case 'garageStockItems':
-            return {
-                label: item.name || item.code,
-                subLabel: item.unit
-            };
-        default:
-            return {
-                label: item.name || item.fullName || item.number || item.code || item.id || JSON.stringify(item).slice(0, 50)
-            };
-    }
-}
-
-const DataExportModal: React.FC<DataExportModalProps> = ({ isOpen, onClose, onExport }) => {
+const DataExportModal: React.FC<DataExportModalProps> = ({ isOpen, onClose }) => {
     const { showToast } = useToast();
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
     const [exporting, setExporting] = useState(false);
+    const [preview, setPreview] = useState<DataPreviewResponse | null>(null);
     const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
     const [expandedTables, setExpandedTables] = useState<Set<string>>(new Set());
     const [selection, setSelection] = useState<SelectionState>({});
-    const [tableData, setTableData] = useState<Record<string, Record<string, TableExportData>>>({});
 
-    // Load data from storage and initialize state
+    // Load data preview
     useEffect(() => {
-        if (!isOpen) {
-            setLoading(false);
-            return;
-        }
-
-        setLoading(true);
-
-        const loadData = async () => {
-            const newTableData: Record<string, Record<string, TableExportData>> = {};
-            const newSelection: SelectionState = {};
-
-            // Initialize all categories
-            for (const category of CATEGORIES) {
-                newTableData[category.key] = {};
-                newSelection[category.key] = {};
-
-                for (const table of category.tables) {
-                    const data = await loadJSON<any[]>(table.key, null);
-
-                    if (!data || !Array.isArray(data) || data.length === 0) {
-                        newTableData[category.key][table.key] = {
-                            key: table.key,
-                            items: [],
-                            totalCount: 0
-                        };
-                        newSelection[category.key][table.key] = new Set();
-                        continue;
-                    }
-
-                    const items: ExportItem[] = [];
-                    const idField = getEntityIdField(data);
-
-                    data.forEach((item, index) => {
-                        if (!item || typeof item !== 'object') return;
-                        const id = item?.[idField] || `item-${index}`;
-                        const { label, subLabel } = makeItemLabel(item, table.key);
-                        items.push({ id: String(id), label, subLabel, data: item });
+        if (isOpen) {
+            setLoading(true);
+            setError(null);
+            getDataPreview()
+                .then((data) => {
+                    setPreview(data);
+                    // Initialize selection with all items selected by default
+                    const initialSelection: SelectionState = {};
+                    CATEGORIES.forEach(cat => {
+                        initialSelection[cat.key] = {};
+                        cat.tables.forEach(table => {
+                            const tableData = (data as any)[cat.key]?.[table.key] as TablePreview | undefined;
+                            if (tableData?.items) {
+                                initialSelection[cat.key][table.key] = new Set(tableData.items.map(i => i.id));
+                            } else {
+                                initialSelection[cat.key][table.key] = new Set();
+                            }
+                        });
                     });
+                    setSelection(initialSelection);
+                })
+                .catch((err) => {
+                    console.error('Failed to load preview:', err);
+                    setError(err instanceof Error ? err.message : 'Ошибка загрузки данных');
+                    showToast('Ошибка загрузки данных. Попробуйте перелогиниться.', 'error');
+                })
+                .finally(() => setLoading(false));
+        }
+    }, [isOpen, showToast]);
 
-                    newTableData[category.key][table.key] = {
-                        key: table.key,
-                        items,
-                        totalCount: items.length
-                    };
-
-                    // Select all items by default
-                    newSelection[category.key][table.key] = new Set(items.map(i => i.id));
-                }
-            }
-
-            // Also load any "other" keys not in categories
-            // This could be expanded to dynamically discover all storage keys
-
-            setTableData(newTableData);
-            setSelection(newSelection);
-            setLoading(false);
-        };
-
-        loadData().catch(err => {
-            console.error('Failed to load export data:', err);
-            setLoading(false);
-        });
-    }, [isOpen]);
-
-    // Get table items
-    const getTableItems = (categoryKey: string, tableKey: string): ExportItem[] => {
-        return tableData[categoryKey]?.[tableKey]?.items || [];
+    // Get table data from preview
+    const getTableData = (categoryKey: string, tableKey: string): TablePreview | null => {
+        if (!preview) return null;
+        return (preview as any)[categoryKey]?.[tableKey] || null;
     };
 
     // Calculate selected count for a table
@@ -223,29 +124,27 @@ const DataExportModal: React.FC<DataExportModalProps> = ({ isOpen, onClose, onEx
         return selection[categoryKey]?.[tableKey]?.size || 0;
     };
 
-    // Calculate total count for a table
-    const getTableTotalCount = (categoryKey: string, tableKey: string): number => {
-        return tableData[categoryKey]?.[tableKey]?.items?.length || 0;
-    };
-
     // Calculate selected count for a category
     const getCategorySelectedCount = (categoryKey: string): number => {
-        const catData = tableData[categoryKey];
-        if (!catData) return 0;
-        return Object.keys(catData).reduce((sum, tableKey) => sum + getTableSelectedCount(categoryKey, tableKey), 0);
+        const category = CATEGORIES.find(c => c.key === categoryKey);
+        if (!category) return 0;
+        return category.tables.reduce((sum, table) => sum + getTableSelectedCount(categoryKey, table.key), 0);
     };
 
     // Calculate total count for a category
     const getCategoryTotalCount = (categoryKey: string): number => {
-        const catData = tableData[categoryKey];
-        if (!catData) return 0;
-        return Object.keys(catData).reduce((sum, tableKey) => sum + getTableTotalCount(categoryKey, tableKey), 0);
+        const category = CATEGORIES.find(c => c.key === categoryKey);
+        if (!category) return 0;
+        return category.tables.reduce((sum, table) => {
+            const data = getTableData(categoryKey, table.key);
+            return sum + (data?.count || 0);
+        }, 0);
     };
 
     // Total selected count
     const totalSelected = useMemo(() => {
         return CATEGORIES.reduce((sum, cat) => sum + getCategorySelectedCount(cat.key), 0);
-    }, [selection, tableData]);
+    }, [selection]);
 
     // Toggle category expansion
     const toggleCategory = (categoryKey: string) => {
@@ -275,8 +174,8 @@ const DataExportModal: React.FC<DataExportModalProps> = ({ isOpen, onClose, onEx
 
     // Toggle entire category selection
     const toggleCategorySelection = (categoryKey: string) => {
-        const catData = tableData[categoryKey];
-        if (!catData) return;
+        const category = CATEGORIES.find(c => c.key === categoryKey);
+        if (!category) return;
 
         const currentCount = getCategorySelectedCount(categoryKey);
         const totalCount = getCategoryTotalCount(categoryKey);
@@ -285,12 +184,12 @@ const DataExportModal: React.FC<DataExportModalProps> = ({ isOpen, onClose, onEx
         setSelection(prev => {
             const next = { ...prev };
             next[categoryKey] = { ...next[categoryKey] };
-            Object.keys(catData).forEach(tableKey => {
-                const items = getTableItems(categoryKey, tableKey);
-                if (shouldSelect) {
-                    next[categoryKey][tableKey] = new Set(items.map(i => i.id));
+            category.tables.forEach(table => {
+                const tableData = getTableData(categoryKey, table.key);
+                if (shouldSelect && tableData?.items) {
+                    next[categoryKey][table.key] = new Set(tableData.items.map(i => i.id));
                 } else {
-                    next[categoryKey][tableKey] = new Set();
+                    next[categoryKey][table.key] = new Set();
                 }
             });
             return next;
@@ -299,15 +198,17 @@ const DataExportModal: React.FC<DataExportModalProps> = ({ isOpen, onClose, onEx
 
     // Toggle entire table selection
     const toggleTableSelection = (categoryKey: string, tableKey: string) => {
-        const items = getTableItems(categoryKey, tableKey);
+        const tableData = getTableData(categoryKey, tableKey);
+        if (!tableData) return;
+
         const currentCount = getTableSelectedCount(categoryKey, tableKey);
-        const shouldSelect = currentCount < items.length;
+        const shouldSelect = currentCount < tableData.count;
 
         setSelection(prev => {
             const next = { ...prev };
             next[categoryKey] = { ...next[categoryKey] };
-            if (shouldSelect) {
-                next[categoryKey][tableKey] = new Set(items.map(i => i.id));
+            if (shouldSelect && tableData.items) {
+                next[categoryKey][tableKey] = new Set(tableData.items.map(i => i.id));
             } else {
                 next[categoryKey][tableKey] = new Set();
             }
@@ -337,26 +238,37 @@ const DataExportModal: React.FC<DataExportModalProps> = ({ isOpen, onClose, onEx
 
         setExporting(true);
         try {
-            // Build selected data map
-            const selectedData: Record<string, any[]> = {};
+            // Build items map for export
+            const items: Record<string, string[]> = {};
+            const tables: string[] = [];
 
             CATEGORIES.forEach(cat => {
-                Object.keys(tableData[cat.key] || {}).forEach(tableKey => {
-                    const selectedIds = selection[cat.key]?.[tableKey];
-                    if (!selectedIds?.size) return;
-
-                    const items = getTableItems(cat.key, tableKey);
-                    const selectedItems = items
-                        .filter(item => selectedIds.has(item.id))
-                        .map(item => item.data);
-
-                    if (selectedItems.length > 0) {
-                        selectedData[tableKey] = selectedItems;
+                cat.tables.forEach(table => {
+                    const selectedIds = Array.from(selection[cat.key]?.[table.key] || []);
+                    if (selectedIds.length > 0) {
+                        const tableData = getTableData(cat.key, table.key);
+                        // If all items are selected, we can optimization by passing table name (backend supports it)
+                        // But verifying exact count is safer. 
+                        // Let's just pass IDs for granular control to be safe.
+                        items[table.key] = selectedIds;
                     }
                 });
             });
 
-            await onExport(selectedData);
+            const data = await exportData({ items });
+            const jsonString = JSON.stringify(data, null, 2);
+            const blob = new Blob([jsonString], { type: 'application/json' });
+
+            // Create download link
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `data-export-${new Date().toISOString().split('T')[0]}.json`;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+
             showToast(`Экспортировано записей: ${totalSelected}`, 'success');
             onClose();
         } catch (err) {
@@ -371,7 +283,7 @@ const DataExportModal: React.FC<DataExportModalProps> = ({ isOpen, onClose, onEx
 
     return (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-3xl max-h-[85vh] overflow-hidden flex flex-col">
                 {/* Header */}
                 <div className="flex items-center justify-between p-4 border-b dark:border-gray-700">
                     <div className="flex items-center gap-2">
@@ -395,6 +307,11 @@ const DataExportModal: React.FC<DataExportModalProps> = ({ isOpen, onClose, onEx
                         <div className="flex items-center justify-center py-12">
                             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-500"></div>
                             <span className="ml-3 text-gray-500">Загрузка данных...</span>
+                        </div>
+                    ) : error ? (
+                        <div className="flex flex-col items-center justify-center py-12 text-center">
+                            <div className="text-red-500 text-lg font-medium mb-2">Ошибка загрузки</div>
+                            <div className="text-gray-500 mb-4">{error}</div>
                         </div>
                     ) : (
                         <div className="space-y-2">
@@ -442,25 +359,24 @@ const DataExportModal: React.FC<DataExportModalProps> = ({ isOpen, onClose, onEx
                                         </div>
 
                                         {/* Category Tables */}
-                                        {isExpanded && tableData[category.key] && (
+                                        {isExpanded && (
                                             <div className="border-t dark:border-gray-700">
-                                                {Object.entries(tableData[category.key]).map(([tableKey, tableInfo]) => {
-                                                    const items = tableInfo.items;
-                                                    const tableCount = items.length;
-                                                    const tableSelectedCount = getTableSelectedCount(category.key, tableKey);
-                                                    const isTableExpanded = expandedTables.has(tableKey);
+                                                {category.tables.map(table => {
+                                                    const tableData = getTableData(category.key, table.key);
+                                                    const tableCount = tableData?.count || 0;
+                                                    const tableSelectedCount = getTableSelectedCount(category.key, table.key);
+                                                    const isTableExpanded = expandedTables.has(table.key);
                                                     const isTableFullySelected = tableSelectedCount === tableCount && tableCount > 0;
                                                     const isTablePartiallySelected = tableSelectedCount > 0 && tableSelectedCount < tableCount;
-                                                    const tableLabel = category.tables.find(t => t.key === tableKey)?.label || tableKey;
 
                                                     if (tableCount === 0) return null;
 
                                                     return (
-                                                        <div key={tableKey} className="border-t dark:border-gray-600 first:border-t-0">
+                                                        <div key={table.key} className="border-t dark:border-gray-600 first:border-t-0">
                                                             {/* Table Header */}
                                                             <div
                                                                 className="flex items-center gap-3 p-3 pl-10 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/30"
-                                                                onClick={() => toggleTable(tableKey)}
+                                                                onClick={() => toggleTable(table.key)}
                                                             >
                                                                 {isTableExpanded ? (
                                                                     <ArrowDownIcon className="h-4 w-4 text-gray-400" />
@@ -475,13 +391,13 @@ const DataExportModal: React.FC<DataExportModalProps> = ({ isOpen, onClose, onEx
                                                                     }}
                                                                     onChange={(e) => {
                                                                         e.stopPropagation();
-                                                                        toggleTableSelection(category.key, tableKey);
+                                                                        toggleTableSelection(category.key, table.key);
                                                                     }}
                                                                     onClick={e => e.stopPropagation()}
                                                                     className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
                                                                 />
                                                                 <span className="text-gray-700 dark:text-gray-200 flex-1">
-                                                                    {tableLabel}
+                                                                    {table.label}
                                                                 </span>
                                                                 <span className="text-sm text-gray-500">
                                                                     {tableSelectedCount} / {tableCount}
@@ -489,10 +405,10 @@ const DataExportModal: React.FC<DataExportModalProps> = ({ isOpen, onClose, onEx
                                                             </div>
 
                                                             {/* Table Items */}
-                                                            {isTableExpanded && items.length > 0 && (
+                                                            {isTableExpanded && tableData?.items && (
                                                                 <div className="bg-gray-50 dark:bg-gray-800/50 max-h-48 overflow-auto">
-                                                                    {items.map(item => {
-                                                                        const isSelected = selection[category.key]?.[tableKey]?.has(item.id) || false;
+                                                                    {tableData.items.map(item => {
+                                                                        const isSelected = selection[category.key]?.[table.key]?.has(item.id) || false;
                                                                         return (
                                                                             <label
                                                                                 key={item.id}
@@ -501,7 +417,7 @@ const DataExportModal: React.FC<DataExportModalProps> = ({ isOpen, onClose, onEx
                                                                                 <input
                                                                                     type="checkbox"
                                                                                     checked={isSelected}
-                                                                                    onChange={() => toggleItemSelection(category.key, tableKey, item.id)}
+                                                                                    onChange={() => toggleItemSelection(category.key, table.key, item.id)}
                                                                                     className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
                                                                                 />
                                                                                 <span className="text-sm text-gray-700 dark:text-gray-300">

@@ -16,8 +16,13 @@
     - **Status:** Completed. Added columns to `VehicleList`.
 
 # Data Management
-- [ ] **EXPORT-DATA:** Implement Advanced Data Export (Grouping, Specific Selection) <!-- id: 8 -->
-    - **Plan:** Refactor `DataExportModal.tsx` to use Backend APIs. Integrate into `Admin.tsx`.
+- [x] **EXPORT-DATA**: Advanced Data Export (Selective) <!-- id: 4 -->
+    - [x] Backend: Update `adminController.ts` to support selective export (by ID list)
+    - [x] Backend: Add `POST /api/admin/export` route
+    - [x] Frontend: Add `exportData` to `adminApi.ts`
+    - [x] Frontend: Update `DataExportModal.tsx` to use new API and matching UI
+    - [x] Frontend: Update `Admin.tsx` integration
+- [ ] **IMPORT-DATA**: Advanced Data Import (Selective) <!-- id: 5 -->
 
     
 # UI Enhancement: Dictionary Icons

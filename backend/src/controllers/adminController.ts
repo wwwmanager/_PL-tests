@@ -606,6 +606,144 @@ interface ImportResult {
     errors: string[];
 }
 
+interface ExportDataRequest {
+    tables?: string[];  // Export entire tables
+    items?: Record<string, string[]>;  // Export specific items by table
+}
+
+/**
+ * Export selected data from the database
+ * Returns a JSON bundle compatible with importData
+ */
+export const exportData = async (req: Request, res: Response) => {
+    const userId = (req as any).user?.id;
+    const { tables, items } = req.body as ExportDataRequest;
+
+    logger.info({ userId, tables, itemsCount: items ? Object.keys(items).length : 0 }, 'Export data requested');
+
+    try {
+        const exportBundle: Record<string, any[]> = {};
+        const meta = {
+            version: '2.0',
+            exportedAt: new Date().toISOString(),
+            exportedBy: userId,
+            source: 'admin-export'
+        };
+
+        // Helper to export table
+        const exportTable = async (tableName: string, ids?: string[]) => {
+            const whereClause = ids ? { id: { in: ids } } : {};
+
+            // Special handling for settings (key is id)
+            if (tableName === 'settings' && ids) {
+                // @ts-ignore
+                whereClause.key = { in: ids };
+                // @ts-ignore
+                delete whereClause.id;
+            }
+
+            switch (tableName) {
+                case 'organizations':
+                    exportBundle.organizations = await prisma.organization.findMany({ where: whereClause });
+                    break;
+                case 'employees':
+                    exportBundle.employees = await prisma.employee.findMany({ where: whereClause });
+                    break;
+                case 'drivers':
+                    // Drivers need their employee data if we want to be thorough, but usually just driver table
+                    exportBundle.drivers = await prisma.driver.findMany({ where: whereClause });
+                    break;
+                case 'vehicles':
+                    exportBundle.vehicles = await prisma.vehicle.findMany({ where: whereClause });
+                    break;
+                case 'routes':
+                    exportBundle.routes = await prisma.route.findMany({ where: whereClause });
+                    break;
+                case 'fuelTypes':
+                    exportBundle.fuelTypes = await prisma.fuelType.findMany({ where: whereClause });
+                    break;
+                case 'fuelCards':
+                    exportBundle.fuelCards = await prisma.fuelCard.findMany({ where: whereClause });
+                    break;
+                case 'warehouses':
+                    exportBundle.warehouses = await prisma.warehouse.findMany({ where: whereClause });
+                    break;
+                case 'stockItems':
+                    exportBundle.stockItems = await prisma.stockItem.findMany({ where: whereClause });
+                    break;
+                case 'stockMovements':
+                    exportBundle.stockMovements = await prisma.stockMovement.findMany({ where: whereClause });
+                    break;
+                case 'waybills':
+                    exportBundle.waybills = await prisma.waybill.findMany({
+                        where: whereClause,
+                        include: {
+                            routes: true,
+                            fuelLines: true
+                        }
+                    });
+                    break;
+                case 'blanks':
+                    exportBundle.blanks = await prisma.blank.findMany({ where: whereClause });
+                    break;
+                case 'blankBatches':
+                    exportBundle.blankBatches = await prisma.blankBatch.findMany({ where: whereClause });
+                    break;
+                case 'departments':
+                    exportBundle.departments = await prisma.department.findMany({ where: whereClause });
+                    break;
+                case 'settings':
+                    // @ts-ignore - Dynamic key usage
+                    exportBundle.settings = await prisma.setting.findMany({ where: whereClause });
+                    break;
+                case 'auditLogs':
+                    exportBundle.auditLogs = await prisma.auditLog.findMany({ where: whereClause });
+                    break;
+            }
+        };
+
+        const allTables = [
+            'organizations', 'employees', 'drivers', 'vehicles', 'routes',
+            'fuelTypes', 'fuelCards', 'warehouses', 'stockItems', 'stockMovements',
+            'waybills', 'blanks', 'blankBatches', 'departments', 'settings', 'auditLogs'
+        ];
+
+        // 1. Export entire tables
+        if (tables && tables.length > 0) {
+            for (const table of tables) {
+                await exportTable(table);
+            }
+        }
+
+        // 2. Export specific items
+        if (items) {
+            for (const [table, ids] of Object.entries(items)) {
+                // If table was already fully exported, skip
+                if (tables?.includes(table)) continue;
+
+                if (ids && ids.length > 0) {
+                    await exportTable(table, ids);
+                }
+            }
+        }
+
+        // If no selection, nothing is exported in data, just meta
+
+        res.json({
+            meta,
+            data: exportBundle
+        });
+
+    } catch (error) {
+        logger.error({ error, userId }, 'Export failed');
+        res.status(500).json({
+            success: false,
+            message: 'Failed to export data',
+            error: error instanceof Error ? error.message : 'Unknown error'
+        });
+    }
+};
+
 /**
  * Import JSON data into PostgreSQL database
  * Supports upsert logic (create new or update existing by ID)

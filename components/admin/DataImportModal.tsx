@@ -28,10 +28,12 @@ const CATEGORIES: CategoryConfig[] = [
         tables: [
             { key: 'organizations', label: 'Организации' },
             { key: 'employees', label: 'Сотрудники' },
+            { key: 'drivers', label: 'Водители' },
             { key: 'vehicles', label: 'Транспортные средства' },
             { key: 'routes', label: 'Маршруты', dbKey: 'savedRoutes' },
             { key: 'fuelTypes', label: 'Типы топлива' },
-            { key: 'fuelCards', label: 'Топливные карты' }
+            { key: 'fuelCards', label: 'Топливные карты' },
+            { key: 'warehouses', label: 'Склады' }
         ]
     },
     {
@@ -40,7 +42,8 @@ const CATEGORIES: CategoryConfig[] = [
         icon: '📦',
         tables: [
             { key: 'stockItems', label: 'Номенклатура', dbKey: 'garageStockItems' },
-            { key: 'stockTransactions', label: 'Операции склада' }
+            { key: 'stockTransactions', label: 'Операции склада' },
+            { key: 'stockMovements', label: 'Движения склада', dbKey: 'stockTransactions' }
         ]
     },
     {
@@ -48,8 +51,19 @@ const CATEGORIES: CategoryConfig[] = [
         label: 'Настройки',
         icon: '⚙️',
         tables: [
+            { key: 'departments', label: 'Подразделения' },
+            { key: 'settings', label: 'Системные настройки' },
             { key: 'seasonSettings', label: 'Сезонные настройки' },
             { key: 'printPositions_v4_layout', label: 'Позиции печати' }
+        ]
+    },
+    {
+        key: 'logs',
+        label: 'Журналы',
+        icon: '📋',
+        tables: [
+            { key: 'auditLogs', label: 'Аудит' },
+            { key: 'import_audit_log', label: 'Журнал импорта' }
         ]
     }
 ];

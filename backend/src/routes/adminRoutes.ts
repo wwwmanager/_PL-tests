@@ -1,5 +1,5 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import { resetDatabase, getDataPreview, selectiveDelete, importData, transferUser, transferOrganizationData, lockStockPeriod, unlockStockPeriod } from '../controllers/adminController';
+import { resetDatabase, getDataPreview, selectiveDelete, exportData, importData, transferUser, transferOrganizationData, lockStockPeriod, unlockStockPeriod } from '../controllers/adminController';
 import { runRecalculation } from '../controllers/recalculationController';
 import { authMiddleware } from '../middleware/authMiddleware';
 import { checkPermission } from '../middleware/checkPermission';
@@ -33,6 +33,9 @@ router.get('/data-preview', authMiddleware, requireRole('admin'), getDataPreview
 
 // POST /api/admin/selective-delete - Delete selected data
 router.post('/selective-delete', authMiddleware, requireRole('admin'), selectiveDelete);
+
+// POST /api/admin/export - Export selected data
+router.post('/export', authMiddleware, requireRole('admin'), exportData);
 
 // POST /api/admin/import - Import JSON data into database
 router.post('/import', authMiddleware, requireRole('admin'), importData);

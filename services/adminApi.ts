@@ -63,6 +63,14 @@ export async function getDataPreview(): Promise<DataPreviewResponse> {
 }
 
 /**
+ * Export selected data
+ * Returns a Blob (file download)
+ */
+export async function exportData(request: SelectiveDeleteRequest): Promise<any> {
+    return httpClient.post<any>('/admin/export', request);
+}
+
+/**
  * Selectively delete data from specified tables or items
  */
 export async function selectiveDelete(request: SelectiveDeleteRequest): Promise<SelectiveDeleteResponse> {

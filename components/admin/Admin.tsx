@@ -1361,11 +1361,6 @@ const Admin: React.FC = () => {
           <DataExportModal
             isOpen={showExportModal}
             onClose={() => setShowExportModal(false)}
-            onExport={(selectedData) => {
-              // Convert selectedData to keys for legacy handleExportConfirm
-              const keys = Object.keys(selectedData);
-              handleExportConfirm(keys, selectedData);
-            }}
           />
         )}
       </React.Suspense>
