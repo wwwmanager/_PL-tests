@@ -14,6 +14,11 @@
     - **Fix:** Enriched backend `getBalancesAt` to return responsible driver/employee. Updated frontend to use it.
 - [x] **ADD-VEHICLE-COLUMNS:** Add 'Mileage' and 'Current Balance' columns to Vehicle Dictionary <!-- id: 7 -->
     - **Status:** Completed. Added columns to `VehicleList`.
+
+# Data Management
+- [ ] **EXPORT-DATA:** Implement Advanced Data Export (Grouping, Specific Selection) <!-- id: 8 -->
+    - **Plan:** Refactor `DataExportModal.tsx` to use Backend APIs. Integrate into `Admin.tsx`.
+
     
 # UI Enhancement: Dictionary Icons
 - [x] Add icons to all dictionary headers [x]
