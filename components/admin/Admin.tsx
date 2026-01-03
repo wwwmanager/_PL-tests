@@ -654,22 +654,22 @@ const ImportPreviewModal: React.FC<{ bundle: ExportBundle; policy: ImportPolicy;
 export const AppSettingsComponent: React.FC = () => {
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const { showToast } = useToast();
-  const { can } = useAuth();
+  const { can, refreshSettings } = useAuth(); // APP-MODE-001: Get refreshSettings
 
   useEffect(() => {
     getAppSettings().then(setSettings);
   }, []);
 
-  const handleSettingChange = (key: keyof AppSettings, value: boolean | AppMode) => {
+  const handleSettingChange = async (key: keyof AppSettings, value: boolean | AppMode) => {
     if (!settings) return;
     const newSettings = { ...settings, [key]: value };
     setSettings(newSettings);
-    saveAppSettings(newSettings).then(() => {
-      showToast('Настройки сохранены.', 'success');
-    });
+    await saveAppSettings(newSettings);
+    await refreshSettings(); // APP-MODE-001: Update AuthContext so header reflects new mode
+    showToast('Настройки сохранены.', 'success');
   };
 
-  const handleBlanksSettingChange = (key: keyof NonNullable<AppSettings['blanks']>, value: boolean) => {
+  const handleBlanksSettingChange = async (key: keyof NonNullable<AppSettings['blanks']>, value: boolean) => {
     if (!settings) return;
     const newSettings = {
       ...settings,
@@ -679,9 +679,9 @@ export const AppSettingsComponent: React.FC = () => {
       }
     };
     setSettings(newSettings);
-    saveAppSettings(newSettings).then(() => {
-      showToast('Настройки сохранены.', 'success');
-    });
+    await saveAppSettings(newSettings);
+    await refreshSettings(); // APP-MODE-001: Sync with AuthContext
+    showToast('Настройки сохранены.', 'success');
   };
 
   if (!can('admin.panel')) {

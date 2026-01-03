@@ -608,6 +608,7 @@ export interface LocationBalance {
   stockItemName: string;
   balance: number;
   unit: string;
+  responsiblePersonName?: string;
 }
 
 /**

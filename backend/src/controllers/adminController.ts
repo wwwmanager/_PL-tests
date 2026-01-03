@@ -77,7 +77,7 @@ export const getDataPreview = async (req: Request, res: Response) => {
             prisma.fuelCard.findMany({ select: { id: true, cardNumber: true, provider: true } }),
             prisma.warehouse.findMany({ select: { id: true, name: true, address: true } }),
             prisma.stockItem.findMany({ select: { id: true, code: true, name: true, unit: true } }),
-            prisma.stockMovement.findMany({ select: { id: true, movementType: true, quantity: true, createdAt: true }, take: 100 }),
+            prisma.stockMovement.findMany({ select: { id: true, movementType: true, quantity: true, createdAt: true } }),
             prisma.department.findMany({ select: { id: true, code: true, name: true } }),
             prisma.setting.findMany({ select: { key: true } }),
             prisma.auditLog.findMany({ select: { id: true, actionType: true, entityType: true, createdAt: true }, take: 100, orderBy: { createdAt: 'desc' } }),

@@ -127,7 +127,7 @@ export async function getDraftReserve(user: AuthUser, fuelCardId: string, exclud
  */
 export async function calculateRealBalance(organizationId: string, fuelCardId: string): Promise<number> {
     const location = await prisma.stockLocation.findFirst({
-        where: { organizationId, fuelCardId },
+        where: { fuelCardId },
     });
 
     if (!location) return 0;

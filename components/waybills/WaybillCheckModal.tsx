@@ -141,12 +141,15 @@ const WaybillCheckModal: React.FC<WaybillCheckModalProps> = ({ isOpen, onClose, 
         const waybillMethod = mapLegacyMethod(rawMethod) as FuelCalculationMethod;
 
         // Calculate using unified service
+        // WB-CHECK-007: Don't pass odometerDistanceKm for BOILER method
+        // This ensures consumption is calculated from routes (same as batch loading)
+        // For MIXED method, we still need odometerDistanceKm as it's part of the formula
         const calcResult = calculatePlannedFuelByMethod({
           method: waybillMethod,
           routes: currentWaybill.routes || [],
           vehicleRates: rates,
           seasonSettings,
-          odometerDistanceKm: odometerDistance,
+          odometerDistanceKm: waybillMethod === 'MIXED' ? odometerDistance : undefined,
           baseDate: currentWaybill.date,
           dayMode: 'multi',
         });

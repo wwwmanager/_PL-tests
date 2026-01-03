@@ -168,6 +168,22 @@ export const VehicleList: React.FC = () => {
         { key: 'brand', label: 'Марка и модель', sortable: true, align: 'center' },
         { key: 'driverName', label: 'Водитель', sortable: true, align: 'center' },
         {
+            key: 'mileage',
+            label: 'Пробег, км',
+            sortable: true,
+            align: 'center',
+            render: (v) => v.mileage?.toLocaleString('ru-RU')
+        },
+        {
+            key: 'currentFuel',
+            label: 'Текущий остаток, л',
+            sortable: true,
+            align: 'center',
+            render: (v) => v.currentFuel !== undefined && v.currentFuel !== null
+                ? v.currentFuel.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                : '-'
+        },
+        {
             key: 'status',
             label: 'Статус',
             sortable: true,

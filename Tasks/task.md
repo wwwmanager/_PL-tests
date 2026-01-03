@@ -1,3 +1,20 @@
+# BUGFIX-SPRINT-2026-01-03: Fuel Balance & UI Corrections
+- [/] **WB-CORRECTION-BALANCES**: Fix currentFuel not recalculating from ledger on WB correction
+    - [x] Backend: Change `waybillService.ts` to execute STORNO -> Recalculate Ledger -> Update Vehicle
+    - [/] Verify fix with user after restart
+- [x] **UI-BUG-001**: Fuel Card Balance in Employee List
+    - [x] `EmployeeList.tsx`: Fetch `getFuelCardsForDriver` for each driver or update `getEmployees` API (Fixed in `fuelCardService` by fixing `calculateRealBalance`)
+- [x] **UI-BUG-002**: Vehicle Tank Visibility in Location Balances
+    - [x] Backend: Check `getBalancesAt` filtering logic (is 0 balance hidden?) (Fixed: Added child orgs lookup)
+    - [x] Backend: Ensure `VEHICLE_TANK` locations are correctly queried
+
+- [x] **INVESTIGATE-001:** Investigate why "manual zeroing" of vehicle tank is not reflected in balances <!-- id: 5 -->
+    - **Outcome:** User edited Vehicle card directly (currentFuel=0) instead of creating Ledger Movement. Balance correct at 38.60.
+- [x] **FIX-RESPONSIBLE-PERSON:** Fix missing Responsible Person for Fuel Cards in Location Balances Journal <!-- id: 6 -->
+    - **Fix:** Enriched backend `getBalancesAt` to return responsible driver/employee. Updated frontend to use it.
+- [x] **ADD-VEHICLE-COLUMNS:** Add 'Mileage' and 'Current Balance' columns to Vehicle Dictionary <!-- id: 7 -->
+    - **Status:** Completed. Added columns to `VehicleList`.
+    
 # UI Enhancement: Dictionary Icons
 - [x] Add icons to all dictionary headers [x]
     - [x] Icons.tsx: Add new SVGs [x]

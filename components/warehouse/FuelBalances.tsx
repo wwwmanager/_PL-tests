@@ -73,32 +73,18 @@ const FuelBalances: React.FC = () => {
         loadData();
     }, [loadData]);
 
-    const getDriverForLocation = useCallback((locationId: string, type: string) => {
-        if (type !== 'VEHICLE_TANK') return null;
 
-        const loc = locations.find(l => l.id === locationId);
-        if (!loc || !loc.vehicleId) return null;
-
-        const vehicle = vehicles.find(v => v.id === loc.vehicleId);
-        if (!vehicle || !vehicle.assignedDriver) return null;
-
-        return vehicle.assignedDriver.fullName;
-    }, [locations, vehicles]);
 
     const filteredBalances = useMemo(() => {
         return balances.filter(b => {
             const matchItem = !filters.stockItemId || b.stockItemId === filters.stockItemId;
             const matchType = !filters.locationType || b.locationType === filters.locationType;
             return matchItem && matchType;
-        }).map(b => {
-            // Enrich with driver name for DataTable filtering/sorting
-            const driverName = getDriverForLocation(b.locationId, b.locationType);
-            return {
-                ...b,
-                driver: driverName || ''
-            };
-        });
-    }, [balances, filters, getDriverForLocation]);
+        }).map(b => ({
+            ...b,
+            driver: b.responsiblePersonName || ''
+        }));
+    }, [balances, filters]);
 
     const handleFilterChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value } = e.target;

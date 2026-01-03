@@ -203,6 +203,7 @@ export interface LocationBalance {
     stockItemName: string;
     unit: string;
     balance: number;
+    responsiblePersonName?: string;
 }
 
 /**
@@ -223,32 +224,62 @@ export async function getBalancesAt(
         return [];
     }
 
-    // Получаем все активные локации организации
+    // REL-701: Include locations from this org AND all child orgs
+    const childOrgs = await prisma.organization.findMany({
+        where: { parentOrganizationId: organizationId },
+        select: { id: true }
+    });
+    const orgIds = [organizationId, ...childOrgs.map(o => o.id)];
+
+    // Получаем все активные локации организации (включая дочерние)
     const locations = await prisma.stockLocation.findMany({
         where: {
-            organizationId,
+            organizationId: { in: orgIds },
             isActive: true,
         },
-        select: {
-            id: true,
-            name: true,
-            type: true,
-        },
+        include: {
+            vehicle: {
+                include: { assignedDriver: true }
+            },
+            fuelCard: {
+                include: {
+                    assignedToDriver: {
+                        include: { employee: true }
+                    }
+                }
+            },
+            warehouse: {
+                include: { responsibleEmployee: true }
+            }
+        }
     });
 
-    console.log(`[getBalancesAt] Found ${locations.length} active locations for org ${organizationId}`);
+    console.log(`[getBalancesAt] Found ${locations.length} active locations for org ${organizationId} (and ${childOrgs.length} children)`);
 
     // Параллельно считаем баланс каждой локации
     const balances = await Promise.all(
-        locations.map(async (loc) => ({
-            locationId: loc.id,
-            locationName: loc.name,
-            locationType: loc.type,
-            stockItemId, // Add stockItemId for frontend filtering
-            stockItemName: stockItem.name,
-            unit: stockItem.unit,
-            balance: await getBalanceAt(loc.id, stockItemId, asOf),
-        }))
+        locations.map(async (loc) => {
+            // Determine responsible person
+            let responsiblePersonName: string | undefined;
+            if (loc.type === 'VEHICLE_TANK' && loc.vehicle?.assignedDriver) {
+                responsiblePersonName = loc.vehicle.assignedDriver.fullName;
+            } else if (loc.type === 'FUEL_CARD' && loc.fuelCard?.assignedToDriver?.employee) {
+                responsiblePersonName = loc.fuelCard.assignedToDriver.employee.fullName;
+            } else if (loc.type === 'WAREHOUSE' && loc.warehouse?.responsibleEmployee) {
+                responsiblePersonName = loc.warehouse.responsibleEmployee.fullName;
+            }
+
+            return {
+                locationId: loc.id,
+                locationName: loc.name,
+                locationType: loc.type,
+                stockItemId,
+                stockItemName: stockItem.name,
+                unit: stockItem.unit,
+                balance: await getBalanceAt(loc.id, stockItemId, asOf),
+                responsiblePersonName
+            };
+        })
     );
 
     // Filter out locations with 0 balance to reduce noise

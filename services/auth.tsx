@@ -34,6 +34,7 @@ type AuthContextValue = {
   allCaps: Capability[];
   rolePolicies: Record<Role, Capability[]>;
   refreshPolicies: () => Promise<void>;
+  refreshSettings: () => Promise<void>; // APP-MODE-001: Refresh appSettings after changes
 };
 const CURRENT_USER_KEY = '__current_user__';
 const TOKEN_KEY = '__auth_token__';
@@ -135,6 +136,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const fetchPolicies = useCallback(async () => {
     const policies = await roleApi.getRolePolicies();
     setRolePolicies(policies);
+  }, []);
+
+  // APP-MODE-001: Function to refresh appSettings after changes
+  const refreshSettings = useCallback(async () => {
+    try {
+      const settings = await getAppSettings();
+      setAppSettings(settings);
+    } catch (e) {
+      console.error('Failed to refresh app settings:', e);
+    }
   }, []);
 
   // AUTH-002: Register session expired handler on mount
@@ -297,6 +308,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     allCaps: ALL_CAPS,
     rolePolicies,
     refreshPolicies: fetchPolicies,
+    refreshSettings, // APP-MODE-001: Expose refreshSettings
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
