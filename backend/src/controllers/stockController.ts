@@ -4,6 +4,61 @@ import { PrismaClient, StockMovementType } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
+// ==================== STOCK LOCATIONS ====================
+
+export async function listStockLocations(req: Request, res: Response, next: NextFunction) {
+    try {
+        if (!req.user) {
+            return res.status(401).json({ error: 'Unauthorized' });
+        }
+        const organizationId = req.user.organizationId;
+
+        // Fetch all implementation locations
+        const [warehouses, vehicles, fuelCards] = await Promise.all([
+            prisma.warehouse.findMany({
+                where: { organizationId },
+                include: { stockLocation: true }
+            }),
+            prisma.vehicle.findMany({
+                where: { organizationId },
+                include: { stockLocation: true }
+            }),
+            prisma.fuelCard.findMany({
+                where: { organizationId, isActive: true },
+                include: { stockLocation: true }
+            })
+        ]);
+
+        // Map to unified StockLocation type
+        const locations = [
+            ...warehouses.map(w => ({
+                id: w.stockLocation?.id || w.id, // Fallback to entity ID if stockLocation missing (should exist)
+                name: w.name,
+                type: 'WAREHOUSE',
+                address: w.address,
+                entityId: w.id
+            })),
+            ...vehicles.map(v => ({
+                id: v.stockLocation?.id || v.id,
+                name: `${v.brand} ${v.model} (${v.registrationNumber})`,
+                type: 'VEHICLE_TANK',
+                entityId: v.id
+            })),
+            ...fuelCards.map(fc => ({
+                id: fc.stockLocation?.id || fc.id,
+                name: `ТК ${fc.cardNumber} (${fc.provider})`,
+                type: 'FUEL_CARD',
+                entityId: fc.id
+            }))
+        ];
+
+        res.json({ data: locations });
+    } catch (err) {
+        console.error('[listStockLocations] Error:', err);
+        next(err);
+    }
+}
+
 // ==================== STOCK ITEMS ====================
 
 export async function listStockItems(req: Request, res: Response, next: NextFunction) {

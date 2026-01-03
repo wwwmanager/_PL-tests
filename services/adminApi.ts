@@ -89,11 +89,20 @@ export async function resetDatabase(): Promise<ResetDatabaseResponse> {
 export interface ImportDataRequest {
     organizations?: any[];
     employees?: any[];
+    drivers?: any[];
     vehicles?: any[];
     fuelTypes?: any[];
     routes?: any[];
     waybills?: any[];
     fuelCards?: any[];
+    warehouses?: any[];
+    stockItems?: any[];
+    stockMovements?: any[];
+    blanks?: any[];
+    blankBatches?: any[];
+    departments?: any[];
+    settings?: any[];
+    auditLogs?: any[];
 }
 
 export interface ImportResult {

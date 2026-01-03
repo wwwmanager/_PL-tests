@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, StockLocationType } from '@prisma/client';
 import { logger } from '../utils/logger';
+import { v4 as uuidv4 } from 'uuid';
 
 const prisma = new PrismaClient();
 
@@ -592,11 +593,20 @@ export const resetDatabase = async (req: Request, res: Response) => {
 interface ImportDataRequest {
     organizations?: any[];
     employees?: any[];
+    drivers?: any[];
     vehicles?: any[];
     fuelTypes?: any[];
     routes?: any[];
     waybills?: any[];
     fuelCards?: any[];
+    warehouses?: any[];
+    stockItems?: any[];
+    stockMovements?: any[];
+    blanks?: any[];
+    blankBatches?: any[];
+    departments?: any[];
+    settings?: any[];
+    auditLogs?: any[];
 }
 
 interface ImportResult {
@@ -753,6 +763,12 @@ export const importData = async (req: Request, res: Response) => {
     const organizationId = (req as any).user?.organizationId;
     const data: ImportDataRequest = req.body;
 
+    // Backward compatibility mapping for keys sent by frontend
+    data.blanks = data.blanks || (data as any).waybillBlanks;
+    data.blankBatches = data.blankBatches || (data as any).waybillBlankBatches;
+    data.stockItems = data.stockItems || (data as any).garageStockItems;
+    data.stockMovements = data.stockMovements || (data as any).stockTransactions;
+
     logger.info({ userId, keys: Object.keys(data) }, 'Import data requested');
 
     // Helper: validate UUID format
@@ -767,7 +783,7 @@ export const importData = async (req: Request, res: Response) => {
     const getOrCreateUuid = (originalId: string): string => {
         if (isValidUuid(originalId)) return originalId;
         if (idMap[originalId]) return idMap[originalId];
-        const newId = crypto.randomUUID();
+        const newId = uuidv4();
         idMap[originalId] = newId;
         return newId;
     };
@@ -777,11 +793,39 @@ export const importData = async (req: Request, res: Response) => {
     try {
         // 1. Import Organizations
         if (data.organizations?.length) {
+            // Pre-fetch existing organizations for smart matching
+            const existingOrgs = await prisma.organization.findMany({});
+            const orgByInn = new Map(existingOrgs.filter(o => o.inn).map(o => [o.inn, o]));
+            const orgByName = new Map(existingOrgs.filter(o => o.name).map(o => [o.name!.toLowerCase().trim(), o]));
+            const orgByShortName = new Map(existingOrgs.filter(o => o.shortName).map(o => [o.shortName!.toLowerCase().trim(), o]));
+
             const result: ImportResult = { table: 'organizations', created: 0, updated: 0, errors: [] };
             for (const org of data.organizations) {
                 try {
-                    const orgId = getOrCreateUuid(org.id);
+                    // Smart match logic:
+                    // 1. Check INN (strongest match)
+                    // 2. Check Name (exact match case-insensitive)
+                    // 3. Check ShortName
+                    // 4. Default to standard UUID mapping
+                    let matchedOrgId: string | undefined;
+
+                    if (org.inn && orgByInn.has(org.inn)) {
+                        matchedOrgId = orgByInn.get(org.inn)!.id;
+                    } else if (org.name && orgByName.has(org.name.toLowerCase().trim())) {
+                        matchedOrgId = orgByName.get(org.name.toLowerCase().trim())!.id;
+                    } else if (org.shortName && orgByShortName.has(org.shortName.toLowerCase().trim())) {
+                        matchedOrgId = orgByShortName.get(org.shortName.toLowerCase().trim())!.id;
+                    }
+
+                    // Pre-populate idMap if we found a match
+                    if (matchedOrgId) {
+                        idMap[org.id] = matchedOrgId;
+                    }
+
+                    const orgId = getOrCreateUuid(org.id); // Will use mapped ID if set above
+
                     const existing = await prisma.organization.findUnique({ where: { id: orgId } });
+
                     if (existing) {
                         await prisma.organization.update({
                             where: { id: orgId },
@@ -799,6 +843,10 @@ export const importData = async (req: Request, res: Response) => {
                                 bankBik: org.bankBik,
                                 bankAccount: org.bankAccount,
                                 correspondentAccount: org.correspondentAccount,
+                                parentOrganizationId: org.parentOrganizationId ? getOrCreateUuid(org.parentOrganizationId) : undefined,
+                                group: org.group, // Added
+                                medicalLicenseNumber: org.medicalLicenseNumber, // Added
+                                medicalLicenseIssueDate: org.medicalLicenseIssueDate, // Added
                             }
                         });
                         result.updated++;
@@ -819,6 +867,10 @@ export const importData = async (req: Request, res: Response) => {
                                 bankBik: org.bankBik,
                                 bankAccount: org.bankAccount,
                                 correspondentAccount: org.correspondentAccount,
+                                parentOrganizationId: org.parentOrganizationId ? getOrCreateUuid(org.parentOrganizationId) : undefined,
+                                group: org.group, // Added (Medical Institution Group)
+                                medicalLicenseNumber: org.medicalLicenseNumber, // Added
+                                medicalLicenseIssueDate: org.medicalLicenseIssueDate, // Added
                             }
                         });
                         result.created++;
@@ -896,6 +948,44 @@ export const importData = async (req: Request, res: Response) => {
             results.push(result);
         }
 
+        // 3.5. Import Departments (must be before employees/users)
+        if (data.departments?.length) {
+            const result: ImportResult = { table: 'departments', created: 0, updated: 0, errors: [] };
+            for (const dept of data.departments) {
+                try {
+                    const deptId = getOrCreateUuid(dept.id);
+                    const deptOrgId = dept.organizationId ? getOrCreateUuid(dept.organizationId) : organizationId;
+
+                    const existing = await prisma.department.findUnique({ where: { id: deptId } });
+                    if (existing) {
+                        await prisma.department.update({
+                            where: { id: deptId },
+                            data: {
+                                name: dept.name,
+                                code: dept.code,
+                                address: dept.address
+                            }
+                        });
+                        result.updated++;
+                    } else {
+                        await prisma.department.create({
+                            data: {
+                                id: deptId,
+                                organizationId: deptOrgId,
+                                name: dept.name,
+                                code: dept.code || undefined,
+                                address: dept.address
+                            }
+                        });
+                        result.created++;
+                    }
+                } catch (e: any) {
+                    result.errors.push(`Department ${dept.id}: ${e.message}`);
+                }
+            }
+            results.push(result);
+        }
+
         // 4. Import Employees (must be before drivers)
         if (data.employees?.length) {
             const result: ImportResult = { table: 'employees', created: 0, updated: 0, errors: [] };
@@ -903,18 +993,38 @@ export const importData = async (req: Request, res: Response) => {
                 try {
                     // Resolve IDs - generate UUID if needed, map organizationId
                     const empId = getOrCreateUuid(emp.id);
-                    const empOrgId = emp.organizationId ? getOrCreateUuid(emp.organizationId) : organizationId;
+                    // Force import to current organization to avoid split data
+                    const empOrgId = organizationId;
 
                     const existing = await prisma.employee.findUnique({ where: { id: empId } });
                     if (existing) {
                         await prisma.employee.update({
                             where: { id: empId },
                             data: {
+                                organizationId: empOrgId, // Adopt to correct org
                                 fullName: emp.fullName,
+                                shortName: emp.shortName, // Added
+                                personnelNumber: emp.personnelNumber, // Added
+                                snils: emp.snils, // Added
+                                address: emp.address, // Added
                                 position: emp.position,
                                 phone: emp.phone,
                                 email: emp.email,
                                 dateOfBirth: emp.birthDate || emp.dateOfBirth || undefined,
+                                notes: emp.notes, // Added
+                                // Driver License fields
+                                licenseCategory: emp.licenseCategory, // Added
+                                documentNumber: emp.documentNumber, // Added
+                                documentExpiry: emp.documentExpiry, // Added
+                                // Medical Certificate fields
+                                medicalCertificateSeries: emp.medicalCertificateSeries, // Added
+                                medicalCertificateNumber: emp.medicalCertificateNumber, // Added
+                                medicalCertificateIssueDate: emp.medicalCertificateIssueDate, // Added
+                                medicalCertificateExpiryDate: emp.medicalCertificateExpiryDate, // Added
+                                // Relational fields
+                                dispatcherId: emp.dispatcherId ? getOrCreateUuid(emp.dispatcherId) : undefined,
+                                controllerId: emp.controllerId ? getOrCreateUuid(emp.controllerId) : undefined,
+                                medicalInstitutionId: emp.medicalInstitutionId ? getOrCreateUuid(emp.medicalInstitutionId) : undefined,
                             }
                         });
                         result.updated++;
@@ -924,10 +1034,28 @@ export const importData = async (req: Request, res: Response) => {
                                 id: empId,
                                 organizationId: empOrgId,
                                 fullName: emp.fullName,
+                                shortName: emp.shortName, // Added
+                                personnelNumber: emp.personnelNumber, // Added
+                                snils: emp.snils, // Added
+                                address: emp.address, // Added
                                 position: emp.position,
                                 phone: emp.phone,
                                 email: emp.email,
                                 dateOfBirth: emp.birthDate || emp.dateOfBirth || undefined,
+                                notes: emp.notes, // Added
+                                // Driver License fields (often stored on Employee too for reference)
+                                licenseCategory: emp.licenseCategory, // Added
+                                documentNumber: emp.documentNumber, // Added
+                                documentExpiry: emp.documentExpiry, // Added
+                                // Medical Certificate fields
+                                medicalCertificateSeries: emp.medicalCertificateSeries, // Added
+                                medicalCertificateNumber: emp.medicalCertificateNumber, // Added
+                                medicalCertificateIssueDate: emp.medicalCertificateIssueDate, // Added
+                                medicalCertificateExpiryDate: emp.medicalCertificateExpiryDate, // Added
+                                // Relational fields
+                                dispatcherId: emp.dispatcherId ? getOrCreateUuid(emp.dispatcherId) : undefined,
+                                controllerId: emp.controllerId ? getOrCreateUuid(emp.controllerId) : undefined,
+                                medicalInstitutionId: emp.medicalInstitutionId ? getOrCreateUuid(emp.medicalInstitutionId) : undefined,
                             }
                         });
                         result.created++;
@@ -939,26 +1067,150 @@ export const importData = async (req: Request, res: Response) => {
             results.push(result);
         }
 
-        // 5. Import Vehicles
+
+        // 4.5. Import Drivers (must be after employees)
+        if (data.drivers?.length) {
+            const result: ImportResult = { table: 'drivers', created: 0, updated: 0, errors: [] };
+            for (const drv of data.drivers) {
+                try {
+                    // Driver needs an existing Employee
+                    const drvId = getOrCreateUuid(drv.id);
+                    const empId = getOrCreateUuid(drv.employeeId);
+
+                    // Verify employee exists (it should, as we imported employees above)
+                    // If not, we might fail foreign key constraint. relying on order.
+
+                    const existing = await prisma.driver.findUnique({ where: { id: drvId } });
+                    if (existing) {
+                        await prisma.driver.update({
+                            where: { id: drvId },
+                            data: {
+                                employeeId: empId,
+                                licenseNumber: drv.licenseNumber,
+                                licenseCategory: drv.licenseCategory,
+                                licenseValidTo: drv.licenseValidTo ? new Date(drv.licenseValidTo) : undefined
+                            }
+                        });
+                        result.updated++;
+                    } else {
+                        await prisma.driver.create({
+                            data: {
+                                id: drvId,
+                                employeeId: empId,
+                                licenseNumber: drv.licenseNumber,
+                                licenseCategory: drv.licenseCategory,
+                                licenseValidTo: drv.licenseValidTo ? new Date(drv.licenseValidTo) : undefined
+                            }
+                        });
+                        result.created++;
+                    }
+                } catch (e: any) {
+                    result.errors.push(`Driver ${drv.id}: ${e.message}`);
+                }
+            }
+            results.push(result);
+        }
+
+        // 5. Import Stock Items (moved up needed for vehicles)
+        if (data.stockItems?.length) {
+            const result: ImportResult = { table: 'stockItems', created: 0, updated: 0, errors: [] };
+            for (const item of data.stockItems) {
+                try {
+                    const itemId = getOrCreateUuid(item.id);
+                    // Force import to current organization
+                    const itemOrgId = organizationId;
+
+                    let existing = await prisma.stockItem.findUnique({ where: { id: itemId } });
+
+                    // Soft match by Name + Org if not found by ID to prevent Unique Constraint violation
+                    if (!existing && item.name) {
+                        const duplicate = await prisma.stockItem.findFirst({
+                            where: {
+                                organizationId: itemOrgId,
+                                name: item.name
+                            }
+                        });
+                        if (duplicate) {
+                            existing = duplicate;
+                            // Map the import ID to the existing ID to preserve relationships
+                            idMap[item.id] = duplicate.id;
+                        }
+                    }
+                    // Map enum if needed, or use existing
+                    let categoryEnum = item.categoryEnum;
+                    if (!categoryEnum && item.category) {
+                        categoryEnum = ['FUEL', 'MATERIAL', 'SPARE_PART', 'SERVICE', 'OTHER'].includes(item.category)
+                            ? item.category
+                            : 'OTHER';
+                    }
+
+                    const dataPayload = {
+                        name: item.name,
+                        code: item.code,
+                        unit: item.unit,
+                        categoryEnum: categoryEnum,
+                        isFuel: !!item.isFuel,
+                        density: item.density,
+                        balance: item.balance !== undefined ? item.balance : 0
+                    };
+
+                    if (existing) {
+                        await prisma.stockItem.update({
+                            where: { id: itemId },
+                            data: {
+                                organizationId: itemOrgId, // Adopt
+                                ...dataPayload
+                            }
+                        });
+                        result.updated++;
+                    } else {
+                        await prisma.stockItem.create({
+                            data: {
+                                id: itemId,
+                                organizationId: itemOrgId,
+                                ...dataPayload
+                            }
+                        });
+                        result.created++;
+                    }
+                } catch (e: any) {
+                    result.errors.push(`StockItem ${item.id}: ${e.message}`);
+                }
+            }
+            results.push(result);
+        }
+
+        // 5.1. Import Vehicles
         if (data.vehicles?.length) {
             const result: ImportResult = { table: 'vehicles', created: 0, updated: 0, errors: [] };
             for (const veh of data.vehicles) {
                 try {
                     const vehId = getOrCreateUuid(veh.id);
-                    const vehOrgId = veh.organizationId ? getOrCreateUuid(veh.organizationId) : organizationId;
+                    // Force import to current organization
+                    const vehOrgId = organizationId;
 
                     const existing = await prisma.vehicle.findUnique({ where: { id: vehId } });
                     if (existing) {
                         await prisma.vehicle.update({
                             where: { id: vehId },
                             data: {
+                                organizationId: vehOrgId, // Adopt
                                 code: veh.code,
                                 registrationNumber: veh.registrationNumber,
                                 brand: veh.brand,
                                 model: veh.model,
                                 vin: veh.vin,
                                 fuelType: veh.fuelType,
+                                fuelStockItemId: veh.fuelStockItemId ? getOrCreateUuid(veh.fuelStockItemId) : undefined, // REL-200
                                 fuelTankCapacity: veh.fuelTankCapacity,
+                                currentFuel: veh.currentFuel !== undefined ? veh.currentFuel : 0, // Added
+                                mileage: veh.mileage, // Added
+                                year: veh.year, // Added
+                                vehicleType: veh.vehicleType || veh.type, // Added
+                                assignedDriverId: veh.assignedDriverId ? getOrCreateUuid(veh.assignedDriverId) : undefined, // Added
+                                fuelConsumptionRates: veh.fuelConsumptionRates ?? undefined, // Added
+                                useCityModifier: !!veh.useCityModifier, // Added
+                                useWarmingModifier: !!veh.useWarmingModifier, // Added
                             }
                         });
                         result.updated++;
@@ -973,11 +1225,49 @@ export const importData = async (req: Request, res: Response) => {
                                 model: veh.model,
                                 vin: veh.vin,
                                 fuelType: veh.fuelType,
+                                fuelStockItemId: veh.fuelStockItemId ? getOrCreateUuid(veh.fuelStockItemId) : undefined, // REL-200
                                 fuelTankCapacity: veh.fuelTankCapacity,
+                                currentFuel: veh.currentFuel !== undefined ? veh.currentFuel : 0, // Added
+                                mileage: veh.mileage, // Added
+                                year: veh.year, // Added
+                                vehicleType: veh.vehicleType || veh.type, // Added
+                                assignedDriverId: veh.assignedDriverId ? getOrCreateUuid(veh.assignedDriverId) : undefined, // Added
+                                fuelConsumptionRates: veh.fuelConsumptionRates ?? undefined, // Added
+                                useCityModifier: !!veh.useCityModifier, // Added
+                                useWarmingModifier: !!veh.useWarmingModifier, // Added
                             }
                         });
                         result.created++;
                     }
+
+                    // Create/Ensure StockLocation for this Vehicle
+                    const existingLoc = await prisma.stockLocation.findUnique({
+                        where: { vehicleId: vehId }
+                    });
+
+                    const vehName = `${veh.brand} ${veh.model} (${veh.registrationNumber})`;
+
+                    if (!existingLoc) {
+                        try {
+                            await prisma.stockLocation.create({
+                                data: {
+                                    organizationId: vehOrgId,
+                                    type: StockLocationType.VEHICLE_TANK,
+                                    name: vehName,
+                                    vehicleId: vehId,
+                                    isActive: true
+                                }
+                            });
+                        } catch (locErr) {
+                            logger.warn({ error: locErr, vehicleId: vehId }, 'Failed to create StockLocation for Vehicle');
+                        }
+                    } else {
+                        await prisma.stockLocation.update({
+                            where: { id: existingLoc.id },
+                            data: { name: vehName }
+                        });
+                    }
+
                 } catch (e: any) {
                     result.errors.push(`Vehicle ${veh.id}: ${e.message}`);
                 }
@@ -991,15 +1281,19 @@ export const importData = async (req: Request, res: Response) => {
             for (const fc of data.fuelCards) {
                 try {
                     const fcId = getOrCreateUuid(fc.id);
-                    const fcOrgId = fc.organizationId ? getOrCreateUuid(fc.organizationId) : organizationId;
+                    // Force import to current organization
+                    const fcOrgId = organizationId;
 
                     const existing = await prisma.fuelCard.findUnique({ where: { id: fcId } });
                     if (existing) {
                         await prisma.fuelCard.update({
                             where: { id: fcId },
                             data: {
+                                organizationId: fcOrgId, // Adopt
                                 cardNumber: fc.cardNumber,
                                 provider: fc.provider,
+                                assignedToDriverId: (fc.assignedToDriverId || fc.driverId) ? getOrCreateUuid(fc.assignedToDriverId || fc.driverId) : undefined, // Link to driver
+                                assignedToVehicleId: (fc.assignedToVehicleId || fc.vehicleId) ? getOrCreateUuid(fc.assignedToVehicleId || fc.vehicleId) : undefined, // Link to vehicle
                             }
                         });
                         result.updated++;
@@ -1007,15 +1301,370 @@ export const importData = async (req: Request, res: Response) => {
                         await prisma.fuelCard.create({
                             data: {
                                 id: fcId,
-                                organizationId: fcOrgId,
+                                organizationId: fcOrgId, // Adopt
                                 cardNumber: fc.cardNumber,
                                 provider: fc.provider,
+                                assignedToDriverId: (fc.assignedToDriverId || fc.driverId) ? getOrCreateUuid(fc.assignedToDriverId || fc.driverId) : undefined, // Link to driver
+                                assignedToVehicleId: (fc.assignedToVehicleId || fc.vehicleId) ? getOrCreateUuid(fc.assignedToVehicleId || fc.vehicleId) : undefined, // Link to vehicle
+                            }
+                        });
+                        result.created++;
+                    }
+
+                    // Create/Ensure StockLocation for this FuelCard
+                    const existingLoc = await prisma.stockLocation.findUnique({
+                        where: { fuelCardId: fcId }
+                    });
+
+                    const fcName = `ТК ${fc.cardNumber} (${fc.provider || '?'})`;
+
+                    if (!existingLoc) {
+                        try {
+                            await prisma.stockLocation.create({
+                                data: {
+                                    organizationId: fcOrgId,
+                                    type: StockLocationType.FUEL_CARD,
+                                    name: fcName,
+                                    fuelCardId: fcId,
+                                    isActive: true
+                                }
+                            });
+                        } catch (locErr) {
+                            logger.warn({ error: locErr, fuelCardId: fcId }, 'Failed to create StockLocation for FuelCard');
+                        }
+                    } else {
+                        await prisma.stockLocation.update({
+                            where: { id: existingLoc.id },
+                            data: { name: fcName }
+                        });
+                    }
+
+                } catch (e: any) {
+                    result.errors.push(`FuelCard ${fc.id}: ${e.message}`);
+                }
+            }
+            results.push(result);
+        }
+
+
+        // 6.5. Import Warehouses
+        if (data.warehouses?.length) {
+            const result: ImportResult = { table: 'warehouses', created: 0, updated: 0, errors: [] };
+            for (const wh of data.warehouses) {
+                try {
+                    const whId = getOrCreateUuid(wh.id);
+                    // Force import to current organization
+                    const whOrgId = organizationId;
+
+                    const existing = await prisma.warehouse.findUnique({ where: { id: whId } });
+                    if (existing) {
+                        await prisma.warehouse.update({
+                            where: { id: whId },
+                            data: {
+                                organizationId: whOrgId, // Adopt
+                                name: wh.name,
+                                address: wh.address,
+                                type: wh.type, // Added
+                                responsibleEmployeeId: wh.responsibleEmployeeId ? getOrCreateUuid(wh.responsibleEmployeeId) : undefined, // Added
+                            }
+                        });
+                        result.updated++;
+                    } else {
+                        await prisma.warehouse.create({
+                            data: {
+                                id: whId,
+                                organizationId: whOrgId,
+                                name: wh.name,
+                                address: wh.address,
+                                type: wh.type, // Added
+                                responsibleEmployeeId: wh.responsibleEmployeeId ? getOrCreateUuid(wh.responsibleEmployeeId) : undefined, // Added
+                            }
+                        });
+                        result.created++;
+                    }
+
+                    // Create/Ensure StockLocation for this Warehouse
+                    const existingLoc = await prisma.stockLocation.findUnique({
+                        where: { warehouseId: whId }
+                    });
+
+                    if (!existingLoc) {
+                        try {
+                            await prisma.stockLocation.create({
+                                data: {
+                                    organizationId: whOrgId,
+                                    type: StockLocationType.WAREHOUSE,
+                                    name: wh.name,
+                                    warehouseId: whId,
+                                    isActive: true
+                                }
+                            });
+                        } catch (locErr) {
+                            logger.warn({ error: locErr, warehouseId: whId }, 'Failed to create StockLocation for Warehouse');
+                        }
+                    } else {
+                        await prisma.stockLocation.update({
+                            where: { id: existingLoc.id },
+                            data: { name: wh.name }
+                        });
+                    }
+
+                } catch (e: any) {
+                    result.errors.push(`Warehouse ${wh.id}: ${e.message}`);
+                }
+            }
+            results.push(result);
+        }
+
+
+
+        // 6.7. Import Stock Movements
+        if (data.stockMovements?.length) {
+            const result: ImportResult = { table: 'stockMovements', created: 0, updated: 0, errors: [] };
+
+            // Pre-fetch locations for fast lookup
+            const warehouses = await prisma.warehouse.findMany({ select: { id: true, stockLocation: { select: { id: true } } } });
+            const vehicles = await prisma.vehicle.findMany({ select: { id: true, stockLocation: { select: { id: true } } } });
+            const fuelCards = await prisma.fuelCard.findMany({ select: { id: true, stockLocation: { select: { id: true } } } });
+
+            const locByWarehouse = new Map(warehouses.map(w => [w.id, w.stockLocation?.id]).filter(x => x[1]) as [string, string][]);
+            const locByVehicle = new Map(vehicles.map(v => [v.id, v.stockLocation?.id]).filter(x => x[1]) as [string, string][]);
+            const locByFuelCard = new Map(fuelCards.map(fc => [fc.id, fc.stockLocation?.id]).filter(x => x[1]) as [string, string][]);
+
+            for (const mv of data.stockMovements) {
+                try {
+                    const mvId = getOrCreateUuid(mv.id);
+                    // Force import to current organization
+                    const mvOrgId = organizationId;
+                    const stockItemId = getOrCreateUuid(mv.stockItemId);
+
+                    // Legacy Fields Resolve
+                    const warehouseId = mv.warehouseId ? getOrCreateUuid(mv.warehouseId) : null;
+                    const vehicleId = mv.vehicleId ? getOrCreateUuid(mv.vehicleId) : null;
+                    const fuelCardId = mv.fuelCardId ? getOrCreateUuid(mv.fuelCardId) : null;
+
+                    const occurredAt = mv.occurredAt ? new Date(mv.occurredAt) : (mv.date ? new Date(mv.date) : new Date());
+
+                    // Resolve StockLocationId (Source)
+                    let stockLocationId: string | null = null;
+                    if (warehouseId && locByWarehouse.has(warehouseId)) stockLocationId = locByWarehouse.get(warehouseId)!;
+                    else if (vehicleId && locByVehicle.has(vehicleId)) stockLocationId = locByVehicle.get(vehicleId)!;
+                    else if (fuelCardId && locByFuelCard.has(fuelCardId)) stockLocationId = locByFuelCard.get(fuelCardId)!;
+
+                    // Resolve toStockLocationId (Destination)
+                    let toStockLocationId: string | null = null;
+                    const toWarehouseId = mv.toWarehouseId ? getOrCreateUuid(mv.toWarehouseId) : null;
+                    const toVehicleId = mv.toVehicleId ? getOrCreateUuid(mv.toVehicleId) : null;
+                    const toFuelCardId = mv.toFuelCardId ? getOrCreateUuid(mv.toFuelCardId) : null;
+
+
+                    if (toWarehouseId && locByWarehouse.has(toWarehouseId)) toStockLocationId = locByWarehouse.get(toWarehouseId)!;
+                    else if (toVehicleId && locByVehicle.has(toVehicleId)) toStockLocationId = locByVehicle.get(toVehicleId)!;
+                    else if (toFuelCardId && locByFuelCard.has(toFuelCardId)) toStockLocationId = locByFuelCard.get(toFuelCardId)!;
+
+                    // Map movement type just in case
+                    const movementType = ['INCOME', 'EXPENSE', 'TRANSFER', 'ADJUSTMENT', 'STORNO', 'REFUND'].includes(mv.movementType) ? mv.movementType : 'ADJUSTMENT' as any;
+
+                    // Map to correct fields based on MovementType (REL-102)
+                    // INCOME: stockLocationId (Dest), from=null, to=null
+                    // EXPENSE: stockLocationId (Source), from=null, to=null
+                    // TRANSFER: fromStockLocationId (Source), toStockLocationId (Dest), stockLocationId=null (or ignore)
+
+                    let finalStockLocationId: string | undefined = undefined;
+                    let finalFromId: string | undefined = undefined;
+                    let finalToId: string | undefined = undefined;
+
+                    if (movementType === 'TRANSFER') {
+                        finalFromId = stockLocationId || undefined;
+                        finalToId = toStockLocationId || undefined;
+                    } else if (movementType === 'INCOME') {
+                        // For INCOME, the simple UI often puts dest in 'stockLocationId'
+                        // But if import provided 'toStockLocationId' (via toWarehouseId), use that.
+                        // Fallback: if 'stockLocationId' is set (from warehouseId), assume it's the destination for Income.
+                        finalStockLocationId = toStockLocationId || stockLocationId || undefined;
+                    } else {
+                        // EXPENSE / ADJUSTMENT
+                        // Source is stockLocationId
+                        finalStockLocationId = stockLocationId || undefined;
+                    }
+
+                    const dataPayload = {
+                        movementType: movementType,
+                        quantity: mv.quantity,
+                        occurredAt: occurredAt,
+                        warehouseId, // Legacy, keep if needed
+                        stockLocationId: finalStockLocationId,
+                        fromStockLocationId: finalFromId,
+                        toStockLocationId: finalToId,
+                        stockItemId: stockItemId,
+                        documentNumber: mv.documentNumber,
+                        comment: mv.comment || mv.comments || '',
+                        externalRef: mv.externalRef || mv.documentNumber,
+                    };
+
+                    const existing = await prisma.stockMovement.findUnique({ where: { id: mvId } });
+                    if (existing) {
+                        await prisma.stockMovement.update({
+                            where: { id: mvId },
+                            data: {
+                                organizationId: mvOrgId,
+                                ...dataPayload
+                            }
+                        });
+                        result.updated++;
+                    } else {
+                        await prisma.stockMovement.create({
+                            data: {
+                                id: mvId,
+                                organizationId: mvOrgId,
+                                ...dataPayload
                             }
                         });
                         result.created++;
                     }
                 } catch (e: any) {
-                    result.errors.push(`FuelCard ${fc.id}: ${e.message}`);
+                    result.errors.push(`StockMovement ${mv.id}: ${e.message}`);
+                }
+            }
+            results.push(result);
+        }
+
+        // 6.8. Import Blank Batches
+        if (data.blankBatches?.length) {
+            const result: ImportResult = { table: 'blankBatches', created: 0, updated: 0, errors: [] };
+            for (const bb of data.blankBatches) {
+                try {
+                    const bbId = getOrCreateUuid(bb.id);
+                    // Force import to current organization
+                    const bbOrgId = organizationId;
+
+                    const existing = await prisma.blankBatch.findUnique({ where: { id: bbId } });
+                    if (existing) {
+                        await prisma.blankBatch.update({
+                            where: { id: bbId },
+                            data: {
+                                organizationId: bbOrgId, // Adopt
+                                series: bb.series,
+                                numberFrom: bb.numberFrom,
+                                numberTo: bb.numberTo
+                            }
+                        });
+                        result.updated++;
+                    } else {
+                        await prisma.blankBatch.create({
+                            data: {
+                                id: bbId,
+                                organizationId: bbOrgId,
+                                series: bb.series,
+                                numberFrom: bb.numberFrom,
+                                numberTo: bb.numberTo
+                            }
+                        });
+                        result.created++;
+                    }
+                } catch (e: any) {
+                    result.errors.push(`BlankBatch ${bb.id}: ${e.message}`);
+                }
+            }
+            results.push(result);
+        }
+
+        // 6.9. Import Blanks
+        if (data.blanks?.length) {
+            const result: ImportResult = { table: 'blanks', created: 0, updated: 0, errors: [] };
+            for (const bl of data.blanks) {
+                try {
+                    const blId = getOrCreateUuid(bl.id);
+                    // Force import to current organization
+                    const blOrgId = organizationId;
+                    const batchId = bl.batchId ? getOrCreateUuid(bl.batchId) : null;
+                    const issuedToDriverId = bl.issuedToDriverId ? getOrCreateUuid(bl.issuedToDriverId) : null;
+
+                    let existing = await prisma.blank.findUnique({ where: { id: blId } });
+
+                    // Soft match by Series + Number + Org to prevent Unique violation
+                    if (!existing && bl.number !== undefined) {
+                        const duplicate = await prisma.blank.findFirst({
+                            where: {
+                                organizationId: blOrgId,
+                                series: bl.series || null, // handle null series explicitly
+                                number: bl.number
+                            }
+                        });
+                        if (duplicate) {
+                            existing = duplicate;
+                            // Map ID if needed (though Blank doesn't have many dependents usually, Waybill checks blankId)
+                            idMap[bl.id] = duplicate.id;
+                        }
+                    }
+                    // Map status enum safely
+                    const status = ['AVAILABLE', 'ISSUED', 'RESERVED', 'USED', 'RETURNED', 'SPOILED'].includes(bl.status)
+                        ? bl.status
+                        : 'AVAILABLE';
+
+                    const dataPayload = {
+                        series: bl.series,
+                        number: bl.number,
+                        batchId,
+                        status,
+                        issuedAt: bl.issuedDate ? new Date(bl.issuedDate) : (bl.issuedAt ? new Date(bl.issuedAt) : undefined),
+                        issuedToDriverId: issuedToDriverId
+                    };
+
+                    if (existing) {
+                        await prisma.blank.update({
+                            where: { id: blId },
+                            data: {
+                                organizationId: blOrgId, // Adopt
+                                ...dataPayload
+                            }
+                        });
+                        result.updated++;
+                    } else {
+                        await prisma.blank.create({
+                            data: {
+                                id: blId,
+                                organizationId: blOrgId,
+                                ...dataPayload
+                            }
+                        });
+                        result.created++;
+                    }
+                } catch (e: any) {
+                    result.errors.push(`Blank ${bl.id}: ${e.message}`);
+                }
+            }
+            results.push(result);
+        }
+
+        // 6.10 Import Settings
+        if (data.settings?.length) {
+            const result: ImportResult = { table: 'settings', created: 0, updated: 0, errors: [] };
+            for (const st of data.settings) {
+                try {
+                    // Settings PK is `key`
+                    const key = st.key;
+                    const existing = await prisma.setting.findUnique({ where: { key } });
+
+                    if (existing) {
+                        await prisma.setting.update({
+                            where: { key },
+                            data: {
+                                value: st.value
+                            }
+                        });
+                        result.updated++;
+                    } else {
+                        await prisma.setting.create({
+                            data: {
+                                key,
+                                value: st.value
+                            }
+                        });
+                        result.created++;
+                    }
+                } catch (e: any) {
+                    result.errors.push(`Setting ${st.key}: ${e.message}`);
                 }
             }
             results.push(result);

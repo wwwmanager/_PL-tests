@@ -1000,26 +1000,38 @@ const Admin: React.FC = () => {
         .map((r) => sanitizeRowByPolicy({ ...r, known: knownSet.has(r.key) }, policy))
         .filter((r) => r.action.enabled);
 
-      if (!safeRows.length) return;
+      // if (!safeRows.length) return; // Removed to allow backend-only imports
 
       // ====== BACKEND IMPORT ======
       // Send data to PostgreSQL backend for entities it supports
       const backendData: Record<string, any[]> = {};
-      for (const row of safeRows) {
-        const { key, incoming } = row;
-        if (Array.isArray(incoming) && incoming.length > 0) {
+      // Use raw rows for backend import to bypass local storage 'known keys' restriction
+      for (const row of rows) {
+        const { key, incoming, action } = row;
+        // Only include if user enabled it in the modal
+        if (action.enabled && Array.isArray(incoming) && incoming.length > 0) {
           backendData[key] = incoming;
         }
       }
+      console.log('[Admin] Prepared backend data keys:', Object.keys(backendData));
 
       if (Object.keys(backendData).length > 0) {
         try {
           const backendResult = await backendImportData(backendData);
           console.log('[Import] Backend result:', backendResult);
+
           if (backendResult.success) {
+            const errors = backendResult.results.flatMap(r => r.errors);
             const summary = backendResult.results
               .map(r => `${r.table}: +${r.created} ~${r.updated}`)
               .join(', ');
+
+            if (errors.length > 0) {
+              console.error('Frontend Import Errors:', errors);
+              alert(`Импорт завершен с ошибками (${errors.length}):\n` + errors.slice(0, 5).join('\n') + (errors.length > 5 ? '\n...и еще ' + (errors.length - 5) : ''));
+              showToast(`Важно: Есть ошибки при импорте! Проверьте консоль.`, 'error');
+            }
+
             showToast(`PostgreSQL: ${summary}`, 'success');
           }
         } catch (backendError: any) {

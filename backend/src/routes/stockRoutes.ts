@@ -7,6 +7,7 @@ import { validateDto } from '../middleware/validateDto';
 import { createMovementSchema } from '../dto/stockMovementDto';
 import {
     listStockItems, createStockItem, updateStockItem, deleteStockItem,
+    listStockLocations, // Added
     listStockMovements, createStockMovement, updateStockMovement, deleteStockMovement,
     voidStockMovementController,
     getFuelCardBalance, getAvailableFuelExpenses
@@ -24,6 +25,7 @@ router.get('/balances', getBalances);              // GET /api/stock/balances?st
 router.get('/balance', getBalance);                // GET /api/stock/balance?locationId=...&stockItemId=...&asOf=...
 
 // Stock Items CRUD
+router.get('/locations', listStockLocations);     // GET /api/stock/locations (for dropdowns)
 router.get('/items', listStockItems);             // GET /api/stock/items
 router.post('/items', createStockItem);           // POST /api/stock/items
 router.put('/items/:id', updateStockItem);        // PUT /api/stock/items/:id
