@@ -60,6 +60,7 @@ async function checkPeriodLock(
     organizationId: string,
     occurredAt: Date
 ): Promise<void> {
+    // 1. Legacy check
     const org = await tx.organization.findUnique({
         where: { id: organizationId },
         select: { stockLockedAt: true }
@@ -69,6 +70,21 @@ async function checkPeriodLock(
         throw new ConflictError(
             `Период складского учёта закрыт до ${org.stockLockedAt.toLocaleString()}. ` +
             `Нельзя создавать или изменять движения в закрытом периоде.`
+        );
+    }
+
+    // 2. PeriodLock check
+    const period = occurredAt.toISOString().substring(0, 7); // YYYY-MM
+    const lockCount = await (tx as any).periodLock.count({
+        where: {
+            organizationId,
+            period
+        }
+    });
+
+    if (lockCount > 0) {
+        throw new ConflictError(
+            `Период ${period} закрыт. Изменения запрещены.`
         );
     }
 }

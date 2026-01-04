@@ -300,10 +300,10 @@ const MovementCreateModal: React.FC<Props> = ({ isOpen, onClose, initialData }) 
                             {...register('movementType')}
                             className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white"
                         >
-                            <option value="INCOME">Поступление (INCOME)</option>
-                            <option value="TRANSFER">Перемещение (TRANSFER)</option>
-                            <option value="EXPENSE">Расход (EXPENSE)</option>
-                            <option value="ADJUSTMENT">Корректировка (ADJUSTMENT)</option>
+                            <option value="INCOME">Поступление</option>
+                            <option value="TRANSFER">Перемещение</option>
+                            <option value="EXPENSE">Расход</option>
+                            <option value="ADJUSTMENT">Корректировка</option>
                         </select>
                     </div>
                 </div>
@@ -320,7 +320,7 @@ const MovementCreateModal: React.FC<Props> = ({ isOpen, onClose, initialData }) 
                             <option value="">Выберите документ для корректировки...</option>
                             {movementsToAdjust.map(m => (
                                 <option key={m.id} value={m.id}>
-                                    {new Date(m.occurredAt).toLocaleDateString()} — {m.movementType} — {m.stockItemName || 'Товар'} — {m.quantity} {(m as any).unit || (m as any).stockItem?.unit || ''}
+                                    {new Date(m.occurredAt).toLocaleDateString()} — {m.movementType === 'INCOME' ? 'Поступление' : m.movementType === 'EXPENSE' ? 'Расход' : m.movementType === 'TRANSFER' ? 'Перемещение' : 'Корр.'} — {m.stockItemName || 'Товар'} — {m.quantity} {(m as any).unit || (m as any).stockItem?.unit || ''}
                                     {m.comment ? ` (${m.comment})` : ''}
                                 </option>
                             ))}
@@ -368,9 +368,14 @@ const MovementCreateModal: React.FC<Props> = ({ isOpen, onClose, initialData }) 
                                 className={`w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white ${errors.fromStockLocationId ? 'border-red-500' : 'border-gray-300'}`}
                             >
                                 <option value="">Выберите источник...</option>
-                                {locations.map(loc => (
-                                    <option key={loc.id} value={loc.id}>{loc.name} ({loc.type})</option>
-                                ))}
+                                {locations.map(loc => {
+                                    let typeName: string = loc.type;
+                                    if (['WAREHOUSE', 'centralWarehouse', 'remoteWarehouse', 'contractorWarehouse'].includes(loc.type)) typeName = 'Склад';
+                                    else if (['VEHICLE_TANK', 'vehicleTank'].includes(loc.type)) typeName = 'Бак ТС';
+                                    else if (['FUEL_CARD', 'fuelCard'].includes(loc.type)) typeName = 'Топл. карта';
+
+                                    return <option key={loc.id} value={loc.id}>{loc.name} ({typeName})</option>;
+                                })}
                             </select>
                             {errors.fromStockLocationId && <p className="mt-1 text-xs text-red-500">{errors.fromStockLocationId.message}</p>}
                         </div>
@@ -386,9 +391,14 @@ const MovementCreateModal: React.FC<Props> = ({ isOpen, onClose, initialData }) 
                                 className={`w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white ${errors.toStockLocationId ? 'border-red-500' : 'border-gray-300'}`}
                             >
                                 <option value="">Выберите назначение...</option>
-                                {locations.map(loc => (
-                                    <option key={loc.id} value={loc.id}>{loc.name} ({loc.type})</option>
-                                ))}
+                                {locations.map(loc => {
+                                    let typeName: string = loc.type;
+                                    if (['WAREHOUSE', 'centralWarehouse', 'remoteWarehouse', 'contractorWarehouse'].includes(loc.type)) typeName = 'Склад';
+                                    else if (['VEHICLE_TANK', 'vehicleTank'].includes(loc.type)) typeName = 'Бак ТС';
+                                    else if (['FUEL_CARD', 'fuelCard'].includes(loc.type)) typeName = 'Топл. карта';
+
+                                    return <option key={loc.id} value={loc.id}>{loc.name} ({typeName})</option>;
+                                })}
                             </select>
                             {errors.toStockLocationId && <p className="mt-1 text-xs text-red-500">{errors.toStockLocationId.message}</p>}
                         </div>

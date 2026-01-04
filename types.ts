@@ -415,6 +415,8 @@ export interface AppSettings {
   };
   // P0-F: Allow deletion of POSTED waybills (default: false)
   allowDeletePostedWaybills?: boolean;
+  // STOCK-DEL-001: Allow direct deletion of stock movements (default: false)
+  allowDirectStockMovementDeletion?: boolean;
 }
 
 export type StorageType =

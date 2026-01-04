@@ -163,6 +163,7 @@ model Organization {
   stockLocations StockLocation[]
   auditLogs      AuditLog[]
   resetRules     FuelCardResetRule[]  // REL-105
+  periodLocks    PeriodLock[]         // PERIOD-LOCK-001
 
   @@index([isOwn])
   @@index([parentOrganizationId])  // ORG-HIERARCHY-001
@@ -233,6 +234,7 @@ model User {
   auditLogs             AuditLog[]
   refreshTokens         RefreshToken[]
   fuelCardTransactions  FuelCardTransaction[] @relation("FuelCardTransactionCreatedBy") // FUEL-001
+  lockedPeriods         PeriodLock[] @relation("PeriodLockLockedBy")  // PERIOD-LOCK-001
 
   @@map("users")
 }
@@ -976,4 +978,30 @@ model FuelCardResetRule {
 
   @@index([organizationId, isActive, nextRunAt])
   @@map("fuel_card_reset_rules")
+}
+
+// ============================================================================
+// PERIOD LOCKING - Защита целостности данных
+// ============================================================================
+
+model PeriodLock {
+  id              String   @id @default(uuid()) @db.Uuid
+  organizationId  String   @db.Uuid
+  period          String   @db.VarChar(7)  // YYYY-MM format
+  lockedAt        DateTime @default(now()) @db.Timestamp(6)
+  lockedByUserId  String   @db.Uuid
+  dataHash        String   @db.Char(64)    // SHA-256 hex (64 chars)
+  recordCount     Int
+  notes           String?  @db.Text
+  
+  // Verification history
+  lastVerifiedAt  DateTime? @db.Timestamp(6)
+  lastVerifyResult Boolean?
+  
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  lockedByUser    User @relation("PeriodLockLockedBy", fields: [lockedByUserId], references: [id], onDelete: Restrict)
+  
+  @@unique([organizationId, period])
+  @@index([organizationId, period])
+  @@map("period_locks")
 }

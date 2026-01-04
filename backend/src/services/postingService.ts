@@ -13,6 +13,7 @@ import {
     getOrCreateFuelCardLocation,
     getOrCreateDefaultWarehouseLocation,
 } from './stockLocationService';
+import { checkPeriodLock } from './periodLockService';
 
 const prisma = new PrismaClient();
 
@@ -87,6 +88,12 @@ export async function postWaybill(
     const expenseMovementIds: string[] = [];
 
     console.log(`[PostingService] postWaybill started: ${waybill.number}`);
+
+    // ENFORCEMENT: Проверка закрытого периода
+    const isLocked = await checkPeriodLock(organizationId, waybill.date.toISOString());
+    if (isLocked) {
+        throw new BadRequestError(`Период ${waybill.date.toISOString().substring(0, 7)} закрыт. Проведение невозможно.`, 'PERIOD_LOCKED');
+    }
 
     // 1. Получить локацию бака ТС
     const vehicleTank = await getOrCreateVehicleTankLocation(waybill.vehicleId);
@@ -311,6 +318,12 @@ export async function cancelWaybill(
     const { organizationId, id: waybillId } = waybill;
 
     console.log(`[PostingService] cancelWaybill started: ${waybill.number}`);
+
+    // ENFORCEMENT: Проверка закрытого периода
+    const isLocked = await checkPeriodLock(organizationId, waybill.date.toISOString());
+    if (isLocked) {
+        throw new BadRequestError(`Период ${waybill.date.toISOString().substring(0, 7)} закрыт. Отмена проведения невозможна.`, 'PERIOD_LOCKED');
+    }
 
     // 1. Rollback Vehicle mileage and fuel
     if (waybill.vehicleId) {

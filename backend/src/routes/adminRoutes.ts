@@ -53,6 +53,55 @@ router.post('/transfer-organization', authMiddleware, requireRole('admin'), tran
 router.post('/stock-period/lock', authMiddleware, checkPermission('stock.period.lock'), lockStockPeriod);
 router.post('/stock-period/unlock', authMiddleware, checkPermission('stock.period.unlock'), unlockStockPeriod);
 
+// PERIOD-LOCK-001: Period locking with hash integrity
+import * as periodLockService from '../services/periodLockService';
+
+// GET /api/admin/period-locks - Get all period locks for organization
+router.get('/period-locks', authMiddleware, requireRole('admin'), async (req: Request, res: Response) => {
+    try {
+        const organizationId = (req as any).user?.organizationId;
+        const locks = await periodLockService.getPeriodLocks(organizationId);
+        res.json({ success: true, data: locks });
+    } catch (err: any) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// POST /api/admin/period-locks/close - Close a period
+router.post('/period-locks/close', authMiddleware, requireRole('admin'), async (req: Request, res: Response) => {
+    try {
+        const { period, notes } = req.body;
+        const userId = (req as any).user?.id;  // Fixed: was userId, should be id
+        const organizationId = (req as any).user?.organizationId;
+
+        const lock = await periodLockService.closePeriod(organizationId, period, userId, notes);
+        res.json({ success: true, data: lock });
+    } catch (err: any) {
+        res.status(400).json({ success: false, error: err.message });
+    }
+});
+
+// POST /api/admin/period-locks/:id/verify - Verify period integrity
+router.post('/period-locks/:id/verify', authMiddleware, requireRole('admin'), async (req: Request, res: Response) => {
+    try {
+        const result = await periodLockService.verifyPeriod(req.params.id);
+        res.json({ success: true, data: result });
+    } catch (err: any) {
+        res.status(400).json({ success: false, error: err.message });
+    }
+});
+
+// DELETE /api/admin/period-locks/:id - Remove period lock
+router.delete('/period-locks/:id', authMiddleware, requireRole('admin'), async (req: Request, res: Response) => {
+    try {
+        const userId = (req as any).user?.id;  // Fixed: was userId, should be id
+        const result = await periodLockService.deletePeriodLock(req.params.id, userId);
+        res.json({ success: true, data: result });
+    } catch (err: any) {
+        res.status(400).json({ success: false, error: err.message });
+    }
+});
+
 // POST /api/admin/recalculate - Helper for recalculating balances
 router.post('/recalculate', authMiddleware, requireRole('admin'), runRecalculation);
 

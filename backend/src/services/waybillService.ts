@@ -11,6 +11,8 @@ import { stornoDocument, executeStorno } from './stornoService';
 import { findActiveCardForDriver } from './fuelCardService';
 // POSTING-SVC-010: Import PostingService
 import { postWaybill, cancelWaybill } from './postingService';
+// PERIOD-LOCK-001: Import period lock check
+import { checkPeriodLock } from './periodLockService';
 
 const prisma = new PrismaClient();
 
@@ -274,6 +276,12 @@ export async function createWaybill(userInfo: UserInfo, input: CreateWaybillInpu
     const date = new Date(input.date);
     if (Number.isNaN(date.getTime())) {
         throw new BadRequestError('Некорректная дата');
+    }
+
+    // PERIOD-LOCK-001: Check if period is locked
+    const dateStr = input.date.substring(0, 10);
+    if (await checkPeriodLock(organizationId, dateStr)) {
+        throw new BadRequestError(`Период ${dateStr.substring(0, 7)} закрыт. Создание документов в этом периоде невозможно.`);
     }
 
     // WB-906: Driver restrictions
@@ -588,6 +596,22 @@ export async function updateWaybill(userInfo: UserInfo, id: string, data: Partia
 
     if (waybill.status === WaybillStatus.POSTED) {
         throw new BadRequestError('Нельзя редактировать проведённый путевой лист');
+    }
+
+    // PERIOD-LOCK-001: Check if old period is locked
+    const oldDateStr = waybill.date instanceof Date
+        ? waybill.date.toISOString().substring(0, 10)
+        : String(waybill.date).substring(0, 10);
+    if (await checkPeriodLock(organizationId, oldDateStr)) {
+        throw new BadRequestError(`Период ${oldDateStr.substring(0, 7)} закрыт. Редактирование документа невозможно.`);
+    }
+
+    // PERIOD-LOCK-001: Check if NEW date (if changed) is in locked period
+    if (data.date && data.date !== oldDateStr) {
+        const newDateStr = data.date.substring(0, 10);
+        if (await checkPeriodLock(organizationId, newDateStr)) {
+            throw new BadRequestError(`Нельзя переместить документ в закрытый период ${newDateStr.substring(0, 7)}.`);
+        }
     }
 
     const newOdometerStart = data.odometerStart !== undefined ? data.odometerStart : (waybill.odometerStart ? Number(waybill.odometerStart) : null);
@@ -1259,6 +1283,14 @@ export async function changeWaybillStatus(
     });
 
     if (!waybill) throw new NotFoundError('Путевой лист не найден');
+
+    // PERIOD-LOCK-001: Check if period is locked before status change
+    const waybillDateStr = waybill.date instanceof Date
+        ? waybill.date.toISOString().substring(0, 10)
+        : String(waybill.date).substring(0, 10);
+    if (await checkPeriodLock(organizationId, waybillDateStr)) {
+        throw new BadRequestError(`Период ${waybillDateStr.substring(0, 7)} закрыт. Изменение статуса документа невозможно.`);
+    }
 
     // State machine validation (aligned with schema.prisma)
     // WB-BULK-POST: Added DRAFT → POSTED for bulk posting

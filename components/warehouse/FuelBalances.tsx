@@ -78,7 +78,11 @@ const FuelBalances: React.FC = () => {
     const filteredBalances = useMemo(() => {
         return balances.filter(b => {
             const matchItem = !filters.stockItemId || b.stockItemId === filters.stockItemId;
-            const matchType = !filters.locationType || b.locationType === filters.locationType;
+            const matchType = !filters.locationType ||
+                (filters.locationType === 'WAREHOUSE' ? ['WAREHOUSE', 'centralWarehouse', 'remoteWarehouse', 'contractorWarehouse'].includes(b.locationType) :
+                    filters.locationType === 'VEHICLE_TANK' ? ['VEHICLE_TANK', 'vehicleTank'].includes(b.locationType) :
+                        filters.locationType === 'FUEL_CARD' ? ['FUEL_CARD', 'fuelCard'].includes(b.locationType) :
+                            b.locationType === filters.locationType);
             return matchItem && matchType;
         }).map(b => ({
             ...b,
@@ -93,9 +97,17 @@ const FuelBalances: React.FC = () => {
 
     const getLocationTypeLabel = (type: string) => {
         switch (type) {
-            case 'WAREHOUSE': return '🏭 Склад';
-            case 'FUEL_CARD': return '💳 Карта';
-            case 'VEHICLE_TANK': return '🚛 Бак ТС';
+            case 'WAREHOUSE':
+            case 'centralWarehouse':
+            case 'remoteWarehouse':
+            case 'contractorWarehouse':
+                return '🏭 Склад';
+            case 'FUEL_CARD':
+            case 'fuelCard':
+                return '💳 Карта';
+            case 'VEHICLE_TANK':
+            case 'vehicleTank':
+                return '🚛 Бак ТС';
             default: return type;
         }
     };

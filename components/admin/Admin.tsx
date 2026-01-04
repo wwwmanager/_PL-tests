@@ -23,6 +23,7 @@ const DataDeletionModal = lazy(() => import('./DataDeletionModal'));
 const DataImportModal = lazy(() => import('./DataImportModal'));
 const DataExportModal = lazy(() => import('./DataExportModal'));
 const ProductionCalendarSettings = lazy(() => import('./ProductionCalendarSettings'));
+const IntegrityManagement = lazy(() => import('./IntegrityManagement'));
 
 // ===== Метаданные/совместимость =====
 
@@ -73,7 +74,7 @@ export const KEY_ALIASES: Record<string, string> = {
 };
 
 
-type AdminTab = 'settings' | 'users' | 'roles' | 'blanks' | 'import_audit' | 'business_audit' | 'calendar' | 'diag';
+type AdminTab = 'settings' | 'users' | 'roles' | 'blanks' | 'import_audit' | 'business_audit' | 'calendar' | 'integrity' | 'diag';
 
 type ExportBundle = {
   meta: {
@@ -1337,6 +1338,7 @@ const Admin: React.FC = () => {
     }
     t.push({ id: 'calendar', label: 'Календарь' });
     if (can('admin.panel')) {
+      t.push({ id: 'integrity', label: 'Целостность' });
       t.push({ id: 'diag', label: 'Диагностика' });
     }
     return t;
@@ -1358,6 +1360,8 @@ const Admin: React.FC = () => {
         return <BusinessAuditLog />;
       case 'calendar':
         return <ProductionCalendarSettings />;
+      case 'integrity':
+        return <IntegrityManagement />;
       case 'diag':
         return <Diagnostics />;
       default:

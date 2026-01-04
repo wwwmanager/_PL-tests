@@ -209,3 +209,60 @@ export async function unlockStockPeriod(organizationId: string): Promise<{ succe
     return httpClient.post('/admin/stock-period/unlock', { organizationId });
 }
 
+// ============================================================================
+// PERIOD-LOCK-001: Period Locking with hash integrity
+// ============================================================================
+
+export interface PeriodLock {
+    id: string;
+    organizationId: string;
+    period: string;
+    lockedAt: string;
+    lockedByUserId: string;
+    dataHash: string;
+    recordCount: number;
+    notes?: string;
+    lastVerifiedAt?: string;
+    lastVerifyResult?: boolean;
+    lockedByUser?: {
+        id: string;
+        fullName: string;
+        email: string;
+    };
+}
+
+export interface VerifyResult {
+    isValid: boolean;
+    currentHash: string;
+    storedHash: string;
+    details?: string;
+}
+
+/**
+ * Get all period locks for current organization
+ */
+export async function getPeriodLocks(): Promise<{ success: boolean; data: PeriodLock[] }> {
+    return httpClient.get('/admin/period-locks');
+}
+
+/**
+ * Close a period (create lock with hash)
+ */
+export async function closePeriod(period: string, notes?: string): Promise<{ success: boolean; data: PeriodLock }> {
+    return httpClient.post('/admin/period-locks/close', { period, notes });
+}
+
+/**
+ * Verify period integrity (recalculate hash and compare)
+ */
+export async function verifyPeriod(lockId: string): Promise<{ success: boolean; data: VerifyResult }> {
+    return httpClient.post(`/admin/period-locks/${lockId}/verify`, {});
+}
+
+/**
+ * Delete period lock (open period for editing)
+ */
+export async function deletePeriodLock(lockId: string): Promise<{ success: boolean; data: { period: string } }> {
+    return httpClient.delete(`/admin/period-locks/${lockId}`);
+}
+
