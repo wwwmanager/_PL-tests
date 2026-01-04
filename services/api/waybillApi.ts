@@ -74,8 +74,8 @@ export async function updateWaybill(id: string, data: Partial<Waybill>): Promise
     return response;
 }
 
-export async function deleteWaybill(id: string): Promise<void> {
-    await httpClient.delete(`/waybills/${id}`);
+export async function deleteWaybill(id: string, blankAction: 'return' | 'spoil' = 'return'): Promise<void> {
+    await httpClient.delete(`/waybills/${id}?blankAction=${blankAction}`);
 }
 
 export async function bulkDeleteWaybills(ids: string[]): Promise<{ success: string[]; errors: { id: string; error: string }[] }> {

@@ -110,7 +110,9 @@ export async function deleteWaybill(req: Request, res: Response, next: NextFunct
     try {
         const orgId = req.user!.organizationId;
         const { id } = req.params;
-        await waybillService.deleteWaybill(req.user as any, id);
+        // BLK-DEL-ACTION-001: Read blankAction from query string
+        const blankAction = (req.query.blankAction as 'return' | 'spoil') || 'return';
+        await waybillService.deleteWaybill(req.user as any, id, blankAction);
         res.json({ message: 'Удалено' });
     } catch (err) {
         next(err);

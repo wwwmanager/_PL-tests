@@ -3,7 +3,7 @@ import { BadRequestError, NotFoundError } from '../utils/errors';
 import { validateOdometer, calculateDistanceKm, calculatePlannedFuelByMethod, FuelConsumptionRates, FuelCalculationMethod, FuelSegment } from '../domain/waybill/fuel';
 import { isWinterDate } from '../utils/dateUtils';
 import { getSeasonSettings, getAppSettings } from './settingsService';
-import { reserveNextBlankForDriver, reserveSpecificBlank, releaseBlank } from './blankService';
+import { reserveNextBlankForDriver, reserveSpecificBlank, releaseBlank, spoilBlank } from './blankService';
 // REL-103: Stock location imports (used by postingService)
 import { getOrCreateVehicleTankLocation } from './stockLocationService';
 import { createTransfer, createExpenseMovement, getBalanceAt } from './stockService';
@@ -1027,7 +1027,7 @@ export async function recalculateDraftChain(
 }
 
 
-export async function deleteWaybill(userInfo: UserInfo, id: string) {
+export async function deleteWaybill(userInfo: UserInfo, id: string, blankAction: 'return' | 'spoil' = 'return') {
 
     const organizationId = userInfo.organizationId;
     // WB-906: Restriction for driver role
@@ -1057,25 +1057,49 @@ export async function deleteWaybill(userInfo: UserInfo, id: string) {
         );
     }
 
-    // WB-DEL-001: Release blank when deleting waybill
-    console.log('[WB-DEL-001] Deleting waybill:', waybill.id, 'blankId:', waybill.blankId, 'blank status:', waybill.blank?.status);
+    // BLK-DEL-ACTION-001: Handle blank based on user choice
+    console.log('[WB-DEL-001] Deleting waybill:', waybill.id, 'blankId:', waybill.blankId, 'blank status:', waybill.blank?.status, 'blankAction:', blankAction);
 
     if (waybill.blankId && waybill.blank) {
         const blankStatus = waybill.blank.status;
 
-        // Release if RESERVED or USED (when deleting POSTED waybill)
+        // Only process blanks in RESERVED or USED status
         if (blankStatus === BlankStatus.RESERVED || blankStatus === BlankStatus.USED) {
-            try {
-                await releaseBlank(organizationId, waybill.blankId);
-                console.log('[WB-DEL-001] ✅ Released blank back to ISSUED:', waybill.blankId);
-            } catch (err) {
-                console.error('[WB-DEL-001] ❌ Failed to release blank:', err);
-                // Force update as fallback
-                await prisma.blank.update({
-                    where: { id: waybill.blankId },
-                    data: { status: BlankStatus.ISSUED }
-                });
-                console.log('[WB-DEL-001] ✅ Force-released blank via fallback:', waybill.blankId);
+            if (blankAction === 'spoil') {
+                // BLK-DEL-ACTION-001: Spoil blank
+                try {
+                    await spoilBlank(organizationId, waybill.blankId, {
+                        reason: 'other',
+                        note: `Списан при удалении ПЛ №${waybill.number}`,
+                        userId: userInfo.id
+                    });
+                    console.log('[WB-DEL-001] ✅ Spoiled blank:', waybill.blankId);
+                } catch (err) {
+                    console.error('[WB-DEL-001] ❌ Failed to spoil blank:', err);
+                    // Force update as fallback
+                    await prisma.blank.update({
+                        where: { id: waybill.blankId },
+                        data: {
+                            status: BlankStatus.SPOILED,
+                            damagedReason: `Списан при удалении ПЛ №${waybill.number}`
+                        }
+                    });
+                    console.log('[WB-DEL-001] ✅ Force-spoiled blank via fallback:', waybill.blankId);
+                }
+            } else {
+                // Default: return blank to driver (ISSUED status)
+                try {
+                    await releaseBlank(organizationId, waybill.blankId);
+                    console.log('[WB-DEL-001] ✅ Released blank back to ISSUED:', waybill.blankId);
+                } catch (err) {
+                    console.error('[WB-DEL-001] ❌ Failed to release blank:', err);
+                    // Force update as fallback
+                    await prisma.blank.update({
+                        where: { id: waybill.blankId },
+                        data: { status: BlankStatus.ISSUED }
+                    });
+                    console.log('[WB-DEL-001] ✅ Force-released blank via fallback:', waybill.blankId);
+                }
             }
         } else {
             console.log('[WB-DEL-001] Blank not in RESERVED/USED status, current:', blankStatus);

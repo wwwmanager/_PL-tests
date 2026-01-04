@@ -107,19 +107,16 @@ export async function updateWaybill(w: FrontWaybill): Promise<FrontWaybill> {
 
 /**
  * Delete waybill
- * Signature matches: mockApi.deleteWaybill(id: string, markAsSpoiled: boolean)
+ * Signature matches: mockApi.deleteWaybill(id: string, blankAction: 'return' | 'spoil')
  * 
- * Note: markAsSpoiled parameter is currently ignored by backend
- * TODO: implement blank spoiling logic in separate endpoint
+ * @param id - Waybill ID
+ * @param blankAction - What to do with the blank: 'return' (back to driver) or 'spoil' (mark as damaged)
  */
 export async function deleteWaybill(
     id: string,
-    markAsSpoiled: boolean = false
+    blankAction: 'return' | 'spoil' = 'return'
 ): Promise<void> {
-    await http.delete<void>(`/waybills/${id}`);
-
-    // TODO: if markAsSpoiled is true, call separate endpoint to spoil the blank
-    // Example: await http.patch(`/blanks/${blankId}/spoil`, { reason: 'waybill_deleted' });
+    await http.delete<void>(`/waybills/${id}?blankAction=${blankAction}`);
 }
 
 /**

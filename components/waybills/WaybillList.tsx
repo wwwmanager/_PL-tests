@@ -300,36 +300,40 @@ const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpene
   };
 
   const handleRequestDelete = (waybill: EnrichedWaybill) => {
-    const onConfirmDelete = (markAsSpoiled: boolean) => {
-      setIsConfirmationModalOpen(false);
-      handleConfirmDelete(waybill.id, markAsSpoiled);
-    };
+    // BLK-DEL-ACTION-001: Ask user what to do with blank
+    const hasBlank = !!waybill.blankId;
 
     setModalProps({
-      title: 'Подтвердить удаление',
-      message: `Вы уверены, что хотите удалить путевой лист №${waybill.number}? Пометить бланк как испорченный?`,
-      confirmText: 'Да, пометить испорченным',
-      confirmButtonClass: 'bg-yellow-600 hover:bg-yellow-700 focus:ring-yellow-500',
-      onConfirm: () => onConfirmDelete(true),
-      // We'll add a second button for the "No" case
-      secondaryAction: {
-        text: 'Нет, вернуть в пачку',
-        className: 'bg-red-600 hover:bg-red-700 focus:ring-red-500',
-        onClick: () => onConfirmDelete(false),
+      title: 'Удаление путевого листа',
+      message: hasBlank
+        ? `Удалить путевой лист №${waybill.number}?\n\nЧто сделать с бланком?`
+        : `Удалить путевой лист №${waybill.number}?`,
+      confirmText: hasBlank ? 'Списать бланк' : 'Удалить',
+      confirmButtonClass: hasBlank ? 'bg-yellow-600 hover:bg-yellow-700 focus:ring-yellow-500' : 'bg-red-600 hover:bg-red-700 focus:ring-red-500',
+      onConfirm: () => {
+        setIsConfirmationModalOpen(false);
+        handleConfirmDelete(waybill.id, 'spoil');
       },
+      secondaryAction: hasBlank ? {
+        text: 'Вернуть водителю',
+        className: 'bg-blue-600 hover:bg-blue-700 focus:ring-blue-500',
+        onClick: () => {
+          setIsConfirmationModalOpen(false);
+          handleConfirmDelete(waybill.id, 'return');
+        },
+      } : undefined,
     } as any);
     setIsConfirmationModalOpen(true);
   };
 
-  const handleConfirmDelete = async (waybillId: string, markAsSpoiled: boolean) => {
+  const handleConfirmDelete = async (waybillId: string, blankAction: 'return' | 'spoil') => {
     try {
-      await deleteWaybill(waybillId);
-      showToast('Путевой лист удален.', 'info');
+      await deleteWaybill(waybillId, blankAction);
+      const actionText = blankAction === 'spoil' ? 'Бланк списан.' : 'Бланк возвращён водителю.';
+      showToast(`Путевой лист удалён. ${actionText}`, 'info');
       fetchData();
     } catch (error) {
       showToast((error as Error).message, 'error');
-    } finally {
-      setIsConfirmationModalOpen(false);
     }
   };
 
