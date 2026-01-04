@@ -4,11 +4,13 @@ import { validateOdometer, calculateDistanceKm, calculatePlannedFuelByMethod, Fu
 import { isWinterDate } from '../utils/dateUtils';
 import { getSeasonSettings, getAppSettings } from './settingsService';
 import { reserveNextBlankForDriver, reserveSpecificBlank, releaseBlank } from './blankService';
-// REL-103: Stock location imports
-import { getOrCreateVehicleTankLocation, getOrCreateFuelCardLocation, getOrCreateDefaultWarehouseLocation } from './stockLocationService';
+// REL-103: Stock location imports (used by postingService)
+import { getOrCreateVehicleTankLocation } from './stockLocationService';
 import { createTransfer, createExpenseMovement, getBalanceAt } from './stockService';
 import { stornoDocument, executeStorno } from './stornoService';
 import { findActiveCardForDriver } from './fuelCardService';
+// POSTING-SVC-010: Import PostingService
+import { postWaybill, cancelWaybill } from './postingService';
 
 const prisma = new PrismaClient();
 
@@ -1023,16 +1025,12 @@ export async function deleteWaybill(userInfo: UserInfo, id: string) {
     });
     if (!waybill) throw new NotFoundError('Путевой лист не найден');
 
-    // P0-F: Block deletion of POSTED waybills unless explicitly allowed in settings
+    // DOC-IMMUTABLE-020: Block deletion of POSTED waybills unconditionally
     if (waybill.status === WaybillStatus.POSTED) {
-        const appSettings = await getAppSettings();
-        if (!appSettings.allowDeletePostedWaybills) {
-            throw new BadRequestError(
-                'Нельзя удалить проведённый путевой лист. Используйте отмену проводки (скорректировать).',
-                'DELETE_POSTED_FORBIDDEN'
-            );
-        }
-        console.log('[P0-F] Deleting POSTED waybill allowed by admin setting');
+        throw new BadRequestError(
+            'Нельзя удалить проведённый путевой лист. Используйте отмену проводки (скорректировать).',
+            'DELETE_POSTED_FORBIDDEN'
+        );
     }
 
     // WB-DEL-001: Release blank when deleting waybill
@@ -1060,17 +1058,7 @@ export async function deleteWaybill(userInfo: UserInfo, id: string) {
         }
     }
 
-    // WB-DEL-002: Delete stock movements created by this waybill (reverse POSTED operations)
-    if (waybill.status === WaybillStatus.POSTED) {
-        console.log('[WB-DEL-002] Deleting stock movements for POSTED waybill:', waybill.id);
-        const deletedMovements = await prisma.stockMovement.deleteMany({
-            where: {
-                documentType: 'WAYBILL',
-                documentId: waybill.id
-            }
-        });
-        console.log('[WB-DEL-002] ✅ Deleted', deletedMovements.count, 'stock movements');
-    }
+    // DOC-IMMUTABLE-020: Stock movement cleanup removed - POSTED waybills can never reach here
 
     return prisma.waybill.delete({ where: { id } });
 }
@@ -1134,8 +1122,14 @@ export async function bulkChangeWaybillStatus(
         }
     });
 
-    // Sort by date to process in chronological order
-    waybills.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    // WB-BULK-ORDER-FIX: Sort order depends on target status
+    // - POSTED: chronological (oldest first) - so chain builds correctly
+    // - DRAFT (cancel): reverse chronological (newest first) - so final rollback = earliest values
+    if (status === WaybillStatus.DRAFT) {
+        waybills.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    } else {
+        waybills.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    }
 
     // WB-BULK-SEQ: Track if we should stop processing
     let shouldStop = false;
@@ -1413,200 +1407,9 @@ export async function changeWaybillStatus(
             console.log('[WB-701] Norm override logged to audit');
         }
 
-        // Business logic для перехода в POSTED (завершенный ПЛ)
+        // POSTING-SVC-010: Delegate posting logic to PostingService
         if (status === WaybillStatus.POSTED) {
-            // REL-103: Получить локацию бака ТС
-            const vehicleTank = await getOrCreateVehicleTankLocation(waybill.vehicleId);
-
-            // 1. REL-103: TRANSFER заправок в бак
-            for (let lineIndex = 0; lineIndex < waybill.fuelLines.length; lineIndex++) {
-                const fuelLine = waybill.fuelLines[lineIndex];
-                const fuelReceived = Number(fuelLine.fuelReceived || 0);
-
-                if (fuelReceived > 0) {
-                    // FUEL-CARD-AUTO-001: Определяем источник заправки
-                    // Приоритет: 1) fuelCardId если есть, 2) sourceType, 3) склад по умолчанию
-                    let sourceLocationId: string;
-
-                    // Если у ПЛ есть привязанная карта (явно или через авто-подбор выше) — используем её
-                    if (effectiveFuelCardId && fuelLine.sourceType !== 'WAREHOUSE') {
-                        // Заправка с топливной карты водителя
-                        const cardLocation = await getOrCreateFuelCardLocation(effectiveFuelCardId);
-                        sourceLocationId = cardLocation.id;
-                        console.log(`[FUEL-CARD-AUTO] Using driver's fuel card as source: ${effectiveFuelCardId}`);
-                    } else {
-                        // Заправка со склада
-                        const warehouseLocation = await getOrCreateDefaultWarehouseLocation(
-                            organizationId,
-                            waybill.departmentId
-                        );
-                        sourceLocationId = warehouseLocation.id;
-                    }
-
-                    // Время заправки: refueledAt или startAt или date
-                    const refueledAt = fuelLine.refueledAt
-                        || waybill.startAt
-                        || waybill.date;
-
-                    // IDEMPOTENCY-FIX: Use unique externalRef with version to prevent duplicates
-                    // Version is determined by counting existing voided movements with same pattern
-                    const baseExternalRef = `WB:REFUEL:${waybill.id}:${lineIndex}`;
-
-                    // Count voided movements to determine version for re-post
-                    const voidedCount = await tx.stockMovement.count({
-                        where: {
-                            organizationId,
-                            externalRef: { startsWith: baseExternalRef },
-                            isVoid: true
-                        }
-                    });
-
-                    const refuelExternalRef = voidedCount > 0
-                        ? `${baseExternalRef}:v${voidedCount + 1}`
-                        : baseExternalRef;
-
-                    // Check if this refueling movement already exists (not voided)
-                    const existingRefuel = await tx.stockMovement.findFirst({
-                        where: {
-                            organizationId,
-                            externalRef: refuelExternalRef,
-                            isVoid: false
-                        }
-                    });
-
-                    if (existingRefuel) {
-                        console.log(`[IDEMPOTENCY] Skipping duplicate refueling TRANSFER: ${refuelExternalRef}`);
-                    } else {
-                        await createTransfer({
-                            organizationId,
-                            stockItemId: fuelLine.stockItemId,
-                            quantity: fuelReceived,
-                            fromLocationId: sourceLocationId,
-                            toLocationId: vehicleTank.id,
-                            occurredAt: refueledAt,
-                            occurredSeq: lineIndex * 100,  // 0, 100, 200...
-                            documentType: 'WAYBILL',
-                            documentId: waybill.id,
-                            externalRef: refuelExternalRef,  // IDEMPOTENCY-FIX with version
-                            comment: `Заправка по ПЛ №${waybill.number}`,
-                            userId,
-                        });
-
-                        console.log(`[REL-103] TRANSFER created: ${fuelReceived}L from ${sourceLocationId} to tank ${vehicleTank.id}`);
-                    }
-                }
-            }
-
-            // 2. REL-103: EXPENSE расхода топлива из бака
-            const expenseOccurredAt = waybill.endAt || waybill.date;
-
-            for (let expenseIndex = 0; expenseIndex < waybill.fuelLines.length; expenseIndex++) {
-                const fuelLine = waybill.fuelLines[expenseIndex];
-
-                // WB-FUEL-NEG-001: Auto-calculate fuelConsumed if missing but we have start/end values
-                let effectiveFuelConsumed = Number(fuelLine.fuelConsumed || 0);
-
-                if (effectiveFuelConsumed === 0 && fuelLine.fuelStart != null && fuelLine.fuelEnd != null) {
-                    const fuelStart = Number(fuelLine.fuelStart);
-                    const fuelReceived = Number(fuelLine.fuelReceived || 0);
-                    const fuelEnd = Number(fuelLine.fuelEnd);
-                    const calculatedConsumed = fuelStart + fuelReceived - fuelEnd;
-
-                    if (calculatedConsumed > 0) {
-                        effectiveFuelConsumed = calculatedConsumed;
-                        console.log(`[WB-FUEL-NEG-001] Auto-calculated fuelConsumed: ${fuelStart} + ${fuelReceived} - ${fuelEnd} = ${effectiveFuelConsumed}`);
-                    }
-                }
-
-                // WB-FUEL-NEG-001: Also use fuelPlanned if no other consumption data
-                if (effectiveFuelConsumed === 0 && fuelLine.fuelPlanned != null) {
-                    const planned = Number(fuelLine.fuelPlanned);
-                    if (planned > 0) {
-                        effectiveFuelConsumed = planned;
-                        console.log(`[WB-FUEL-NEG-001] Using fuelPlanned as fuelConsumed: ${effectiveFuelConsumed}`);
-                    }
-                }
-
-                if (effectiveFuelConsumed > 0) {
-                    // WB-FUEL-NEG-001: Pre-validate tank balance BEFORE creating EXPENSE
-                    const tankBalance = await getBalanceAt(vehicleTank.id, fuelLine.stockItemId, expenseOccurredAt);
-
-                    // Account for fuel received in this waybill (TRANSFER happened above)
-                    const fuelReceived = Number(fuelLine.fuelReceived || 0);
-                    const effectiveBalance = tankBalance + fuelReceived;
-
-                    if (effectiveBalance < effectiveFuelConsumed) {
-                        throw new BadRequestError(
-                            `Недостаточно топлива в баке ТС для проведения ПЛ №${waybill.number}. ` +
-                            `Требуется списать: ${effectiveFuelConsumed.toFixed(2)} л, ` +
-                            `доступно в баке: ${effectiveBalance.toFixed(2)} л (баланс ${tankBalance.toFixed(2)} + заправка ${fuelReceived.toFixed(2)}). ` +
-                            `Добавьте заправку или скорректируйте расход.`,
-                            'INSUFFICIENT_TANK_FUEL'
-                        );
-                    }
-
-                    // IDEMPOTENCY-FIX: Check if this expense movement already exists
-                    const existingExpense = await tx.stockMovement.findFirst({
-                        where: {
-                            organizationId,
-                            documentType: 'WAYBILL',
-                            documentId: waybill.id,
-                            movementType: 'EXPENSE',
-                            stockLocationId: vehicleTank.id,
-                            stockItemId: fuelLine.stockItemId,
-                            isVoid: false
-                        }
-                    });
-
-                    if (existingExpense) {
-                        console.log(`[IDEMPOTENCY] Skipping duplicate EXPENSE for waybill ${waybill.id}`);
-                    } else {
-                        await createExpenseMovement(
-                            organizationId,
-                            fuelLine.stockItemId,
-                            effectiveFuelConsumed,
-                            'WAYBILL',
-                            waybill.id,
-                            userId,
-                            null,  // warehouseId deprecated
-                            `Расход по ПЛ №${waybill.number} от ${waybill.date.toISOString().slice(0, 10)}`,
-                            vehicleTank.id,  // stockLocationId = бак ТС
-                            expenseOccurredAt  // occurredAt = endAt или date
-                        );
-
-                        console.log(`[REL-103] EXPENSE created: ${effectiveFuelConsumed}L from tank ${vehicleTank.id}`);
-                    }
-                }
-            }
-
-            // 3. WB-501: Обновить статус бланка (ISSUED/RESERVED → USED)
-            if (waybill.blankId && waybill.blank) {
-                const blankStatus = waybill.blank.status;
-                if (blankStatus === BlankStatus.ISSUED || blankStatus === BlankStatus.RESERVED) {
-                    await tx.blank.update({
-                        where: { id: waybill.blankId },
-                        data: {
-                            status: BlankStatus.USED,
-                            usedAt: new Date(),
-                        },
-                    });
-                    console.log('[WB-501] Blank status updated to USED:', waybill.blankId);
-                }
-            }
-
-            // 4. WB-POST-VEHICLE: Обновить пробег и остаток топлива в справочнике авто
-            const fuelEnd = waybill.fuelLines.reduce((acc, fl) => {
-                return Number(fl.fuelEnd) || acc;
-            }, 0);
-
-            await tx.vehicle.update({
-                where: { id: waybill.vehicleId },
-                data: {
-                    ...(waybill.odometerEnd != null && { mileage: waybill.odometerEnd }),
-                    ...(fuelEnd > 0 && { currentFuel: fuelEnd }),
-                }
-            });
-            console.log('[WB-POST-VEHICLE] ✅ Updated vehicle:', waybill.vehicleId, 'mileage:', waybill.odometerEnd, 'fuel:', fuelEnd);
+            await postWaybill(tx, waybill as any, effectiveFuelCardId, userId);
         }
 
         // Обновляем статус ПЛ
@@ -1620,37 +1423,9 @@ export async function changeWaybillStatus(
             },
         });
 
-        // 5. LEDGER-DOCS: Create STORNO if returning from POSTED to DRAFT
+        // POSTING-SVC-010: Delegate cancel logic to PostingService
         if (currentStatus === WaybillStatus.POSTED && status === WaybillStatus.DRAFT) {
-            console.log(`[STORNO] Waybill №${waybill.number} returned to DRAFT. Reversing movements.`);
-
-            // 5a. WB-CORRECTION-ROLLBACK: Restore Vehicle mileage and fuel to values before this waybill
-            if (waybill.vehicleId) {
-                const fuelStart = waybill.fuelLines.length > 0
-                    ? Number(waybill.fuelLines[0].fuelStart || 0)
-                    : 0;
-
-                await tx.vehicle.update({
-                    where: { id: waybill.vehicleId },
-                    data: {
-                        mileage: waybill.odometerStart || 0,
-                        currentFuel: fuelStart,
-                    }
-                });
-                console.log(`[WB-CORRECTION-ROLLBACK] Vehicle ${waybill.vehicleId} rolled back: mileage=${waybill.odometerStart}, fuel=${fuelStart}`);
-            }
-
-            // 5b. Execute storno for stock movements
-            try {
-                await executeStorno(tx, organizationId, 'WAYBILL', id, reason || 'Корректировка ПЛ', userId);
-            } catch (err) {
-                // WB-STORNO-FIX: Use statusCode check since custom error classes may not have proper .name  
-                if ((err as any).statusCode === 404) {
-                    console.warn('[STORNO] No movements found to storno for posted waybill - this is OK if no fuel was processed');
-                } else {
-                    throw err;
-                }
-            }
+            await cancelWaybill(tx, waybill as any, reason || 'Корректировка ПЛ', userId);
         }
 
         // Логируем в audit

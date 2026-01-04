@@ -1,53 +1,65 @@
-# Реализация расширенного экспорта данных через Бэкенд
+# Implementation Plan - Posting Service & Immutable Documents (ARCH-POSTING-REPLY-001)
 
-## Цель
-Реализовать "Расширенный экспорт данных" в Админ-панели, который повторяет функциональность и интерфейс "Выборочного удаления данных".
-Экспорт должен выполняться на стороне Бэкенда (совместимость с Central Mode) и позволять гранулярный выбор данных (Таблицы -> Категории -> Элементы).
+## Goal Description
+Implement a proper "Ledger-based" transaction processing system where:
+1.  **Waybills** drive the creation of **Stock Movements** via strict status transitions (Draft -> Posted).
+2.  **Stock Movements** are immutable ledger entries (no physical delete, only Void/Storno).
+3.  **PostingService** acts as the central orchestrator for creating these ledger entries atomically.
 
-## Предлагаемые изменения
+> [!IMPORTANT]
+> **NO STATUS ON STOCK MOVEMENT**: We strictly adhere to the decision that `StockMovement` is a ledger row without a "Draft" state. It exists or it doesn't (or it is Void).
 
-### Бэкенд (Backend)
+## User Review Required
+*   **Immutable Documents**: Once a Waybill is `POSTED`, it cannot be deleted physically. It can only be `CANCELLED` (Void), which generates reversing ledger entries. This is a behavior change for users used to deleting anything.
 
-#### [MODIFY] [adminRoutes.ts](file:///c:/_PL-tests/backend/src/routes/adminRoutes.ts)
-- [x] Добавить маршрут `POST /export`, защищенный ролью `admin`.
+## Proposed Changes
 
-#### [MODIFY] [adminController.ts](file:///c:/_PL-tests/backend/src/controllers/adminController.ts)
-- [x] Реализовать контроллер `exportData(req, res)`.
-    -   Принимает `SelectiveExportRequest` (список таблиц, карта элементов).
-    -   Получает полные данные для выбранных сущностей из Prisma.
-    -   Формирует JSON "Export Bundle" (совместимый с `FormatVersion: 2`).
-    -   Возвращает JSON ответ.
-    -   Логика должна зеркально отражать `selectiveDelete`, но выбирать данные вместо удаления и форматировать их.
+### 1. New Service: `PostingService` (Backend)
+Create `backend/src/services/postingService.ts`.
+This service will be responsible for the "Business Logic of Posting".
 
-### Фронтенд (Frontend)
+#### Ledger Logic
+*   **postWaybill(waybillId, userId)**:
+    *   Verifies Waybill is in `DRAFT` (or correct state).
+    *   Calculates required stock movements (Fuel consumption, etc.).
+    *   Executes a `prisma.$transaction`:
+        *   Sets Waybill.status = `POSTED`.
+        *   Calls `stockService.createExpenseMovement` / `createIncomeMovement` etc.
+        *   Validates balances (if not allowed to go negative).
+*   **cancelWaybill(waybillId, userId, reason)**:
+    *   Verifies Waybill is `POSTED`.
+    *   Executes a `prisma.$transaction`:
+        *   Sets Waybill.status = `CANCELLED`.
+        *   Finds previously created StockMovements for this Waybill.
+        *   Marks them as `isVoid = true` OR creates explicit "Storno" movements (depending on strictness preference, plan says "storno/void". `isVoid` is cleaner for balance calculation if supported by `getBalance`).
+        *   *Decision*: We will use `isVoid = true` for simplicity if existing queries support it (they seem to: `isVoid: false` check exists in `stockService.ts`).
 
-#### [MODIFY] [adminApi.ts](file:///c:/_PL-tests/services/adminApi.ts)
-- [x] Добавить метод `exportData(request: SelectiveDeleteRequest): Promise<Blob>` (используя тип `SelectiveDeleteRequest` или похожую структуру).
+### 2. Update `WaybillService` (Backend)
+*   Remove any ad-hoc stock movement creation if it exists.
+*   Integrate `PostingService` calls.
 
-#### [MODIFY] [DataExportModal.tsx](file:///c:/_PL-tests/components/admin/DataExportModal.tsx)
-- [x] Рефакторинг для использования `getDataPreview()` для загрузки дерева данных (вместо `loadJSON`).
-- [x] Адоптировать структуру `CATEGORIES` и маппинг из `DataDeletionModal.tsx` (или использовать совместно, если возможно, но дублирование безопаснее, чтобы не сломать удаление).
-- [x] Реализовать логику выбора (Категории/Таблицы/Элементы), идентичную `DataDeletionModal`.
-- [x] Заменить действие "Export" на вызов `adminApi.exportData` и инициирование скачивания файла.
+### 3. Update `AdminController` / Routes (Backend)
+*   Add endpoints for `POST /waybills/:id/post` and `POST /waybills/:id/cancel`.
 
-#### [MODIFY] [Admin.tsx](file:///c:/_PL-tests/components/admin/Admin.tsx)
-- [x] Убедиться, что в `DataExportModal` передаются правильные пропсы (если изменятся).
-- [x] (Опционально) Обновить "Export All" для использования бэкенд-эндпоинта.
+### 4. Database Schema (Verification)
+*   Ensure `StockMovement` has `documentType`, `documentId`, `isVoid` (Confirmed: they exist).
+*   Ensure `Waybill` has `status` (Confirmed).
 
-## План проверки (Verification Plan)
+## Verification Plan
 
-### Автоматизированные тесты
-- Запустить `npm run test` для проверки регрессий в компонентах Админки.
+### Automated Tests
+*   **Unit Tests (`postingService.test.ts`)**:
+    *   Post a waybill -> Check `StockMovement` created.
+    *   Post a waybill with insufficient funds -> Check error.
+    *   Cancel a waybill -> Check `StockMovement` is voided and balance restored.
 
-### Ручная проверка
-1.  **Открыть Админ-панель**: Настройки -> Экспорт.
-2.  **Открыть Расширенный экспорт**: Нажать кнопку "Export..." (убедиться, что открывается новое модальное окно).
-3.  **Проверка UI**: Проверить аккордеоны (Документы, Справочники и т.д.), чтобы они визуально совпадали с "Очисткой данных".
-4.  **Выбор**: Выбрать конкретные элементы (например, 2 путевых листа, 1 организацию).
-5.  **Экспорт**: Нажать "Export Selected".
-6.  **Проверка файла**: Открыть скачанный JSON.
-    -   Проверить структуру (`meta`, `data`).
-    -   Проверить, что присутствуют только выбранные элементы.
-    -   Проверить целостность данных.
-7.  **Выбрать все**: Выбрать целую категорию (например, Справочники).
-8.  **Экспорт и проверка**: Убедиться, что все справочники попали в JSON.
+### Manual Verification
+1.  **Create Waybill (Draft)**:
+    *   Verify NO `StockMovements` are created.
+    *   Verify Fuel Card balance is UNCHANGED.
+2.  **Post Waybill**:
+    *   Verify `StockMovements` appear (EXPENSE).
+    *   Verify Fuel Card balance DECREASES (if applicable).
+3.  **Cancel Waybill**:
+    *   Verify `StockMovements` disappear from ledger (or marked Void).
+    *   Verify Fuel Card balance RESTORES.
