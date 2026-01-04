@@ -467,6 +467,16 @@ const BlankList: React.FC<{ key: number }> = () => {
                         {pagination.total}
                     </span>
                 </div>
+                {selectionCount > 0 && isSpoilAllowed && (
+                    <Button
+                        onClick={() => setIsSpoilModalOpen(true)}
+                        variant="warning"
+                        size="sm"
+                        leftIcon={<TrashIcon className="h-4 w-4" />}
+                    >
+                        Списать выбранные ({selectionCount})
+                    </Button>
+                )}
             </div>
 
             <div className="overflow-x-auto bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700">
@@ -605,15 +615,6 @@ const BlankList: React.FC<{ key: number }> = () => {
                 </div>
 
                 <div className="flex items-center gap-4">
-                    {selectionCount > 0 && isSpoilAllowed && (
-                        <button
-                            onClick={() => setIsSpoilModalOpen(true)}
-                            className="bg-yellow-500 text-white text-sm font-semibold py-1.5 px-4 rounded-lg shadow-sm hover:bg-yellow-600 transition-colors"
-                        >
-                            Списать выбранные ({selectionCount})
-                        </button>
-                    )}
-
                     <div className="flex gap-2">
                         <button
                             onClick={() => setPagination(p => ({ ...p, page: p.page - 1 }))}
