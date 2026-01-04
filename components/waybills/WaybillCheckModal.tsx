@@ -298,7 +298,7 @@ const WaybillCheckModal: React.FC<WaybillCheckModalProps> = ({ isOpen, onClose, 
                 onChange={e => setCalculationMethod(e.target.value as 'BOILER' | 'SEGMENTS' | 'MIXED')}
                 className="w-full bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-500 rounded-md p-2 focus:ring-blue-500 focus:border-blue-500 text-gray-700 dark:text-gray-200"
               >
-                <option value="BOILER">По котлу — только базовая норма</option>
+                <option value="BOILER">Общий метод — только базовая норма</option>
                 <option value="SEGMENTS">По отрезкам — с учётом города/прогрева</option>
                 <option value="MIXED">Смешанный — усреднённая норма</option>
               </select>

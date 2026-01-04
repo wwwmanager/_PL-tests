@@ -101,13 +101,13 @@ const FuelBalances: React.FC = () => {
             case 'centralWarehouse':
             case 'remoteWarehouse':
             case 'contractorWarehouse':
-                return '🏭 Склад';
+                return 'Склад';
             case 'FUEL_CARD':
             case 'fuelCard':
-                return '💳 Карта';
+                return 'Карта';
             case 'VEHICLE_TANK':
             case 'vehicleTank':
-                return '🚛 Бак ТС';
+                return 'Бак ТС';
             default: return type;
         }
     };
@@ -123,6 +123,7 @@ const FuelBalances: React.FC = () => {
             key: 'locationType',
             label: 'Тип',
             sortable: true,
+            align: 'center' as const,
             render: (row: LocationBalance) => (
                 <span className="text-sm text-gray-600 dark:text-gray-300">
                     {getLocationTypeLabel(row.locationType)}
@@ -133,12 +134,14 @@ const FuelBalances: React.FC = () => {
             key: 'stockItemName',
             label: 'Товар',
             sortable: true,
+            align: 'center' as const,
             render: (row: LocationBalance) => <span className="text-sm text-gray-600 dark:text-gray-300">{row.stockItemName}</span>
         },
         {
             key: 'balance',
             label: 'Остаток',
             sortable: true,
+            align: 'right' as const,
             render: (row: LocationBalance) => (
                 <span className={`font-bold ${row.balance < 0 ? 'text-red-600' : 'text-green-600'}`}>
                     {row.balance.toLocaleString('ru-RU', { minimumFractionDigits: 2 })}
@@ -149,12 +152,14 @@ const FuelBalances: React.FC = () => {
             key: 'unit',
             label: 'Ед. изм.',
             sortable: true,
+            align: 'center' as const,
             render: (row: LocationBalance) => <span className="text-sm text-gray-500 dark:text-gray-400">{row.unit}</span>
         },
         {
             key: 'driver',
             label: 'Водитель / Ответственный',
             sortable: true,
+            align: 'center' as const,
             render: (row: LocationBalance) => {
                 // Driver name is already enriched in filteredBalances
                 return <span className="text-sm font-medium text-gray-800 dark:text-gray-200">{(row as any).driver || '-'}</span>;
@@ -169,57 +174,51 @@ const FuelBalances: React.FC = () => {
                 <h3 className="text-xl font-semibold text-gray-800 dark:text-white">Остатки по локациям</h3>
             </div>
             {/* Filters */}
-            <div className="flex flex-wrap gap-4 items-end bg-gray-50 dark:bg-gray-800/50 p-4 rounded-xl border border-gray-100 dark:border-gray-700">
-                <div className="flex items-center gap-2 text-gray-500 text-sm font-medium mr-2 self-center">
+            <div className="flex flex-wrap gap-3 items-center bg-gray-50 dark:bg-gray-800/50 p-3 rounded-lg border border-gray-200 dark:border-gray-700 mb-6">
+                <div className="flex items-center gap-2 text-gray-500 text-sm font-medium mr-2">
                     <FunnelIcon className="h-4 w-4" /> Фильтры:
                 </div>
-                <div className="flex-1 min-w-[200px]">
-                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">На дату/время</label>
-                    <input
-                        type="datetime-local"
-                        value={asOf}
-                        onChange={(e) => setAsOf(e.target.value)}
-                        className="w-full text-sm bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:text-white"
-                    />
-                </div>
-                <div className="min-w-[200px]">
-                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Товар</label>
-                    <select
-                        name="stockItemId"
-                        value={filters.stockItemId}
-                        onChange={handleFilterChange}
-                        className="w-full text-sm bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:text-white"
-                    >
-                        <option value="">Все товары</option>
-                        {items.map(item => (
-                            <option key={item.id} value={item.id}>{item.name}</option>
-                        ))}
-                    </select>
-                </div>
-                <div className="min-w-[200px]">
-                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Тип локации</label>
-                    <select
-                        name="locationType"
-                        value={filters.locationType}
-                        onChange={handleFilterChange}
-                        className="w-full text-sm bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:text-white"
-                    >
-                        <option value="">Все типы</option>
-                        <option value="WAREHOUSE">Склады</option>
-                        <option value="FUEL_CARD">Топливные карты</option>
-                        <option value="VEHICLE_TANK">Баки ТС</option>
-                    </select>
-                </div>
-                <div className="flex items-center">
-                    <Button
-                        onClick={loadData}
-                        disabled={loading}
-                        variant="primary"
-                        size="sm"
-                    >
-                        Обновить
-                    </Button>
-                </div>
+
+                <input
+                    type="datetime-local"
+                    value={asOf}
+                    onChange={(e) => setAsOf(e.target.value)}
+                    className="p-2 text-sm border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                />
+
+                <select
+                    name="stockItemId"
+                    value={filters.stockItemId}
+                    onChange={handleFilterChange}
+                    className="p-2 text-sm border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white min-w-[200px]"
+                >
+                    <option value="">Все товары</option>
+                    {items.map(item => (
+                        <option key={item.id} value={item.id}>{item.name}</option>
+                    ))}
+                </select>
+
+                <select
+                    name="locationType"
+                    value={filters.locationType}
+                    onChange={handleFilterChange}
+                    className="p-2 text-sm border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white min-w-[150px]"
+                >
+                    <option value="">Тип локации: Все</option>
+                    <option value="WAREHOUSE">Склады</option>
+                    <option value="FUEL_CARD">Топливные карты</option>
+                    <option value="VEHICLE_TANK">Баки ТС</option>
+                </select>
+
+                <Button
+                    onClick={loadData}
+                    disabled={loading}
+                    variant="primary"
+                    size="sm"
+                    className="ml-auto"
+                >
+                    Обновить
+                </Button>
             </div>
 
             {/* Table */}

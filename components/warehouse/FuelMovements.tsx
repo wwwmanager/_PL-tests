@@ -161,12 +161,14 @@ const FuelMovements: React.FC = () => {
             key: 'occurredAt',
             label: 'Дата',
             sortable: true,
+            align: 'center' as const,
             render: (row: StockMovementV2) => new Date(row.occurredAt).toLocaleString('ru-RU', { dateStyle: 'short', timeStyle: 'short' })
         },
         {
             key: 'translatedType',
             label: 'Тип',
             sortable: true,
+            align: 'center' as const,
             render: (row: any) => {
                 const type = getTypeLabel(row.movementType);
                 return <Badge variant={type.variant}>{row.translatedType}</Badge>;
@@ -176,12 +178,14 @@ const FuelMovements: React.FC = () => {
             key: 'stockItemName',
             label: 'Товар',
             sortable: true,
+            align: 'center' as const,
             render: (row: StockMovementV2) => <span className="font-medium text-gray-900 dark:text-white">{row.stockItemName}</span>
         },
         {
             key: 'quantity',
             label: 'Кол-во',
             sortable: true,
+            align: 'right' as const,
             render: (row: StockMovementV2) => (
                 <span className="font-semibold text-gray-700 dark:text-gray-200">
                     {row.quantity.toLocaleString('ru-RU', { minimumFractionDigits: 2 })}

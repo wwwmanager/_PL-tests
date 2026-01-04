@@ -29,11 +29,11 @@ interface StockItemFormData {
 }
 
 const CATEGORY_LABELS: Record<StockItemCategory, string> = {
-    FUEL: '⛽ Топливо',
-    MATERIAL: '📦 Материалы',
-    SPARE_PART: '🔧 Запчасти',
-    SERVICE: '🛠️ Услуги',
-    OTHER: '📋 Прочее',
+    FUEL: 'Топливо',
+    MATERIAL: 'Материалы',
+    SPARE_PART: 'Запчасти',
+    SERVICE: 'Услуги',
+    OTHER: 'Прочее',
 };
 
 

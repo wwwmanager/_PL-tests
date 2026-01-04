@@ -39747,3 +39747,119 @@
 [2026-01-04T13:46:18.519Z] 🌐 Found 1 vehicles for org b033e4d0-5f6b-4272-8daf-f694338f4139
 [2026-01-04T13:46:18.525Z] 🌐 GET /vehicles - User Org: b033e4d0-5f6b-4272-8daf-f694338f4139, Dept: null, Role: admin, DriverFilter: none
 [2026-01-04T13:46:18.533Z] 🌐 Found 1 vehicles for org b033e4d0-5f6b-4272-8daf-f694338f4139
+[2026-01-04T13:52:12.420Z] 🌐 GET /vehicles - User Org: b033e4d0-5f6b-4272-8daf-f694338f4139, Dept: null, Role: admin, DriverFilter: none
+[2026-01-04T13:52:12.430Z] 🌐 Found 1 vehicles for org b033e4d0-5f6b-4272-8daf-f694338f4139
+[2026-01-04T13:52:12.434Z] 🌐 GET /vehicles - User Org: b033e4d0-5f6b-4272-8daf-f694338f4139, Dept: null, Role: admin, DriverFilter: none
+[2026-01-04T13:52:12.439Z] 🌐 Found 1 vehicles for org b033e4d0-5f6b-4272-8daf-f694338f4139
+[2026-01-04T13:52:15.763Z] 🌐 GET /vehicles - User Org: b033e4d0-5f6b-4272-8daf-f694338f4139, Dept: null, Role: admin, DriverFilter: none
+[2026-01-04T13:52:15.780Z] 🌐 Found 1 vehicles for org b033e4d0-5f6b-4272-8daf-f694338f4139
+[2026-01-04T13:52:15.788Z] 🌐 GET /vehicles - User Org: b033e4d0-5f6b-4272-8daf-f694338f4139, Dept: null, Role: admin, DriverFilter: none
+[2026-01-04T13:52:15.794Z] 🌐 Found 1 vehicles for org b033e4d0-5f6b-4272-8daf-f694338f4139
+[2026-01-04T13:52:22.836Z] 🌐 [employeeController] GET /employees - User Org: b033e4d0-5f6b-4272-8daf-f694338f4139, Role: admin, Query: {}
+[2026-01-04T13:52:22.991Z] 🌐 [employeeController] Found 1 employees
+[2026-01-04T14:21:52.694Z] 🌐 GET /vehicles - User Org: b033e4d0-5f6b-4272-8daf-f694338f4139, Dept: null, Role: admin, DriverFilter: none
+[2026-01-04T14:21:52.697Z] 🌐 [employeeController] GET /employees - User Org: b033e4d0-5f6b-4272-8daf-f694338f4139, Role: admin, Query: {}
+[2026-01-04T14:21:52.712Z] 🌐 Found 1 vehicles for org b033e4d0-5f6b-4272-8daf-f694338f4139
+[2026-01-04T14:21:52.722Z] 🌐 GET /vehicles - User Org: b033e4d0-5f6b-4272-8daf-f694338f4139, Dept: null, Role: admin, DriverFilter: none
+[2026-01-04T14:21:52.729Z] 🌐 Found 1 vehicles for org b033e4d0-5f6b-4272-8daf-f694338f4139
+[2026-01-04T14:21:52.995Z] 🌐 [employeeController] Found 1 employees
+[2026-01-04T14:21:52.998Z] 🌐 [employeeController] GET /employees - User Org: b033e4d0-5f6b-4272-8daf-f694338f4139, Role: admin, Query: {}
+[2026-01-04T14:21:53.010Z] 🌐 [employeeController] Found 1 employees
+[2026-01-04T14:21:54.466Z] 🌐 [employeeController] GET /employees - User Org: b033e4d0-5f6b-4272-8daf-f694338f4139, Role: admin, Query: {"isActive":"true"}
+[2026-01-04T14:21:54.477Z] 🌐 [employeeController] Found 1 employees
+[2026-01-04T14:21:54.482Z] 🌐 [employeeController] GET /employees - User Org: b033e4d0-5f6b-4272-8daf-f694338f4139, Role: admin, Query: {"isActive":"true"}
+[2026-01-04T14:21:54.489Z] 🌐 [employeeController] Found 1 employees
+[2026-01-04T14:22:00.358Z] 🌐 GET /vehicles - User Org: b033e4d0-5f6b-4272-8daf-f694338f4139, Dept: null, Role: admin, DriverFilter: none
+[2026-01-04T14:22:00.376Z] 🌐 Found 1 vehicles for org b033e4d0-5f6b-4272-8daf-f694338f4139
+[2026-01-04T14:22:00.380Z] 🌐 GET /vehicles - User Org: b033e4d0-5f6b-4272-8daf-f694338f4139, Dept: null, Role: admin, DriverFilter: none
+[2026-01-04T14:22:00.387Z] 🌐 Found 1 vehicles for org b033e4d0-5f6b-4272-8daf-f694338f4139
+[2026-01-04T14:22:02.188Z] 🌐 GET /vehicles - User Org: b033e4d0-5f6b-4272-8daf-f694338f4139, Dept: null, Role: admin, DriverFilter: none
+[2026-01-04T14:22:02.196Z] 🌐 Found 1 vehicles for org b033e4d0-5f6b-4272-8daf-f694338f4139
+[2026-01-04T14:22:02.201Z] 🌐 GET /vehicles - User Org: b033e4d0-5f6b-4272-8daf-f694338f4139, Dept: null, Role: admin, DriverFilter: none
+[2026-01-04T14:22:02.208Z] 🌐 Found 1 vehicles for org b033e4d0-5f6b-4272-8daf-f694338f4139
+[2026-01-04T14:36:02.253Z] 🌐 GET /vehicles - User Org: b033e4d0-5f6b-4272-8daf-f694338f4139, Dept: null, Role: admin, DriverFilter: none
+[2026-01-04T14:36:02.269Z] 🌐 Found 1 vehicles for org b033e4d0-5f6b-4272-8daf-f694338f4139
+[2026-01-04T14:36:02.276Z] 🌐 GET /vehicles - User Org: b033e4d0-5f6b-4272-8daf-f694338f4139, Dept: null, Role: admin, DriverFilter: none
+[2026-01-04T14:36:02.282Z] 🌐 Found 1 vehicles for org b033e4d0-5f6b-4272-8daf-f694338f4139
+[2026-01-04T14:36:02.286Z] 🌐 GET /vehicles - User Org: b033e4d0-5f6b-4272-8daf-f694338f4139, Dept: null, Role: admin, DriverFilter: none
+[2026-01-04T14:36:02.292Z] 🌐 Found 1 vehicles for org b033e4d0-5f6b-4272-8daf-f694338f4139
+[2026-01-04T14:36:12.179Z] 🌐 GET /vehicles - User Org: b033e4d0-5f6b-4272-8daf-f694338f4139, Dept: null, Role: admin, DriverFilter: none
+[2026-01-04T14:36:12.188Z] 🌐 Found 1 vehicles for org b033e4d0-5f6b-4272-8daf-f694338f4139
+[2026-01-04T14:36:12.197Z] 🌐 GET /vehicles - User Org: b033e4d0-5f6b-4272-8daf-f694338f4139, Dept: null, Role: admin, DriverFilter: none
+[2026-01-04T14:36:12.211Z] 🌐 Found 1 vehicles for org b033e4d0-5f6b-4272-8daf-f694338f4139
+[2026-01-04T14:36:12.218Z] 🌐 GET /vehicles - User Org: b033e4d0-5f6b-4272-8daf-f694338f4139, Dept: null, Role: admin, DriverFilter: none
+[2026-01-04T14:36:12.225Z] 🌐 Found 1 vehicles for org b033e4d0-5f6b-4272-8daf-f694338f4139
+[2026-01-04T14:40:41.726Z] 🌐 GET /vehicles - User Org: b033e4d0-5f6b-4272-8daf-f694338f4139, Dept: null, Role: admin, DriverFilter: none
+[2026-01-04T14:40:41.741Z] 🌐 Found 1 vehicles for org b033e4d0-5f6b-4272-8daf-f694338f4139
+[2026-01-04T14:40:41.745Z] 🌐 GET /vehicles - User Org: b033e4d0-5f6b-4272-8daf-f694338f4139, Dept: null, Role: admin, DriverFilter: none
+[2026-01-04T14:40:41.752Z] 🌐 Found 1 vehicles for org b033e4d0-5f6b-4272-8daf-f694338f4139
+[2026-01-04T14:40:41.757Z] 🌐 GET /vehicles - User Org: b033e4d0-5f6b-4272-8daf-f694338f4139, Dept: null, Role: admin, DriverFilter: none
+[2026-01-04T14:40:41.764Z] 🌐 Found 1 vehicles for org b033e4d0-5f6b-4272-8daf-f694338f4139
+[2026-01-04T14:51:05.293Z] 🌐 GET /vehicles - User Org: b033e4d0-5f6b-4272-8daf-f694338f4139, Dept: null, Role: admin, DriverFilter: none
+[2026-01-04T14:51:05.309Z] 🌐 Found 1 vehicles for org b033e4d0-5f6b-4272-8daf-f694338f4139
+[2026-01-04T14:51:05.314Z] 🌐 GET /vehicles - User Org: b033e4d0-5f6b-4272-8daf-f694338f4139, Dept: null, Role: admin, DriverFilter: none
+[2026-01-04T14:51:05.320Z] 🌐 Found 1 vehicles for org b033e4d0-5f6b-4272-8daf-f694338f4139
+[2026-01-04T14:51:09.233Z] 🌐 GET /vehicles - User Org: b033e4d0-5f6b-4272-8daf-f694338f4139, Dept: null, Role: admin, DriverFilter: none
+[2026-01-04T14:51:09.243Z] 🌐 Found 1 vehicles for org b033e4d0-5f6b-4272-8daf-f694338f4139
+[2026-01-04T14:51:09.248Z] 🌐 GET /vehicles - User Org: b033e4d0-5f6b-4272-8daf-f694338f4139, Dept: null, Role: admin, DriverFilter: none
+[2026-01-04T14:51:09.256Z] 🌐 Found 1 vehicles for org b033e4d0-5f6b-4272-8daf-f694338f4139
+[2026-01-04T14:51:09.261Z] 🌐 GET /vehicles - User Org: b033e4d0-5f6b-4272-8daf-f694338f4139, Dept: null, Role: admin, DriverFilter: none
+[2026-01-04T14:51:09.266Z] 🌐 Found 1 vehicles for org b033e4d0-5f6b-4272-8daf-f694338f4139
+[2026-01-04T14:51:13.583Z] 🌐 GET /vehicles - User Org: b033e4d0-5f6b-4272-8daf-f694338f4139, Dept: null, Role: admin, DriverFilter: none
+[2026-01-04T14:51:13.589Z] 🌐 Found 1 vehicles for org b033e4d0-5f6b-4272-8daf-f694338f4139
+[2026-01-04T14:51:13.599Z] 🌐 GET /vehicles - User Org: b033e4d0-5f6b-4272-8daf-f694338f4139, Dept: null, Role: admin, DriverFilter: none
+[2026-01-04T14:51:13.604Z] 🌐 Found 1 vehicles for org b033e4d0-5f6b-4272-8daf-f694338f4139
+[2026-01-04T14:51:26.446Z] 🌐 GET /vehicles - User Org: b033e4d0-5f6b-4272-8daf-f694338f4139, Dept: null, Role: admin, DriverFilter: none
+[2026-01-04T14:51:26.452Z] 🌐 Found 1 vehicles for org b033e4d0-5f6b-4272-8daf-f694338f4139
+[2026-01-04T14:51:26.459Z] 🌐 GET /vehicles - User Org: b033e4d0-5f6b-4272-8daf-f694338f4139, Dept: null, Role: admin, DriverFilter: none
+[2026-01-04T14:51:26.472Z] 🌐 Found 1 vehicles for org b033e4d0-5f6b-4272-8daf-f694338f4139
+[2026-01-04T14:51:26.483Z] 🌐 GET /vehicles - User Org: b033e4d0-5f6b-4272-8daf-f694338f4139, Dept: null, Role: admin, DriverFilter: none
+[2026-01-04T14:51:26.489Z] 🌐 Found 1 vehicles for org b033e4d0-5f6b-4272-8daf-f694338f4139
+[2026-01-04T14:52:43.680Z] 🌐 GET /vehicles - User Org: b033e4d0-5f6b-4272-8daf-f694338f4139, Dept: null, Role: admin, DriverFilter: none
+[2026-01-04T14:52:43.696Z] 🌐 Found 1 vehicles for org b033e4d0-5f6b-4272-8daf-f694338f4139
+[2026-01-04T14:52:43.700Z] 🌐 GET /vehicles - User Org: b033e4d0-5f6b-4272-8daf-f694338f4139, Dept: null, Role: admin, DriverFilter: none
+[2026-01-04T14:52:43.707Z] 🌐 Found 1 vehicles for org b033e4d0-5f6b-4272-8daf-f694338f4139
+[2026-01-04T14:54:34.128Z] 🌐 GET /vehicles - User Org: b033e4d0-5f6b-4272-8daf-f694338f4139, Dept: null, Role: admin, DriverFilter: none
+[2026-01-04T14:54:34.134Z] 🌐 Found 1 vehicles for org b033e4d0-5f6b-4272-8daf-f694338f4139
+[2026-01-04T14:54:34.142Z] 🌐 GET /vehicles - User Org: b033e4d0-5f6b-4272-8daf-f694338f4139, Dept: null, Role: admin, DriverFilter: none
+[2026-01-04T14:54:34.149Z] 🌐 Found 1 vehicles for org b033e4d0-5f6b-4272-8daf-f694338f4139
+[2026-01-04T14:54:34.158Z] 🌐 GET /vehicles - User Org: b033e4d0-5f6b-4272-8daf-f694338f4139, Dept: null, Role: admin, DriverFilter: none
+[2026-01-04T14:54:34.168Z] 🌐 Found 1 vehicles for org b033e4d0-5f6b-4272-8daf-f694338f4139
+[2026-01-04T14:55:03.597Z] 🌐 GET /vehicles - User Org: b033e4d0-5f6b-4272-8daf-f694338f4139, Dept: null, Role: admin, DriverFilter: none
+[2026-01-04T14:55:03.604Z] 🌐 Found 1 vehicles for org b033e4d0-5f6b-4272-8daf-f694338f4139
+[2026-01-04T14:55:03.609Z] 🌐 GET /vehicles - User Org: b033e4d0-5f6b-4272-8daf-f694338f4139, Dept: null, Role: admin, DriverFilter: none
+[2026-01-04T14:55:03.617Z] 🌐 Found 1 vehicles for org b033e4d0-5f6b-4272-8daf-f694338f4139
+[2026-01-04T14:55:03.626Z] 🌐 GET /vehicles - User Org: b033e4d0-5f6b-4272-8daf-f694338f4139, Dept: null, Role: admin, DriverFilter: none
+[2026-01-04T14:55:03.630Z] 🌐 Found 1 vehicles for org b033e4d0-5f6b-4272-8daf-f694338f4139
+[2026-01-04T14:55:10.066Z] 🌐 GET /vehicles - User Org: b033e4d0-5f6b-4272-8daf-f694338f4139, Dept: null, Role: admin, DriverFilter: none
+[2026-01-04T14:55:10.073Z] 🌐 Found 1 vehicles for org b033e4d0-5f6b-4272-8daf-f694338f4139
+[2026-01-04T14:55:10.077Z] 🌐 GET /vehicles - User Org: b033e4d0-5f6b-4272-8daf-f694338f4139, Dept: null, Role: admin, DriverFilter: none
+[2026-01-04T14:55:10.087Z] 🌐 Found 1 vehicles for org b033e4d0-5f6b-4272-8daf-f694338f4139
+[2026-01-04T14:55:10.093Z] 🌐 GET /vehicles - User Org: b033e4d0-5f6b-4272-8daf-f694338f4139, Dept: null, Role: admin, DriverFilter: none
+[2026-01-04T14:55:10.098Z] 🌐 Found 1 vehicles for org b033e4d0-5f6b-4272-8daf-f694338f4139
+[2026-01-04T14:59:24.937Z] 🌐 GET /vehicles - User Org: b033e4d0-5f6b-4272-8daf-f694338f4139, Dept: null, Role: admin, DriverFilter: none
+[2026-01-04T14:59:24.948Z] 🌐 Found 1 vehicles for org b033e4d0-5f6b-4272-8daf-f694338f4139
+[2026-01-04T14:59:24.952Z] 🌐 GET /vehicles - User Org: b033e4d0-5f6b-4272-8daf-f694338f4139, Dept: null, Role: admin, DriverFilter: none
+[2026-01-04T14:59:24.957Z] 🌐 Found 1 vehicles for org b033e4d0-5f6b-4272-8daf-f694338f4139
+[2026-01-04T14:59:28.505Z] 🌐 GET /vehicles - User Org: b033e4d0-5f6b-4272-8daf-f694338f4139, Dept: null, Role: admin, DriverFilter: none
+[2026-01-04T14:59:28.516Z] 🌐 Found 1 vehicles for org b033e4d0-5f6b-4272-8daf-f694338f4139
+[2026-01-04T14:59:28.523Z] 🌐 GET /vehicles - User Org: b033e4d0-5f6b-4272-8daf-f694338f4139, Dept: null, Role: admin, DriverFilter: none
+[2026-01-04T14:59:28.541Z] 🌐 Found 1 vehicles for org b033e4d0-5f6b-4272-8daf-f694338f4139
+[2026-01-04T14:59:53.249Z] 🌐 GET /vehicles - User Org: b033e4d0-5f6b-4272-8daf-f694338f4139, Dept: null, Role: admin, DriverFilter: none
+[2026-01-04T14:59:53.250Z] 🌐 [employeeController] GET /employees - User Org: b033e4d0-5f6b-4272-8daf-f694338f4139, Role: admin, Query: {}
+[2026-01-04T14:59:53.257Z] 🌐 Found 1 vehicles for org b033e4d0-5f6b-4272-8daf-f694338f4139
+[2026-01-04T14:59:53.265Z] 🌐 GET /vehicles - User Org: b033e4d0-5f6b-4272-8daf-f694338f4139, Dept: null, Role: admin, DriverFilter: none
+[2026-01-04T14:59:53.272Z] 🌐 Found 1 vehicles for org b033e4d0-5f6b-4272-8daf-f694338f4139
+[2026-01-04T14:59:53.434Z] 🌐 [employeeController] Found 1 employees
+[2026-01-04T14:59:53.437Z] 🌐 [employeeController] GET /employees - User Org: b033e4d0-5f6b-4272-8daf-f694338f4139, Role: admin, Query: {}
+[2026-01-04T14:59:53.447Z] 🌐 [employeeController] Found 1 employees
+[2026-01-04T15:00:02.142Z] 🌐 [employeeController] GET /employees - User Org: b033e4d0-5f6b-4272-8daf-f694338f4139, Role: admin, Query: {"isActive":"true"}
+[2026-01-04T15:00:02.152Z] 🌐 [employeeController] Found 1 employees
+[2026-01-04T15:00:02.155Z] 🌐 [employeeController] GET /employees - User Org: b033e4d0-5f6b-4272-8daf-f694338f4139, Role: admin, Query: {"isActive":"true"}
+[2026-01-04T15:00:02.164Z] 🌐 [employeeController] Found 1 employees
+[2026-01-04T15:00:19.149Z] 🌐 GET /vehicles - User Org: b033e4d0-5f6b-4272-8daf-f694338f4139, Dept: null, Role: admin, DriverFilter: none
+[2026-01-04T15:00:19.155Z] 🌐 Found 1 vehicles for org b033e4d0-5f6b-4272-8daf-f694338f4139
+[2026-01-04T15:00:19.160Z] 🌐 GET /vehicles - User Org: b033e4d0-5f6b-4272-8daf-f694338f4139, Dept: null, Role: admin, DriverFilter: none
+[2026-01-04T15:00:19.167Z] 🌐 Found 1 vehicles for org b033e4d0-5f6b-4272-8daf-f694338f4139
+[2026-01-04T15:00:19.171Z] 🌐 GET /vehicles - User Org: b033e4d0-5f6b-4272-8daf-f694338f4139, Dept: null, Role: admin, DriverFilter: none
+[2026-01-04T15:00:19.176Z] 🌐 Found 1 vehicles for org b033e4d0-5f6b-4272-8daf-f694338f4139

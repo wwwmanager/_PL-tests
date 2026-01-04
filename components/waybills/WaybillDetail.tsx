@@ -1798,7 +1798,7 @@ export const WaybillDetail: React.FC<WaybillDetailProps> = ({ waybill, isPrefill
                   onChange={handleChange}
                   disabled={!canEdit}
                 >
-                  <option value="BOILER">По котлу (без коэф.)</option>
+                  <option value="BOILER">Общий метод (без коэф.)</option>
                   <option value="SEGMENTS">По сегментам (с коэф.)</option>
                   <option value="MIXED">Смешанный (одометр + сегменты)</option>
                 </FormSelect>

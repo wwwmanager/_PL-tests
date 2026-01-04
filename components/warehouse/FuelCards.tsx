@@ -717,12 +717,13 @@ const FuelCards: React.FC = () => {
     };
 
     const columns = useMemo(() => [
-        { key: 'cardNumber', label: 'Номер карты', sortable: true },
-        { key: 'provider', label: 'Поставщик', sortable: true },
+        { key: 'cardNumber', label: 'Номер карты', sortable: true, align: 'center' as const },
+        { key: 'provider', label: 'Поставщик', sortable: true, align: 'center' as const },
         {
             key: 'assignedDriver',
             label: 'Водитель',
             sortable: true,
+            align: 'center' as const,
             render: (row: FuelCard) => (
                 <span className={row.assignedToDriver ? 'text-gray-900' : 'text-gray-400 italic'}>
                     {row.assignedToDriver?.fullName || 'Не назначен'}
@@ -733,6 +734,7 @@ const FuelCards: React.FC = () => {
             key: 'isActive',
             label: 'Статус',
             sortable: true,
+            align: 'center' as const,
             render: (row: FuelCard) => (
                 <Badge variant={row.isActive ? 'success' : 'danger'}>
                     {row.isActive ? 'Активна' : 'Неактивна'}
@@ -743,6 +745,7 @@ const FuelCards: React.FC = () => {
             key: 'balanceLiters',
             label: 'Баланс (л)',
             sortable: true,
+            align: 'right' as const,
             render: (row: FuelCard) => (
                 <span className={`font-bold ${row.balanceLiters < 100 ? 'text-red-600' : 'text-gray-900 dark:text-gray-100'}`}>
                     {Number(row.balanceLiters || 0).toLocaleString('ru-RU', { minimumFractionDigits: 2 })}
