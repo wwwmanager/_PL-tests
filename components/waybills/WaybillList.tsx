@@ -98,26 +98,26 @@ const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpene
   const waybillColumns: Column<EnrichedWaybill>[] = useMemo(() => {
     if (isExtendedView) {
       return [
-        { key: 'rowNumber', label: '№', sortable: true },
-        { key: 'number', label: 'Номер', sortable: true, render: (w) => <span className="font-medium text-gray-900 dark:text-white">{w.number}</span> },
-        { key: 'validFrom', label: 'Выезд', sortable: true, render: (w) => w.validFrom ? new Date(w.validFrom).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—' },
-        { key: 'validTo', label: 'Возврат', sortable: true, render: (w) => w.validTo ? new Date(w.validTo).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—' },
-        { key: 'odometerStart', label: 'Одом. нач.', sortable: true },
-        { key: 'odometerEnd', label: 'Одом. кон.', sortable: true, render: (w) => w.odometerEnd ?? '—' },
-        { key: 'mileage', label: 'Пробег', sortable: true },
-        { key: 'fuelAtStart', label: 'Топл. нач.', sortable: true, render: (w) => <span className={Number(w.fuelAtStart) < 0 ? 'text-red-600' : ''}>{w.fuelAtStart ?? '—'}</span> },
-        { key: 'fuelReceived', label: 'Запр.', sortable: true, render: (w) => <span className="text-green-600 dark:text-green-400 font-medium">{(w as any).fuelReceived > 0 ? `+${(w as any).fuelReceived}` : '—'}</span> },
-        { key: 'fuelAtEnd', label: 'Топл. кон.', sortable: true, render: (w) => <span className={Number(w.fuelAtEnd) < 0 ? 'text-red-600' : ''}>{w.fuelAtEnd ?? '—'}</span> },
-        { key: 'status', label: 'Статус', sortable: true, render: (w) => <WaybillStatusBadge status={w.status} /> },
+        { key: 'rowNumber', label: '№', sortable: true, align: 'center' as const },
+        { key: 'number', label: 'Номер', sortable: true, align: 'center' as const, render: (w) => <span className="font-medium text-gray-900 dark:text-white">{w.number}</span> },
+        { key: 'validFrom', label: 'Выезд', sortable: true, align: 'center' as const, render: (w) => w.validFrom ? new Date(w.validFrom).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—' },
+        { key: 'validTo', label: 'Возврат', sortable: true, align: 'center' as const, render: (w) => w.validTo ? new Date(w.validTo).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—' },
+        { key: 'odometerStart', label: 'Одом. нач.', sortable: true, align: 'center' as const },
+        { key: 'odometerEnd', label: 'Одом. кон.', sortable: true, align: 'center' as const, render: (w) => w.odometerEnd ?? '—' },
+        { key: 'mileage', label: 'Пробег', sortable: true, align: 'center' as const },
+        { key: 'fuelAtStart', label: 'Топл. нач.', sortable: true, align: 'right' as const, render: (w) => <span className={Number(w.fuelAtStart) < 0 ? 'text-red-600' : ''}>{w.fuelAtStart ?? '—'}</span> },
+        { key: 'fuelReceived', label: 'Запр.', sortable: true, align: 'center' as const, render: (w) => <span className="text-green-600 dark:text-green-400 font-medium">{(w as any).fuelReceived > 0 ? `+${(w as any).fuelReceived}` : '—'}</span> },
+        { key: 'fuelAtEnd', label: 'Топл. кон.', sortable: true, align: 'right' as const, render: (w) => <span className={Number(w.fuelAtEnd) < 0 ? 'text-red-600' : ''}>{w.fuelAtEnd ?? '—'}</span> },
+        { key: 'status', label: 'Статус', sortable: true, align: 'center' as const, render: (w) => <WaybillStatusBadge status={w.status} /> },
       ];
     }
     return [
-      { key: 'number', label: 'Номер', sortable: true, render: (w) => <span className="font-medium text-gray-900 dark:text-white">{w.number}</span> },
-      { key: 'date', label: 'Дата', sortable: true, render: (w) => new Date(w.date).toLocaleDateString('ru-RU') },
-      { key: 'vehicle', label: 'ТС', sortable: true },
-      { key: 'driver', label: 'Водитель', sortable: true },
-      { key: 'organizationId', label: 'Организация', sortable: true },
-      { key: 'status', label: 'Статус', sortable: true, render: (w) => <WaybillStatusBadge status={w.status} /> },
+      { key: 'number', label: 'Номер', sortable: true, align: 'center' as const, render: (w) => <span className="font-medium text-gray-900 dark:text-white">{w.number}</span> },
+      { key: 'date', label: 'Дата', sortable: true, align: 'center' as const, render: (w) => new Date(w.date).toLocaleDateString('ru-RU') },
+      { key: 'vehicle', label: 'ТС', sortable: true, align: 'center' as const },
+      { key: 'driver', label: 'Водитель', sortable: true, align: 'center' as const },
+      { key: 'organizationId', label: 'Организация', sortable: true, align: 'center' as const },
+      { key: 'status', label: 'Статус', sortable: true, align: 'center' as const, render: (w) => <WaybillStatusBadge status={w.status} /> },
     ];
   }, [isExtendedView]);
 
@@ -877,7 +877,7 @@ const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpene
                         className={`px-6 py-3 cursor-pointer bg-gray-50 dark:bg-gray-700 ${col.sortable ? 'hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors' : ''}`}
                         onClick={() => col.sortable && handleSort(col.key as any)}
                       >
-                        <div className="flex items-center gap-1">
+                        <div className={`flex items-center gap-1 w-full ${col.align === 'center' ? 'justify-center' : col.align === 'right' ? 'justify-end' : ''}`}>
                           {col.label}
                           {sortColumn === col.key && (sortDirection === 'asc' ? <ArrowUpIcon className="h-4 w-4" /> : <ArrowDownIcon className="h-4 w-4" />)}
                         </div>
@@ -929,7 +929,7 @@ const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpene
                           </div>
                         </td>
                         {columns.map(col => (
-                          <td key={col.key} className="px-6 py-4">
+                          <td key={col.key} className={`px-6 py-4 ${col.align === 'center' ? 'text-center' : col.align === 'right' ? 'text-right' : 'text-left'}`}>
                             {col.render ? col.render(w) : (w as any)[col.key]}
                           </td>
                         ))}

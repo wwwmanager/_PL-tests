@@ -15,7 +15,8 @@ import { MenuIcon } from './components/Icons';
 
 
 const Dashboard = lazy(() => import('./components/dashboard/Dashboard'));
-const WaybillList = lazy(() => import('./components/waybills/WaybillList'));
+const WaybillsPage = lazy(() => import('./components/waybills/WaybillsPage'));
+// WaybillList is now internal to WaybillsPage, but we keep WaybillDetail for direct route
 const WaybillDetail = lazy(() => import('./components/waybills/WaybillDetail'));
 const VehicleList = lazy(() => import('./components/vehicles/VehicleList'));
 const EmployeeList = lazy(() => import('./components/employees/EmployeeList'));
@@ -80,7 +81,7 @@ const AppContent: React.FC = () => {
         return <Dashboard />;
       case 'waybills':
         return (
-          <WaybillList
+          <WaybillsPage
             onSelectWaybill={(id) => {
               setSelectedWaybillId(id);
               setCurrentPage('waybill-detail');

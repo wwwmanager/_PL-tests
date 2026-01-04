@@ -18,7 +18,8 @@ import { TabsNavigation } from '../shared/TabsNavigation';
 const UserManagement = lazy(() => import('./UserManagement'));
 const RoleManagement = lazy(() => import('./RoleManagement'));
 const BusinessAuditLog = lazy(() => import('./BusinessAuditLog'));
-const BlankManagement = lazy(() => import('./BlankManagement'));
+
+// const BlankManagement = lazy(() => import('./BlankManagement')); // Moved to WaybillsPage
 const DataDeletionModal = lazy(() => import('./DataDeletionModal'));
 const DataImportModal = lazy(() => import('./DataImportModal'));
 const DataExportModal = lazy(() => import('./DataExportModal'));
@@ -1327,10 +1328,12 @@ const Admin: React.FC = () => {
     if (can('admin.panel')) {
       t.push({ id: 'users', label: 'Пользователи' });
       t.push({ id: 'roles', label: 'Управление ролями' });
-      t.push({ id: 'blanks', label: 'Бланки ПЛ' });
+      t.push({ id: 'users', label: 'Пользователи' });
+      t.push({ id: 'roles', label: 'Управление ролями' });
+      // t.push({ id: 'blanks', label: 'Бланки ПЛ' }); // Moved
     } else if (currentUser?.role === 'driver' && appSettings?.blanks?.driverCanAddBatches) {
       // Driver gets blanks tab if setting is enabled
-      t.push({ id: 'blanks', label: 'Бланки ПЛ' });
+      // t.push({ id: 'blanks', label: 'Бланки ПЛ' }); // Moved
     }
     t.push({ id: 'import_audit', label: 'Журнал импорта' });
     if (can('audit.business.read')) {
@@ -1352,8 +1355,9 @@ const Admin: React.FC = () => {
         return <UserManagement />;
       case 'roles':
         return <RoleManagement />;
-      case 'blanks':
-        return <BlankManagement />;
+      case 'roles':
+        return <RoleManagement />;
+      // case 'blanks': return <BlankManagement />; // Moved
       case 'import_audit':
         return <ImportAuditLog />;
       case 'business_audit':
