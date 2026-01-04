@@ -1111,8 +1111,8 @@ export async function deleteWaybill(userInfo: UserInfo, id: string, blankAction:
     return prisma.waybill.delete({ where: { id } });
 }
 
-export async function bulkDeleteWaybills(userInfo: UserInfo, ids: string[]) {
-    console.log(`[WB-DEL-BULK] Deleting ${ids.length} waybills for user ${userInfo.id}`);
+export async function bulkDeleteWaybills(userInfo: UserInfo, ids: string[], blankAction: 'return' | 'spoil' = 'return') {
+    console.log(`[WB-DEL-BULK] Deleting ${ids.length} waybills for user ${userInfo.id}, blankAction: ${blankAction}`);
     const results = {
         success: [] as string[],
         errors: [] as { id: string; error: string }[]
@@ -1120,7 +1120,7 @@ export async function bulkDeleteWaybills(userInfo: UserInfo, ids: string[]) {
 
     for (const id of ids) {
         try {
-            await deleteWaybill(userInfo, id);
+            await deleteWaybill(userInfo, id, blankAction);
             results.success.push(id);
         } catch (err: any) {
             console.error(`[WB-DEL-BULK] Failed to delete waybill ${id}:`, err);

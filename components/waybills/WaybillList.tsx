@@ -360,15 +360,17 @@ const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpene
   const handleBulkDelete = () => {
     if (selectedIds.size === 0) return;
 
-    const onConfirmBulkDelete = async () => {
+    // BLK-DEL-ACTION-001: Bulk delete with blank action choice
+    const onConfirmBulkDelete = async (blankAction: 'return' | 'spoil') => {
       setIsConfirmationModalOpen(false);
       try {
-        const result = await bulkDeleteWaybills(Array.from(selectedIds));
+        const result = await bulkDeleteWaybills(Array.from(selectedIds), blankAction);
+        const actionText = blankAction === 'spoil' ? 'Бланки списаны.' : 'Бланки возвращены водителям.';
         if (result.errors.length > 0) {
-          showToast(`Удалено: ${result.success.length}. Ошибок: ${result.errors.length}`, 'error');
+          showToast(`Удалено: ${result.success.length}. Ошибок: ${result.errors.length}. ${actionText}`, 'error');
           console.error('Errors during bulk delete:', result.errors);
         } else {
-          showToast(`Удалено путевых листов: ${result.success.length}`, 'info');
+          showToast(`Удалено путевых листов: ${result.success.length}. ${actionText}`, 'info');
         }
         setSelectedIds(new Set());
         fetchData();
@@ -379,10 +381,15 @@ const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpene
 
     setModalProps({
       title: 'Массовое удаление',
-      message: `Выбрано элементов: ${selectedIds.size}. Удалить их?`,
-      confirmText: 'Удалить выбранные',
-      confirmButtonClass: 'bg-red-600 hover:bg-red-700 focus:ring-red-500',
-      onConfirm: onConfirmBulkDelete,
+      message: `Выбрано элементов: ${selectedIds.size}.\n\nЧто сделать с бланками?`,
+      confirmText: 'Списать бланки',
+      confirmButtonClass: 'bg-yellow-600 hover:bg-yellow-700 focus:ring-yellow-500',
+      onConfirm: () => onConfirmBulkDelete('spoil'),
+      secondaryAction: {
+        text: 'Вернуть водителям',
+        className: 'bg-blue-600 hover:bg-blue-700 focus:ring-blue-500',
+        onClick: () => onConfirmBulkDelete('return'),
+      },
     } as any);
     setIsConfirmationModalOpen(true);
   };

@@ -122,13 +122,15 @@ export async function deleteWaybill(req: Request, res: Response, next: NextFunct
 export async function bulkDeleteWaybills(req: Request, res: Response, next: NextFunction) {
     try {
         const orgId = req.user!.organizationId;
-        const { ids } = req.body;
+        const { ids, blankAction } = req.body;
 
         if (!Array.isArray(ids) || ids.length === 0) {
             throw new BadRequestError('Не переданы ID для удаления');
         }
 
-        const result = await waybillService.bulkDeleteWaybills(req.user as any, ids);
+        // BLK-DEL-ACTION-001: Pass blankAction to service
+        const validBlankAction = (blankAction === 'spoil' ? 'spoil' : 'return') as 'return' | 'spoil';
+        const result = await waybillService.bulkDeleteWaybills(req.user as any, ids, validBlankAction);
         res.json(result);
     } catch (err) {
         next(err);
