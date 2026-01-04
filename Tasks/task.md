@@ -6,7 +6,7 @@
 - [x] **DOC-IMMUTABLE-020**: Enforce Immutability
     - [x] Prevent physical deletion of POSTED waybills in `waybillService`
     - [x] Ensure only CANCEL allowed for POSTED
-- [ ] **RECALC-030**: Admin Recalculation Tool (Optional/Later)
-    - [ ] Create endpoint for balance recalculation if caching is used
+- [x] **RECALC-030**: Admin Recalculation Tool (Optional/Later)
+    - [x] Create endpoint for balance recalculation if caching is used
 - [ ] **Verification**
     - [ ] Verify Waybill flow (Create -> Post -> Cancel) with Fuel Balance checks

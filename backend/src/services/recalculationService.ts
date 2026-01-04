@@ -1,100 +1,127 @@
+/**
+ * RECALC-030: Recalculation Service
+ * Пересчёт балансов и статистики
+ */
 
 import { PrismaClient, StockMovementType } from '@prisma/client';
 import { logger } from '../utils/logger';
+import { getBalanceAt } from './stockService';
 
 const prisma = new PrismaClient();
 
 /**
- * Recalculate Warehouse/Gararge Stock Balances
+ * Recalculate StockItem balances (global per item, NOT per location)
+ * RECALC-030: Fixed to exclude voided movements
  */
 export const recalculateStockBalances = async () => {
-    logger.info('Starting Stock Balance Recalculation...');
+    logger.info('[RECALC] Starting Stock Balance Recalculation...');
 
-    // Fetch all stock items
     const items = await prisma.stockItem.findMany();
     let count = 0;
 
     for (const item of items) {
-        // Sum all transactions
+        // RECALC-030: Add isVoid: false filter
         const movements = await prisma.stockMovement.groupBy({
             by: ['movementType'],
-            where: { stockItemId: item.id },
+            where: {
+                stockItemId: item.id,
+                isVoid: false  // <-- FIX: exclude voided movements
+            },
             _sum: { quantity: true }
         });
 
-        let balance = 0;
-
-        // Sum based on type
-        // INCOME adds, EXPENSE subtracts, ADJUSTMENT (if relative) adds/subtracts?
-        // Assuming ADJUSTMENT is treated as INCOME (positive) or EXPENSE (negative quantity)?
-        // Or ADJUSTMENT implies "set to value"?
-        // If undefined, standard is INCOME - EXPENSE.
-
         const income = movements.find(m => m.movementType === 'INCOME')?._sum.quantity?.toNumber() || 0;
         const expense = movements.find(m => m.movementType === 'EXPENSE')?._sum.quantity?.toNumber() || 0;
-        // Adjustments: In some systems adjustment is explicit +/-. If Type is ADJUSTMENT, we assume quantity dictates sign? 
-        // Or if it's "Correction", we might need logic.
-        // For simplicity: Income - Expense. (Ignore Adjustment for now or treat as Income if user enters negative logic).
-        // If Adjustment means "Inventory Count", it sets the balance.
-        // Since we are summing history, we assume history is delta-based.
-
         const adj = movements.find(m => m.movementType === 'ADJUSTMENT')?._sum.quantity?.toNumber() || 0;
 
-        balance = income - expense + adj;
+        // Note: TRANSFER doesn't affect global item balance (moves between locations)
+        const balance = income - expense + adj;
 
-        // Update item with cache
         await prisma.stockItem.update({
             where: { id: item.id },
             data: { balance }
         });
         count++;
     }
-    logger.info(`Stock Balance Recalculation Completed. Updated ${count} items.`);
+    logger.info(`[RECALC] Stock Balance Recalculation Completed. Updated ${count} items.`);
 };
 
-export const recalculateDriverBalances = async () => {
-    // Legacy used 'balance snapshots'. For now we calculate live for current balance.
-    // Or we can implement snapshots later if slow.
-    // Driver balance is on Employee.fuelCardBalance.
-
-    logger.info('Starting Driver Balance Recalculation...');
-    // Fetch all employees with fuel cards or just drivers
-    const employees = await prisma.employee.findMany();
-    let count = 0;
-
-    // Logic: Balance = Initial? + TopUps - WaybillConsumption
-    // Needs logic mapping StockMovements (FuelCardTopUp) and Waybills.
-
-    // Since logic is complex and legacy used distinct repositories,
-    // We will implement a simplified version: Set to 0 if we can't fully trace history easily without strict tagging.
-    // OR, leave as TODO if risky.
-    // Plan says "Adapt logic".
-    // I will implement a placeholder that logs for now, to check "RecalculationService" existence.
-    logger.info('Driver Balance Recalculation - Placeholder (Not fully ported yet due to complexity)');
-};
-
+/**
+ * Recalculate Vehicle stats: mileage AND currentFuel from tank balance
+ * RECALC-030: Added currentFuel sync from StockLocation
+ */
 export const recalculateVehicleStats = async () => {
-    logger.info('Starting Vehicle Stats Recalculation...');
-    const vehicles = await prisma.vehicle.findMany();
-    let count = 0;
+    logger.info('[RECALC] Starting Vehicle Stats Recalculation...');
+
+    const vehicles = await prisma.vehicle.findMany({
+        include: { fuelStockItem: true }
+    });
+    let mileageCount = 0;
+    let fuelCount = 0;
 
     for (const v of vehicles) {
-        // Calculate mileage from Waybills
-        // Find last waybill
+        const updateData: { mileage?: any; currentFuel?: number } = {};
+
+        // 1. Mileage from last POSTED waybill
         const lastWb = await prisma.waybill.findFirst({
-            where: { vehicleId: v.id, status: 'POSTED' }, // POSTED is mapped status
-            orderBy: { date: 'desc' } // and maybe odometerEnd
+            where: { vehicleId: v.id, status: 'POSTED' },
+            orderBy: { date: 'desc' },
+            include: { fuelLines: true }
         });
 
         if (lastWb) {
-            const mileage = lastWb.odometerEnd || 0;
-            // Update vehicle
+            updateData.mileage = lastWb.odometerEnd || v.mileage;
+            mileageCount++;
+
+            // 2. RECALC-030: Get currentFuel from fuelEnd of last waybill
+            const fuelEnd = lastWb.fuelLines.reduce((acc, fl) => {
+                return Number(fl.fuelEnd) || acc;
+            }, 0);
+
+            if (fuelEnd > 0) {
+                updateData.currentFuel = fuelEnd;
+                fuelCount++;
+            }
+        }
+
+        // 3. Alternative: Calculate from tank StockLocation balance
+        if (!updateData.currentFuel && v.fuelStockItemId) {
+            const tankLocation = await prisma.stockLocation.findFirst({
+                where: { vehicleId: v.id, type: 'VEHICLE_TANK', isActive: true }
+            });
+
+            if (tankLocation) {
+                const tankBalance = await getBalanceAt(tankLocation.id, v.fuelStockItemId, new Date());
+                if (tankBalance > 0) {
+                    updateData.currentFuel = tankBalance;
+                    fuelCount++;
+                    logger.info(`[RECALC] Vehicle ${v.registrationNumber}: tank balance = ${tankBalance}`);
+                }
+            }
+        }
+
+        if (Object.keys(updateData).length > 0) {
             await prisma.vehicle.update({
                 where: { id: v.id },
-                data: { mileage: mileage }
+                data: updateData
             });
-            count++;
         }
     }
-    logger.info(`Vehicle Stats Recalculation Completed. Updated ${count} vehicles.`);
+
+    logger.info(`[RECALC] Vehicle Stats Completed. Mileage: ${mileageCount}, Fuel: ${fuelCount}`);
+};
+
+/**
+ * RECALC-030: Removed placeholder, function now logs summary only
+ * Driver balances are calculated live via FuelCard StockLocation
+ */
+export const recalculateDriverBalances = async () => {
+    logger.info('[RECALC] Driver balances are calculated live via FuelCard StockLocations.');
+
+    // Count fuel cards with locations for info
+    const fuelCardLocations = await prisma.stockLocation.count({
+        where: { type: 'FUEL_CARD', isActive: true }
+    });
+
+    logger.info(`[RECALC] Active Fuel Card locations: ${fuelCardLocations}`);
 };
