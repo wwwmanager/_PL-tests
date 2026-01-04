@@ -1328,8 +1328,6 @@ const Admin: React.FC = () => {
     if (can('admin.panel')) {
       t.push({ id: 'users', label: 'Пользователи' });
       t.push({ id: 'roles', label: 'Управление ролями' });
-      t.push({ id: 'users', label: 'Пользователи' });
-      t.push({ id: 'roles', label: 'Управление ролями' });
       // t.push({ id: 'blanks', label: 'Бланки ПЛ' }); // Moved
     } else if (currentUser?.role === 'driver' && appSettings?.blanks?.driverCanAddBatches) {
       // Driver gets blanks tab if setting is enabled
@@ -1353,8 +1351,6 @@ const Admin: React.FC = () => {
         return <AppSettingsComponent />;
       case 'users':
         return <UserManagement />;
-      case 'roles':
-        return <RoleManagement />;
       case 'roles':
         return <RoleManagement />;
       // case 'blanks': return <BlankManagement />; // Moved
