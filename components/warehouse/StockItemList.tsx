@@ -221,9 +221,10 @@ const StockItemList: React.FC = () => {
                     <Button
                         onClick={openCreateModal}
                         variant="primary"
-                        leftIcon={<PlusIcon className="w-5 h-5" />}
+                        size="sm"
+                        leftIcon={<PlusIcon className="w-4 h-4" />}
                     >
-                        Добавить номенклатуру
+                        Добавить
                     </Button>
                 )}
             </div>

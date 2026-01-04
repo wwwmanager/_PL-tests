@@ -158,8 +158,8 @@ const RouteList: React.FC = () => {
                             {routes.length}
                         </span>
                     </div>
-                    <Button onClick={handleAddNew} variant="primary" leftIcon={<PlusIcon className="h-5 w-5" />}>
-                        Добавить маршрут
+                    <Button onClick={handleAddNew} variant="primary" size="sm" leftIcon={<PlusIcon className="h-4 w-4" />}>
+                        Добавить
                     </Button>
                 </div>
 

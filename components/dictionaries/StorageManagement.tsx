@@ -252,8 +252,8 @@ const StorageManagement = () => {
                     </div>
                     {/* RLS-WAREHOUSE-FE-010: Hide Add button for drivers */}
                     {!isDriver && (
-                        <Button onClick={handleAddNew} variant="primary" leftIcon={<PlusIcon className="h-5 w-5" />}>
-                            Добавить место хранения
+                        <Button onClick={handleAddNew} variant="primary" size="sm" leftIcon={<PlusIcon className="h-4 w-4" />}>
+                            Добавить
                         </Button>
                     )}
                 </div>
