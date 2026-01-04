@@ -47,6 +47,32 @@ const Dictionaries: React.FC<DictionariesProps> = ({ subViewToOpen }) => {
     // I will stick to existing functionality map but update labels.
 
     const [activeDictionary, setActiveDictionary] = useState<DictionaryType>(allDicts[0]?.id || 'vehicles');
+    const [orderedTabs, setOrderedTabs] = useState(allDicts);
+
+    useEffect(() => {
+        const savedOrder = localStorage.getItem('dictionaries_tab_order');
+        if (savedOrder) {
+            try {
+                const parsedOrder = JSON.parse(savedOrder);
+                // Validate that saved tabs match current tabs
+                const savedTabs = parsedOrder.map((id: string) => allDicts.find(t => t.id === id)).filter(Boolean);
+
+                // If we have valid saved tabs, check if any new tabs are missing
+                if (savedTabs.length > 0) {
+                    const savedIds = new Set(savedTabs.map((t: any) => t.id));
+                    const missingTabs = allDicts.filter(t => !savedIds.has(t.id));
+                    setOrderedTabs([...savedTabs, ...missingTabs]);
+                }
+            } catch (e) {
+                console.error('Failed to parse saved tab order', e);
+            }
+        }
+    }, []);
+
+    const handleTabReorder = (newTabs: any[]) => {
+        setOrderedTabs(newTabs);
+        localStorage.setItem('dictionaries_tab_order', JSON.stringify(newTabs.map(t => t.id)));
+    };
 
     useEffect(() => {
         const handleNavigate = (event: CustomEvent) => {
@@ -85,9 +111,10 @@ const Dictionaries: React.FC<DictionariesProps> = ({ subViewToOpen }) => {
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm min-h-[calc(100vh-8rem)]">
             <div className="px-6 pt-4">
                 <TabsNavigation
-                    tabs={allDicts}
+                    tabs={orderedTabs}
                     activeTab={activeDictionary}
                     onTabChange={(id) => setActiveDictionary(id as DictionaryType)}
+                    onReorder={handleTabReorder}
                 />
             </div>
 
