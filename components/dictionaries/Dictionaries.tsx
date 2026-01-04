@@ -16,13 +16,15 @@ import {
     FireIcon,
     HomeModernIcon,
     GlobeAltIcon,
-    NomenclatureIcon
+    NomenclatureIcon,
+    CalendarDaysIcon
 } from '../Icons';
 
 import StockItemList from '../warehouse/StockItemList';
 
 const GarageManagement = lazy(() => import('./GarageManagement'));
 const StorageManagement = lazy(() => import('./StorageManagement'));
+const ProductionCalendarSettings = lazy(() => import('../admin/ProductionCalendarSettings'));
 
 interface DictionariesProps {
     subViewToOpen?: DictionaryType | null;
@@ -37,6 +39,7 @@ const Dictionaries: React.FC<DictionariesProps> = ({ subViewToOpen }) => {
         { id: 'organizations', label: 'Организации', icon: BuildingOffice2Icon },
         { id: 'fuelTypes', label: 'Топливо', icon: FireIcon },
         { id: 'storageLocations', label: 'Места хранения', icon: HomeModernIcon },
+        { id: 'calendar', label: 'Календарь', icon: CalendarDaysIcon },
         { id: 'routes', label: 'Маршруты', icon: GlobeAltIcon },
     ];
     // Calendar is missing in original list but present in design, keeping existing for now or adding placeholder?
@@ -72,6 +75,7 @@ const Dictionaries: React.FC<DictionariesProps> = ({ subViewToOpen }) => {
             case 'vehicles': return <VehicleList />;
             case 'employees': return <EmployeeList />;
             case 'storageLocations': return <Suspense fallback={<div>Загрузка...</div>}><StorageManagement /></Suspense>;
+            case 'calendar': return <Suspense fallback={<div>Загрузка...</div>}><ProductionCalendarSettings /></Suspense>;
             case 'routes': return <RouteList />;
             default: return <div className="p-4 text-gray-500">Выберите справочник.</div>;
         }

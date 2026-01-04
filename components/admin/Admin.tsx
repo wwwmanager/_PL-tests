@@ -1337,7 +1337,6 @@ const Admin: React.FC = () => {
     if (can('audit.business.read')) {
       t.push({ id: 'business_audit', label: 'Бизнес-аудит' });
     }
-    t.push({ id: 'calendar', label: 'Календарь' });
     if (can('admin.panel')) {
       t.push({ id: 'integrity', label: 'Целостность' });
       t.push({ id: 'diag', label: 'Диагностика' });
@@ -1358,8 +1357,6 @@ const Admin: React.FC = () => {
         return <ImportAuditLog />;
       case 'business_audit':
         return <BusinessAuditLog />;
-      case 'calendar':
-        return <ProductionCalendarSettings />;
       case 'integrity':
         return <IntegrityManagement />;
       case 'diag':

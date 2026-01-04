@@ -100,7 +100,8 @@ export type DictionaryType =
   | 'garageStockItems'
   | 'stockTransactions'
   | 'storageLocations'
-  | 'nomenclature';
+  | 'nomenclature'
+  | 'calendar';
 
 // Расширяем статусы ПЛ, добавляем обратную совместимость
 export enum WaybillStatus {
