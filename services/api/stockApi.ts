@@ -11,6 +11,7 @@ export interface StockMovementFilters {
     search?: string;
     page?: number;
     limit?: number;
+    includeVoided?: boolean;  // SHOW-VOID: Toggle to show voided movements
 }
 
 /**
@@ -46,6 +47,7 @@ export async function getStockMovements(filters: StockMovementFilters = {}): Pro
     if (filters.search) params.append('search', filters.search);
     if (filters.page) params.append('page', String(filters.page));
     if (filters.limit) params.append('limit', String(filters.limit));
+    if (filters.includeVoided) params.append('includeVoided', 'true');  // SHOW-VOID
 
     const response = await httpClient.get<ApiListResponse<StockMovementV2>>(`/stock/movements?${params.toString()}`);
     return response;

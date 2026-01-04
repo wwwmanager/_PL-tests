@@ -176,15 +176,18 @@ export async function listStockMovements(req: Request, res: Response, next: Next
             return res.status(401).json({ error: 'Unauthorized' });
         }
         const organizationId = req.user.organizationId;
-        const { stockItemId, waybillId, driverId } = req.query as {
+        const { stockItemId, waybillId, driverId, includeVoided } = req.query as {
             stockItemId?: string;
             waybillId?: string;
             driverId?: string;
+            includeVoided?: string;  // SHOW-VOID: Toggle to include voided movements
         };
 
-        const where: any = {
-            isVoid: false, // P1-3: Exclude voided movements
-        };
+        const where: any = {};
+        // SHOW-VOID: Only filter isVoid if not explicitly including voided records
+        if (includeVoided !== 'true') {
+            where.isVoid = false;
+        }
         if (organizationId) where.organizationId = organizationId;
         if (stockItemId) where.stockItemId = stockItemId;
         if (waybillId) where.documentId = waybillId;

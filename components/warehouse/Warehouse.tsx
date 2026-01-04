@@ -29,7 +29,7 @@ const Warehouse: React.FC = () => {
                     <TabsNavigation
                         tabs={[
                             { id: 'balances', label: 'Остатки', icon: BalancesIcon },
-                            { id: 'movements', label: 'Движения', icon: MovementsIcon },
+                            { id: 'movements', label: 'Операции', icon: MovementsIcon },
                             { id: 'fuel-cards', label: 'Топливные карты', icon: FuelCardIcon },
                             { id: 'rules', label: 'Правила', icon: RulesIcon },
                         ]}

@@ -96,6 +96,7 @@ const FuelMovements: React.FC = () => {
         locationId: '',
         stockItemId: '',
         search: '',
+        includeVoided: false,  // SHOW-VOID: Toggle for showing voided movements
     });
 
     const { showToast } = useToast();
@@ -218,7 +219,7 @@ const FuelMovements: React.FC = () => {
         <div className="p-0 space-y-6">
             <div className="flex items-center gap-3 mb-2">
                 <MovementsIcon className="h-6 w-6 text-gray-600 dark:text-gray-400" />
-                <h3 className="text-xl font-semibold text-gray-800 dark:text-white">Журнал движений</h3>
+                <h3 className="text-xl font-semibold text-gray-800 dark:text-white">Журнал операций</h3>
             </div>
             {/* Filters */}
             <div className="flex flex-wrap gap-4 items-end bg-gray-50 dark:bg-gray-800/50 p-4 rounded-xl border border-gray-100 dark:border-gray-700">
@@ -306,6 +307,16 @@ const FuelMovements: React.FC = () => {
                     <span className="px-3 py-1 bg-gray-100 dark:bg-gray-700 rounded-full text-sm text-gray-600 dark:text-gray-300 font-semibold transition-all">
                         Найдено записей: {total}
                     </span>
+                    {/* SHOW-VOID: Toggle for showing voided movements */}
+                    <label className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300 cursor-pointer">
+                        <input
+                            type="checkbox"
+                            checked={filters.includeVoided}
+                            onChange={(e) => setFilters(prev => ({ ...prev, includeVoided: e.target.checked }))}
+                            className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        />
+                        Показать все операции
+                    </label>
                 </div>
                 {can('stock.create') && (
                     <Button

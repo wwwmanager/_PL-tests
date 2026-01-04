@@ -1,10 +1,13 @@
 /**
  * LEDGER-DOCS-BE-020: Storno Service
- * Отмена проведённых документов путём создания обратных движений
+ * Отмена проведённых документов путём пометки isVoid=true
+ * 
+ * ВАЖНО: Мы используем "soft void" подход - НЕ создаём обратные записи,
+ * а просто помечаем оригинальные движения как void.
  */
 
 import { PrismaClient, StockMovementType, Prisma } from '@prisma/client';
-import { BadRequestError, NotFoundError } from '../utils/errors';
+import { NotFoundError } from '../utils/errors';
 
 const prisma = new PrismaClient();
 
@@ -13,7 +16,7 @@ export interface StornoResult {
     documentType: string;
     documentId: string;
     originalMovementsCount: number;
-    stornoMovementsIds: string[];
+    stornoMovementsIds: string[]; // теперь пустой массив (обратные записи не создаются)
     reason: string;
 }
 
@@ -30,7 +33,11 @@ export async function stornoDocument(
 }
 
 /**
- * Внутренняя логика сторно, которую можно вызвать внутри существующей транзакции
+ * Внутренняя логика сторно - помечает движения как void БЕЗ создания обратных записей
+ * 
+ * ИЗМЕНЕНО: Ранее создавались обратные движения + void. Теперь только void.
+ * Причина: При повторном проведении ПЛ обратные записи оставались активными,
+ * что приводило к накоплению ошибок в балансах.
  */
 export async function executeStorno(
     tx: Prisma.TransactionClient,
@@ -48,7 +55,7 @@ export async function executeStorno(
             documentId,
             isVoid: false,
         },
-        orderBy: { occurredAt: 'asc' }, // Важно для корректного порядка сторно
+        orderBy: { occurredAt: 'asc' },
     });
 
     if (originalMovements.length === 0) {
@@ -59,110 +66,7 @@ export async function executeStorno(
 
     console.log(`[STORNO] Found ${originalMovements.length} movements for ${documentType}:${documentId}`);
 
-    const stornoMovementsIds: string[] = [];
-    const stornoExternalRefPrefix = `STORNO:${documentType}:${documentId}`;
-
-    // 2. Создать обратные движения
-    for (const original of originalMovements) {
-        const stornoExternalRef = `${stornoExternalRefPrefix}:${original.id}`;
-
-        // Проверяем что сторно ещё не было создано (идемпотентность)
-        const existing = await tx.stockMovement.findFirst({
-            where: {
-                organizationId,
-                externalRef: stornoExternalRef,
-            }
-        });
-
-        if (existing) {
-            console.log(`[STORNO] Skipping already reversed movement: ${original.id}`);
-            stornoMovementsIds.push(existing.id);
-            continue;
-        }
-
-        // Определяем обратный тип и локации
-        let stornoData: Prisma.StockMovementCreateInput;
-        const baseData = {
-            organization: { connect: { id: organizationId } },
-            stockItem: { connect: { id: original.stockItemId } },
-            quantity: original.quantity, // Тот же quantity, но смысл обратный
-            occurredAt: new Date(),
-            occurredSeq: 0,
-            documentType: 'STORNO',
-            documentId: original.id, // Ссылаемся на оригинальное движение
-            externalRef: stornoExternalRef,
-            comment: `Сторно: ${reason}`,
-            createdByUser: userId ? { connect: { id: userId } } : undefined,
-        };
-
-        switch (original.movementType) {
-            case StockMovementType.INCOME:
-                // Обратное к приходу = расход
-                stornoData = {
-                    ...baseData,
-                    movementType: StockMovementType.EXPENSE,
-                    stockLocation: original.stockLocationId
-                        ? { connect: { id: original.stockLocationId } }
-                        : undefined,
-                    warehouse: original.warehouseId
-                        ? { connect: { id: original.warehouseId } }
-                        : undefined,
-                };
-                break;
-
-            case StockMovementType.EXPENSE:
-                // Обратное к расходу = приход
-                stornoData = {
-                    ...baseData,
-                    movementType: StockMovementType.INCOME,
-                    stockLocation: original.stockLocationId
-                        ? { connect: { id: original.stockLocationId } }
-                        : undefined,
-                    warehouse: original.warehouseId
-                        ? { connect: { id: original.warehouseId } }
-                        : undefined,
-                };
-                break;
-
-            case StockMovementType.TRANSFER:
-                // Обратное к переводу = перевод в обратном направлении
-                stornoData = {
-                    ...baseData,
-                    movementType: StockMovementType.TRANSFER,
-                    fromStockLocation: original.toStockLocationId
-                        ? { connect: { id: original.toStockLocationId } }
-                        : undefined,
-                    toStockLocation: original.fromStockLocationId
-                        ? { connect: { id: original.fromStockLocationId } }
-                        : undefined,
-                };
-                break;
-
-            case StockMovementType.ADJUSTMENT:
-                // Обратное к корректировке = корректировка с обратным знаком
-                stornoData = {
-                    ...baseData,
-                    movementType: StockMovementType.ADJUSTMENT,
-                    quantity: new Prisma.Decimal(Number(original.quantity) * -1),
-                    stockLocation: original.stockLocationId
-                        ? { connect: { id: original.stockLocationId } }
-                        : undefined,
-                };
-                break;
-
-            default:
-                throw new BadRequestError(`Неизвестный тип движения: ${original.movementType}`);
-        }
-
-        const stornoMovement = await tx.stockMovement.create({
-            data: stornoData,
-        });
-
-        stornoMovementsIds.push(stornoMovement.id);
-        console.log(`[STORNO] Created storno movement ${stornoMovement.id} for original ${original.id}`);
-    }
-
-    // 3. Пометить оригинальные движения как void
+    // 2. Пометить все движения как void (БЕЗ создания обратных записей)
     await tx.stockMovement.updateMany({
         where: {
             id: { in: originalMovements.map(m => m.id) },
@@ -175,21 +79,41 @@ export async function executeStorno(
         },
     });
 
-    console.log(`[STORNO] Marked ${originalMovements.length} movements as void`);
+    console.log(`[STORNO] Marked ${originalMovements.length} movements as void (no reverse entries created)`);
+
+    // 3. Также пометить как void любые СТАРЫЕ сторно-записи для этого документа
+    // (на случай если были созданы по старой логике)
+    const stornoPrefix = `STORNO:${documentType}:${documentId}`;
+    const oldStornoRecords = await tx.stockMovement.updateMany({
+        where: {
+            organizationId,
+            externalRef: { startsWith: stornoPrefix },
+            isVoid: false,
+        },
+        data: {
+            isVoid: true,
+            voidedAt: new Date(),
+            voidedByUserId: userId,
+            voidReason: `CLEANUP: ${reason}`,
+        },
+    });
+
+    if (oldStornoRecords.count > 0) {
+        console.log(`[STORNO] Also voided ${oldStornoRecords.count} old storno records`);
+    }
 
     return {
         success: true,
         documentType,
         documentId,
         originalMovementsCount: originalMovements.length,
-        stornoMovementsIds,
+        stornoMovementsIds: [], // Теперь не создаём обратные записи
         reason,
     };
 }
 
 /**
  * Проверить, можно ли сделать сторно документа
- * (проверяет что балансы не уйдут в минус после сторно)
  */
 export async function canStornoDocument(
     organizationId: string,
@@ -208,10 +132,6 @@ export async function canStornoDocument(
     if (movements.length === 0) {
         return { canStorno: false, reason: 'Движения не найдены или уже отменены' };
     }
-
-    // TODO: Добавить проверку балансов
-    // Для каждого INCOME движения проверить что на локации достаточно остатка для списания
-    // Для каждого TRANSFER проверить что на целевой локации достаточно для обратного перевода
 
     return { canStorno: true };
 }
