@@ -69,6 +69,7 @@ function sanitizeVehiclePayload(data: Record<string, unknown>): Record<string, u
         model: toNullIfEmpty(data.model),
         vin: toNullIfEmpty(data.vin),
         vehicleType: toNullIfEmpty(data.vehicleType),
+        vehicleModelId: toNullIfEmpty(data.vehicleModelId),  // REL-206: Vehicle Model reference
         year: data.year ?? null,
         fuelTankCapacity: data.fuelTankCapacity ?? null,
         mileage: data.mileage ?? null,

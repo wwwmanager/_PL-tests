@@ -448,6 +448,7 @@ async function main() {
     const diesel = await prisma.stockItem.create({
         data: {
             organizationId: org.id,
+            departmentId: mainDept.id,
             code: 'ДТ',
             name: 'Дизельное топливо (зимнее)',
             unit: 'л',
@@ -460,6 +461,7 @@ async function main() {
     const petrol92 = await prisma.stockItem.create({
         data: {
             organizationId: org.id,
+            departmentId: mainDept.id,
             code: 'АИ-92',
             name: 'Бензин АИ-92',
             unit: 'л',
@@ -472,6 +474,7 @@ async function main() {
     const petrol95 = await prisma.stockItem.create({
         data: {
             organizationId: org.id,
+            departmentId: mainDept.id,
             code: 'АИ-95',
             name: 'Бензин АИ-95',
             unit: 'л',
@@ -484,6 +487,7 @@ async function main() {
     const oil = await prisma.stockItem.create({
         data: {
             organizationId: org.id,
+            departmentId: mainDept.id,
             code: 'M10W40',
             name: 'Масло моторное 10W-40',
             unit: 'л',

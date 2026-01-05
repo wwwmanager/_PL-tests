@@ -101,6 +101,7 @@ export type DictionaryType =
   | 'stockTransactions'
   | 'storageLocations'
   | 'nomenclature'
+  | 'vehicleModels'
   | 'calendar';
 
 // Расширяем статусы ПЛ, добавляем обратную совместимость
@@ -236,11 +237,15 @@ export interface Vehicle {
   id: string;
   registrationNumber: string;  // Changed from plateNumber to match backend
   brand: string;
+  model?: string;
   vin: string;
   mileage: number;
   /** @deprecated Use fuelStockItemId instead. */
   fuelTypeId: string;
   fuelStockItemId?: string | null;
+  // REL-206
+  vehicleModelId?: string | null;
+  vehicleModel?: { id: string; name: string; brand: string; model: string; type: string; } | null;
   fuelConsumptionRates: FuelConsumptionRates;
   assignedDriverId: string | null;
   assignedDriver?: { id: string; fullName: string; } | null;

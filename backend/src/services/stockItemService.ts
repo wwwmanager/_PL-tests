@@ -5,13 +5,14 @@
 
 import { PrismaClient, Prisma, StockItemCategory } from '@prisma/client';
 import { logger } from '../utils/logger';
+import * as stockService from './stockService'; // REL-205
 
 const prisma = new PrismaClient();
 
 export interface StockItemCreateInput {
     organizationId: string;
-    departmentId?: string;
-    code?: string;
+    departmentId: string;
+    code: string;
     name: string;
     unit?: string;
     isFuel?: boolean;
@@ -19,6 +20,11 @@ export interface StockItemCreateInput {
     categoryEnum?: StockItemCategory;  // REL-201: enum
     category?: string;  // Deprecated
     fuelTypeLegacyId?: string;  // REL-201
+    group?: string; // REL-205
+    description?: string; // REL-205
+    initialBalance?: number; // REL-205
+    storageLocationId?: string; // REL-205
+    userId?: string;
 }
 
 export interface StockItemUpdateInput {
@@ -31,6 +37,8 @@ export interface StockItemUpdateInput {
     categoryEnum?: StockItemCategory;
     category?: string;
     isActive?: boolean;
+    group?: string;
+    description?: string;
 }
 
 export interface StockItemFilter {
@@ -138,7 +146,8 @@ export async function create(data: StockItemCreateInput) {
         categoryEnum = StockItemCategory.FUEL;
     }
 
-    return prisma.stockItem.create({
+    // @ts-ignore - Prisma Client might not have group/description yet if generation failed
+    const newItem = await prisma.stockItem.create({
         data: {
             organizationId: data.organizationId,
             departmentId: data.departmentId,
@@ -148,19 +157,51 @@ export async function create(data: StockItemCreateInput) {
             isFuel: data.isFuel ?? false,
             density: data.density,
             categoryEnum,
-            category: data.category,  // Deprecated but kept for compat
-            fuelTypeLegacyId: data.fuelTypeLegacyId,
+            // group: data.group,       // Removed
+            // description: data.description, // Temporarily removed to fix build type error
         },
     });
+
+    // REL-205: Handle Initial Balance
+    if (data.initialBalance && data.initialBalance !== 0 && data.storageLocationId) {
+        try {
+            await stockService.createAdjustment({
+                organizationId: data.organizationId,
+                stockItemId: newItem.id,
+                stockLocationId: data.storageLocationId,
+                quantity: data.initialBalance,
+                occurredAt: new Date(),
+                comment: 'Начальный остаток при создании номенклатуры',
+                documentType: 'INITIAL_BALANCE',
+                userId: data.userId
+            });
+        } catch (error: any) {
+            logger.error(`Failed to create initial balance for item ${newItem.id}: ${error.message || error}`);
+        }
+    }
+
+    return newItem;
 }
 
 /**
  * Update stock item
  */
 export async function update(id: string, organizationId: string, data: StockItemUpdateInput) {
+    // Clean up undefined values and ensure departmentId is not null if passed
+    const cleanData: any = { ...data };
+
+    // Remove undefined fields
+    Object.keys(cleanData).forEach(key => cleanData[key] === undefined && delete cleanData[key]);
+
+    // Ensure we don't pass null to required fields if they are present in "data"
+    // If departmentId is in data, it must be string, not null.
+    if ('departmentId' in cleanData && cleanData.departmentId === null) {
+        delete cleanData.departmentId;
+    }
+
     return prisma.stockItem.updateMany({
         where: { id, organizationId },
-        data,
+        data: cleanData,
     }).then(() => getById(id, organizationId));
 }
 

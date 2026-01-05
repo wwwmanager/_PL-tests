@@ -215,8 +215,9 @@ export async function getWaybillById(userInfo: UserInfo, id: string) {
 
     const waybill = await prisma.waybill.findFirst({
         where,
+        // @ts-ignore: VehicleModel relation is new
         include: {
-            vehicle: true,
+            vehicle: { include: { vehicleModel: true } },
             driver: {
                 include: {
                     employee: true
@@ -229,9 +230,13 @@ export async function getWaybillById(userInfo: UserInfo, id: string) {
             dispatcherEmployee: true,
             controllerEmployee: true
         }
-    });
+    }) as any;
 
     if (!waybill) return null;
+
+    if (waybill.vehicle) {
+        waybill.vehicle = applyVehicleFallbacks(waybill.vehicle);
+    }
 
     // B1: Flatten fuel for frontend (WB-FIX-PL-001)
     // Select aggregate deterministically: refueledAt desc nulls last, then id desc
@@ -267,6 +272,32 @@ function formatBlankNumber(series: string | null, number: number): string {
     const s = series || '';
     const n = number.toString().padStart(6, '0');
     return s ? `${s} ${n}` : n;
+}
+
+function applyVehicleFallbacks(vehicle: any) {
+    if (!vehicle || !vehicle.vehicleModel) return vehicle;
+
+    // Fallback for Tank Capacity
+    if (vehicle.fuelTankCapacity === null || vehicle.fuelTankCapacity === undefined) {
+        if (vehicle.vehicleModel.tankCapacity) {
+            vehicle.fuelTankCapacity = Number(vehicle.vehicleModel.tankCapacity);
+        }
+    }
+
+    // Fallback for Rates
+    // basic check: if object is empty or rates are 0/null
+    let rates = vehicle.fuelConsumptionRates as any;
+    if (!rates || (Object.keys(rates).length === 0) || (!rates.summerRate && !rates.winterRate)) {
+        if (vehicle.vehicleModel.summerRate || vehicle.vehicleModel.winterRate) {
+            vehicle.fuelConsumptionRates = {
+                summerRate: Number(vehicle.vehicleModel.summerRate || 0),
+                winterRate: Number(vehicle.vehicleModel.winterRate || 0),
+                cityIncreasePercent: rates?.cityIncreasePercent,
+                warmingIncreasePercent: rates?.warmingIncreasePercent
+            };
+        }
+    }
+    return vehicle;
 }
 
 export async function createWaybill(userInfo: UserInfo, input: CreateWaybillInput) {
@@ -311,10 +342,13 @@ export async function createWaybill(userInfo: UserInfo, input: CreateWaybillInpu
     // Note: We don't filter by organizationId because:
     // 1. Vehicle/driver may be in a sub-organization
     // 2. Parent org should be able to create waybills for sub-org vehicles
-    const vehicle = await prisma.vehicle.findFirst({
-        where: { id: input.vehicleId }
+    const vehicleData = await prisma.vehicle.findFirst({
+        where: { id: input.vehicleId },
+        // @ts-ignore: VehicleModel relation is new
+        include: { vehicleModel: true }
     });
-    if (!vehicle) throw new BadRequestError('Транспортное средство не найдено');
+    if (!vehicleData) throw new BadRequestError('Транспортное средство не найдено');
+    const vehicle = applyVehicleFallbacks(vehicleData);
 
     // REL-701: Strict Driver.id enforcement. No more fallback to employeeId.
     const driver = await prisma.driver.findFirst({
@@ -590,8 +624,9 @@ export async function updateWaybill(userInfo: UserInfo, id: string, data: Partia
 
     const waybill = await prisma.waybill.findFirst({
         where,
-        include: { vehicle: true, fuelLines: true }
-    });
+        // @ts-ignore: VehicleModel relation is new
+        include: { vehicle: { include: { vehicleModel: true } }, fuelLines: true }
+    }) as any;
     if (!waybill) throw new NotFoundError('Путевой лист не найден');
 
     if (waybill.status === WaybillStatus.POSTED) {
@@ -671,7 +706,17 @@ export async function updateWaybill(userInfo: UserInfo, id: string, data: Partia
         }
     }
 
-    const vehicle = data.vehicleId ? await prisma.vehicle.findFirst({ where: { id: data.vehicleId } }) : waybill.vehicle;
+    // If vehicleId changed, fetch new vehicle with model
+    const vehicleData = data.vehicleId
+        ? await prisma.vehicle.findFirst({
+            where: { id: data.vehicleId },
+            // @ts-ignore: VehicleModel relation is new
+            include: { vehicleModel: true }
+        })
+        : waybill.vehicle;
+
+    // Apply defaults from model
+    const vehicle = applyVehicleFallbacks(vehicleData);
     const waybillDate = data.date || waybill.date.toISOString().slice(0, 10);
     const odometerDistanceKm = calculateDistanceKm(newOdometerStart, newOdometerEnd);
 
@@ -898,9 +943,12 @@ export async function recalculateDraftChain(
     excludeWaybillId?: string
 ): Promise<{ updatedCount: number; waybillIds: string[] }> {
     // Get vehicle for fuel consumption rates
-    const vehicle = await prisma.vehicle.findUnique({
-        where: { id: vehicleId }
+    const vehicleData = await prisma.vehicle.findUnique({
+        where: { id: vehicleId },
+        // @ts-ignore: VehicleModel relation is new
+        include: { vehicleModel: true }
     });
+    const vehicle = applyVehicleFallbacks(vehicleData);
 
     if (!vehicle) {
         console.log('[WB-CASCADE] Vehicle not found, skipping cascade');

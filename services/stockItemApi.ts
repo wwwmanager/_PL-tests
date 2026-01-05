@@ -12,8 +12,8 @@ export type StockItemCategory = 'FUEL' | 'MATERIAL' | 'SPARE_PART' | 'SERVICE' |
 export interface StockItem {
     id: string;
     organizationId: string;
-    departmentId?: string | null;
-    code?: string | null;
+    departmentId: string; // Required
+    code: string;         // Required
     name: string;
     unit: string;
     isFuel: boolean;
@@ -21,6 +21,10 @@ export interface StockItem {
     categoryEnum?: StockItemCategory | null;
     category?: string | null; // Deprecated
     fuelTypeLegacyId?: string | null;
+    group?: string | null;
+    description?: string | null;
+    brandId?: string | null;
+    avgCost?: number | null;
     balance: number;
     isActive: boolean;
     createdAt: string;
@@ -28,16 +32,22 @@ export interface StockItem {
     // Relations
     fuelType?: { id: string; code: string; name: string } | null;
     department?: { id: string; name: string } | null;
+    brand?: { id: string; name: string } | null;
 }
 
 export interface StockItemCreateInput {
-    code?: string;
+    code: string;
     name: string;
     unit?: string;
     isFuel?: boolean;
     density?: number;
     categoryEnum?: StockItemCategory;
-    departmentId?: string;
+    departmentId: string;
+    group?: string;
+    description?: string;
+    brandId?: string;
+    initialBalance?: number;
+    storageLocationId?: string;
 }
 
 export interface StockItemUpdateInput {
@@ -49,6 +59,9 @@ export interface StockItemUpdateInput {
     categoryEnum?: StockItemCategory;
     departmentId?: string | null;
     isActive?: boolean;
+    group?: string;
+    description?: string;
+    brandId?: string | null;
 }
 
 export interface StockItemFilter {

@@ -22,6 +22,9 @@ import {
 
 import StockItemList from '../warehouse/StockItemList';
 
+
+
+const VehicleModelManagement = lazy(() => import('./VehicleModelManagement'));
 const GarageManagement = lazy(() => import('./GarageManagement'));
 const StorageManagement = lazy(() => import('./StorageManagement'));
 const ProductionCalendarSettings = lazy(() => import('../admin/ProductionCalendarSettings'));
@@ -34,10 +37,11 @@ const Dictionaries: React.FC<DictionariesProps> = ({ subViewToOpen }) => {
 
     const allDicts: { id: DictionaryType; label: string; icon: React.FC<React.SVGProps<SVGSVGElement>>; }[] = [
         { id: 'nomenclature', label: 'Номенклатура', icon: NomenclatureIcon },
+        { id: 'vehicleModels', label: 'Марки ТС', icon: TruckIcon },
         { id: 'vehicles', label: 'Транспорт', icon: TruckIcon },
         { id: 'employees', label: 'Сотрудники', icon: UserGroupIcon },
         { id: 'organizations', label: 'Организации', icon: BuildingOffice2Icon },
-        { id: 'fuelTypes', label: 'Топливо', icon: FireIcon },
+        // { id: 'fuelTypes', label: 'Топливо', icon: FireIcon }, // Hidden as per user request (duplicate of Nomenclature)
         { id: 'storageLocations', label: 'Места хранения', icon: HomeModernIcon },
         { id: 'calendar', label: 'Календарь', icon: CalendarDaysIcon },
         { id: 'routes', label: 'Маршруты', icon: GlobeAltIcon },
@@ -96,6 +100,7 @@ const Dictionaries: React.FC<DictionariesProps> = ({ subViewToOpen }) => {
     const renderActiveDictionary = () => {
         switch (activeDictionary) {
             case 'nomenclature': return <StockItemList />;
+            case 'vehicleModels': return <Suspense fallback={<div>Загрузка...</div>}><VehicleModelManagement /></Suspense>;
             case 'fuelTypes': return <FuelTypeManagement />;
             case 'organizations': return <OrganizationManagement />;
             case 'vehicles': return <VehicleList />;

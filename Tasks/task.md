@@ -1,12 +1,12 @@
-# Task Checklist
+# Список задач - Отображение ТС в Журнале Операций
 
-- [x] **POSTING-SVC-010**: Create `PostingService`
-    - [x] Implement `postWaybill` (Draft -> Posted -> Ledger Entries)
-    - [x] Implement `cancelWaybill` (Posted -> Cancelled -> Void key Ledger Entries)
-- [x] **DOC-IMMUTABLE-020**: Enforce Immutability
-    - [x] Prevent physical deletion of POSTED waybills in `waybillService`
-    - [x] Ensure only CANCEL allowed for POSTED
-- [x] **RECALC-030**: Admin Recalculation Tool (Optional/Later)
-    - [x] Create endpoint for balance recalculation if caching is used
-- [ ] **Verification**
-    - [ ] Verify Waybill flow (Create -> Post -> Cancel) with Fuel Balance checks
+- [x] **BUG-HIERARCHY-001**: Исправления видимости хранилищ для подразделений
+    - [x] Исследовать `stockService.ts` на предмет логики получения locations
+    - [x] Проверить SQL/TypeORM запрос на учет дочерних организаций
+    - [x] Исправить запрос, чтобы он включал транспорт дочерних подразделений (stockController.ts)
+    - [x] Верифицировать исправление
+
+- [ ] **UI-STOCK-002**: Отображение ТС в колонке Получатель для списаний по ПЛ
+    - [x] Найти компонент списка движений (`FuelMovements.tsx`)
+    - [x] Понять, откуда берется "Получатель ID: ..."
+    - [ ] Изменить логику отображения: если `documentType === 'WAYBILL'` и `type === 'EXPENSE'`, выводить ТС (из `fromStockLocation` или `documentId` -> `Waybill` -> `Vehicle`)

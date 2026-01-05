@@ -16,6 +16,7 @@ import {
     useSortable
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import { restrictToHorizontalAxis } from '@dnd-kit/modifiers';
 
 interface Tab {
     id: string;
@@ -50,9 +51,10 @@ const SortableTab: React.FC<SortableTabProps> = ({ tab, isActive, onTabChange })
     const style = {
         transform: CSS.Transform.toString(transform),
         transition,
-        cursor: 'grab',
+        cursor: isDragging ? 'grabbing' : 'grab',
         zIndex: isDragging ? 10 : 'auto',
         opacity: isDragging ? 0.5 : 1,
+        touchAction: 'none'
     };
 
     const Icon = tab.icon;
@@ -65,7 +67,7 @@ const SortableTab: React.FC<SortableTabProps> = ({ tab, isActive, onTabChange })
             {...listeners}
             onClick={() => onTabChange(tab.id)}
             className={`
-                whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors flex items-center gap-2 select-none
+                whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors flex items-center gap-2 select-none outline-none focus:outline-none
                 ${isActive
                     ? 'border-blue-500 text-blue-600 dark:text-blue-400'
                     : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'
@@ -81,7 +83,11 @@ const SortableTab: React.FC<SortableTabProps> = ({ tab, isActive, onTabChange })
 
 export const TabsNavigation: React.FC<TabsNavigationProps> = ({ tabs, activeTab, onTabChange, onReorder, className = '' }) => {
     const sensors = useSensors(
-        useSensor(PointerSensor),
+        useSensor(PointerSensor, {
+            activationConstraint: {
+                distance: 8,
+            },
+        }),
         useSensor(KeyboardSensor, {
             coordinateGetter: sortableKeyboardCoordinates,
         })
@@ -104,6 +110,7 @@ export const TabsNavigation: React.FC<TabsNavigationProps> = ({ tabs, activeTab,
                     sensors={sensors}
                     collisionDetection={closestCenter}
                     onDragEnd={handleDragEnd}
+                    modifiers={[restrictToHorizontalAxis]}
                 >
                     <nav className="-mb-px flex space-x-8 overflow-x-auto scrollbar-hide" aria-label="Tabs">
                         <SortableContext

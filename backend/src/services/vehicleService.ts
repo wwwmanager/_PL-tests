@@ -112,12 +112,38 @@ export async function listVehicles(
             fuelTypeRelation: true,
             fuelStockItem: true,  // REL-202
             assignedDriver: true, // REL-205: Include driver for Fuel Balances
+            vehicleModel: true,   // REL-206: Include Vehicle Model
         },
     });
     console.log(`📊 [vehicleService] Found ${vehicles.length} vehicles`);
 
+    // Helper for fallback logic
+    const applyModelFallbacks = (v: any) => {
+        if (!v.vehicleModel) return v;
+
+        let rates = v.fuelConsumptionRates;
+        // If rates are missing or empty on Vehicle, try to use Model's rates
+        if (!rates || Object.keys(rates).length === 0) {
+            if (v.vehicleModel.summerRate || v.vehicleModel.winterRate) {
+                rates = {
+                    summerRate: v.vehicleModel.summerRate ? Number(v.vehicleModel.summerRate) : 0,
+                    winterRate: v.vehicleModel.winterRate ? Number(v.vehicleModel.winterRate) : 0,
+                };
+            }
+        }
+
+        return {
+            ...v,
+            // Fallback for logic that uses these fields
+            fuelTankCapacity: (v.fuelTankCapacity !== null && v.fuelTankCapacity !== undefined)
+                ? v.fuelTankCapacity
+                : (v.vehicleModel.tankCapacity ? Number(v.vehicleModel.tankCapacity) : null),
+            fuelConsumptionRates: rates
+        };
+    };
+
     return vehicles.map((v: any) => ({
-        ...v,
+        ...applyModelFallbacks(v),
         // FIX: Используем PascalCase для соответствия frontend enum VehicleStatus
         status: v.isActive ? 'Active' : 'Archived'
     }));
@@ -132,13 +158,39 @@ export async function getVehicleById(organizationId: string, id: string) {
             fuelTypeRelation: true,
             fuelStockItem: true,  // REL-202
             assignedDriver: true, // REL-205
+            vehicleModel: true,   // REL-206
         },
     });
 
     if (!vehicle) return null;
 
+    // Helper for fallback logic (duplicated for now, TODO: extract)
+    const applyModelFallbacks = (v: any) => {
+        if (!v.vehicleModel) return v;
+
+        let rates = v.fuelConsumptionRates;
+        if (!rates || Object.keys(rates).length === 0) {
+            if (v.vehicleModel.summerRate || v.vehicleModel.winterRate) {
+                rates = {
+                    summerRate: v.vehicleModel.summerRate ? Number(v.vehicleModel.summerRate) : 0,
+                    winterRate: v.vehicleModel.winterRate ? Number(v.vehicleModel.winterRate) : 0,
+                };
+            }
+        }
+
+        return {
+            ...v,
+            fuelTankCapacity: (v.fuelTankCapacity !== null && v.fuelTankCapacity !== undefined)
+                ? v.fuelTankCapacity
+                : (v.vehicleModel.tankCapacity ? Number(v.vehicleModel.tankCapacity) : null),
+            fuelConsumptionRates: rates
+        };
+    };
+
+    const processedVehicle = applyModelFallbacks(vehicle);
+
     return {
-        ...vehicle,
+        ...processedVehicle,
         // FIX: Используем PascalCase для соответствия frontend enum VehicleStatus
         status: (vehicle as any).isActive ? 'Active' : 'Archived'
     } as any;
@@ -173,6 +225,7 @@ export async function createVehicle(organizationId: string, data: any) {
                     fuelType,
                     fuelTypeId: fuelTypeId || null,
                     fuelStockItemId: data.fuelStockItemId || null,  // REL-202
+                    vehicleModelId: data.vehicleModelId || null,    // REL-206
                     fuelTankCapacity: data.fuelTankCapacity ? Number(data.fuelTankCapacity) : null,
                     mileage: data.mileage ? Number(data.mileage) : 0,
                     currentFuel: data.currentFuel ? Number(data.currentFuel) : 0,
@@ -210,7 +263,8 @@ export async function createVehicle(organizationId: string, data: any) {
             });
 
             // Create StockLocation for the vehicle tank
-            await tx.stockLocation.create({
+            logToDebugFile(`Creating StockLocation for vehicle tank: vehicleId=${v.id}, orgId=${actualOrgId}`);
+            const stockLoc = await tx.stockLocation.create({
                 data: {
                     organizationId: actualOrgId,
                     type: StockLocationType.VEHICLE_TANK,
@@ -219,6 +273,7 @@ export async function createVehicle(organizationId: string, data: any) {
                     isActive: true,
                 },
             });
+            logToDebugFile(`StockLocation created: id=${stockLoc.id}, name=${stockLoc.name}`);
 
             return v;
         });
@@ -267,6 +322,7 @@ export async function updateVehicle(organizationId: string, id: string, data: an
                 fuelType,
                 fuelTypeId,
                 fuelStockItemId: data.fuelStockItemId,  // REL-202
+                vehicleModelId: data.vehicleModelId,    // REL-206
                 fuelTankCapacity: data.fuelTankCapacity !== undefined ? Number(data.fuelTankCapacity) : undefined,
                 mileage: data.mileage !== undefined ? Number(data.mileage) : undefined,
                 currentFuel: data.currentFuel !== undefined ? Number(data.currentFuel) : undefined,
@@ -314,11 +370,14 @@ export async function updateVehicle(organizationId: string, id: string, data: an
         });
 
         if (existingLocation) {
-            // Update name if changed
-            if (existingLocation.name !== stockLocationName) {
+            // Update name and organizationId if changed
+            if (existingLocation.name !== stockLocationName || existingLocation.organizationId !== v.organizationId) {
                 await tx.stockLocation.update({
                     where: { id: existingLocation.id },
-                    data: { name: stockLocationName }
+                    data: {
+                        name: stockLocationName,
+                        organizationId: v.organizationId  // Sync org with vehicle
+                    }
                 });
             }
         } else {
@@ -341,8 +400,15 @@ export async function updateVehicle(organizationId: string, id: string, data: an
 }
 
 export async function deleteVehicle(organizationId: string, id: string) {
+    // ORG-HIERARCHY: Include child orgs for delete permission
+    const childOrgs = await prisma.organization.findMany({
+        where: { parentOrganizationId: organizationId },
+        select: { id: true }
+    });
+    const orgIds = [organizationId, ...childOrgs.map(o => o.id)];
+
     const vehicle = await prisma.vehicle.findFirst({
-        where: { id, organizationId },
+        where: { id, organizationId: { in: orgIds } },
     });
 
     if (!vehicle) {

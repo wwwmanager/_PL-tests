@@ -32,11 +32,13 @@ describe('Fuel Card Service (Draft Reserve)', () => {
         const item = await prisma.stockItem.create({
             data: {
                 organizationId,
+                departmentId: '00000000-0000-0000-0000-000000000000',
                 name: 'Diesel Test',
+                code: 'FUEL-TEST-' + uuidv4(),
                 unit: 'l',
                 isFuel: true,
                 categoryEnum: 'FUEL',
-                category: 'FUEL'
+                // category: 'FUEL' // Removed legacy
             }
         });
         stockItemId = item.id;

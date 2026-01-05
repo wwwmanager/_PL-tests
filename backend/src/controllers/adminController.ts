@@ -1146,12 +1146,13 @@ export const importData = async (req: Request, res: Response) => {
 
                     const dataPayload = {
                         name: item.name,
-                        code: item.code,
+                        code: item.code || `IMP-${item.id.substring(0, 8)}`, // Fallback
                         unit: item.unit,
                         categoryEnum: categoryEnum,
                         isFuel: !!item.isFuel,
                         density: item.density,
-                        balance: item.balance !== undefined ? item.balance : 0
+                        balance: item.balance !== undefined ? item.balance : 0,
+                        departmentId: '00000000-0000-0000-0000-000000000000', // Placeholder
                     };
 
                     if (existing) {

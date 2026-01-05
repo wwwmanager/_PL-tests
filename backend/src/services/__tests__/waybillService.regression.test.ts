@@ -101,7 +101,9 @@ describe('Waybill Regression Tests (WB-REG-002)', () => {
         const fuelItem = await prisma.stockItem.create({
             data: {
                 organizationId,
+                departmentId: dept.id,
                 name: 'Diesel RegTest',
+                code: 'FUEL-REG-TEST',
                 unit: 'l',
                 categoryEnum: 'FUEL'
             }

@@ -111,6 +111,40 @@ enum StockItemCategory {
   OTHER
 }
 
+// REL-301: Enums for Vehicle Sets and Assets
+enum SeasonType {
+  SUMMER
+  WINTER
+}
+
+enum SetKind {
+  TIRE
+  WHEEL
+}
+
+enum SetStatus {
+  STORED
+  IN_USE
+  SCRAPPED
+}
+
+enum AssetKind {
+  BATTERY
+  AGGREGATE
+}
+
+enum WearMode {
+  BY_MILEAGE
+  BY_MONTHS
+}
+
+enum IdentifierType {
+  MPN
+  BARCODE
+  INTERNAL
+  OTHER
+}
+
 // ============================================================================
 // ОРГАНИЗАЦИИ И ПОДРАЗДЕЛЕНИЯ
 // ============================================================================
@@ -164,6 +198,7 @@ model Organization {
   auditLogs      AuditLog[]
   resetRules     FuelCardResetRule[]  // REL-105
   periodLocks    PeriodLock[]         // PERIOD-LOCK-001
+  vehicleModels  VehicleModel[]       // REL-300
 
   @@index([isOwn])
   @@index([parentOrganizationId])  // ORG-HIERARCHY-001
@@ -437,14 +472,51 @@ model Vehicle {
   fuelTypeRelation FuelType? @relation(fields: [fuelTypeId], references: [id], onDelete: SetNull)
   fuelStockItem    StockItem? @relation("VehicleFuelStockItem", fields: [fuelStockItemId], references: [id], onDelete: SetNull)  // REL-200
   storageLocation Warehouse? @relation(fields: [storageLocationId], references: [id], onDelete: SetNull)
+  
+  // REL-300: Vehicle Model Reference
+  vehicleModelId   String?    @db.Uuid
+  vehicleModel     VehicleModel? @relation(fields: [vehicleModelId], references: [id], onDelete: SetNull)
 
   waybills     Waybill[]
   fuelCards    FuelCard[]   @relation("FuelCardVehicle")
   blanksIssued Blank[]      @relation("BlankIssuedToVehicle")
   stockLocation StockLocation? @relation("VehicleTankLocation")
   cardAssignments FuelCardAssignment[] @relation("AssignmentVehicle")  // REL-106
+  
+  // REL-301: Assets
+  vehicleSets    VehicleSet[]
+  vehicleAssets  VehicleAsset[]
 
   @@map("vehicles")
+}
+
+// REL-300: Справочник Марок ТС (Vehicle Models)
+model VehicleModel {
+  id                String   @id @default(uuid()) @db.Uuid
+  organizationId    String   @db.Uuid
+  name              String   @db.Text  // Полное наименование конфигурации (напр. "KAMAZ 5490 Зима")
+  brand             String   @db.Text
+  model             String   @db.Text
+  type              String   @db.Text  // Тип ТС (грузовой, легковой и т.д.)
+  
+  fuelStockItemId   String?  @db.Uuid
+  tankCapacity      Decimal? @db.Decimal(10, 2)
+  summerRate        Decimal? @db.Decimal(10, 2)
+  winterRate        Decimal? @db.Decimal(10, 2)
+  
+  tireSize          String?  @db.Text
+  rimSize           String?  @db.Text
+  manufactureYearFrom Int?
+  manufactureYearTo   Int?
+  
+  createdAt         DateTime @default(now()) @db.Timestamp(6)
+  updatedAt         DateTime @default(now()) @updatedAt @db.Timestamp(6)
+
+  organization      Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  fuelStockItem     StockItem?   @relation(fields: [fuelStockItemId], references: [id], onDelete: SetNull)
+  vehicles          Vehicle[]
+
+  @@map("vehicle_models")
 }
 
 model FuelCard {
@@ -504,16 +576,23 @@ model FuelCardAssignment {
 // СКЛАДСКОЙ УЧЁТ
 // ============================================================================
 
+// REL-201: Универсальная номенклатура
 model StockItem {
   id             String   @id @default(uuid()) @db.Uuid
   organizationId String   @db.Uuid
-  departmentId   String?  @db.Uuid  // REL-201: привязка к подразделению
-  code           String?  @db.Text  // артикул
+  departmentId   String   @db.Uuid  // REL-301: Made required for strict scoping
+  code           String   @db.Text  // REL-301: Made required
   name           String   @db.Text
   unit           String   @default("л") @db.Text
   
   // REL-201: Use enum instead of string for category
   categoryEnum   StockItemCategory?  // FUEL, MATERIAL, SPARE_PART, SERVICE, OTHER
+  
+  group          String?  @db.Text   // REL-205: Группа (например ГСМ)
+  description    String?  @db.Text   // REL-205: Описание
+  
+  brandId        String?  @db.Uuid   // REL-301
+  avgCost        Decimal? @db.Decimal(14, 2) // REL-301
   
   isFuel         Boolean  @default(false)  // Kept for backward compatibility
   balance        Decimal  @default(0) @db.Decimal(14, 3)
@@ -528,17 +607,100 @@ model StockItem {
   updatedAt      DateTime @default(now()) @updatedAt @db.Timestamp(6)
 
   organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  department     Department?     @relation(fields: [departmentId], references: [id], onDelete: SetNull)  // REL-201
+  department     Department?     @relation(fields: [departmentId], references: [id], onDelete: SetNull) // Note: Relation is optional but FK field is required? Wait, if FK is required, relation can't be optional in Prisma usually if using strict guarantees, but mapped to optional relation object is fine. Actually Department relation should be mandatory if departmentId is.
   fuelType       FuelType?       @relation(fields: [fuelTypeLegacyId], references: [id], onDelete: SetNull)
   stockMovements StockMovement[]
   waybillFuel    WaybillFuel[]
   topUpRules     FuelCardTopUpRule[] @relation("TopUpRuleStockItem")
   resetRules     FuelCardResetRule[] @relation("ResetRuleStockItem")
   vehicles       Vehicle[]       @relation("VehicleFuelStockItem")
+  vehicleModels  VehicleModel[]
+  
+  brand          Brand?          @relation(fields: [brandId], references: [id], onDelete: SetNull)
+  identifiers    StockItemIdentifier[]
+  vehicleAssets  VehicleAsset[]
 
-  @@unique([organizationId, name])  // REL-201: уникальность по орг + имени
-  @@index([organizationId, categoryEnum])  // REL-201
+  // REL-301: New uniqueness constraint
+  @@unique([organizationId, departmentId, code])
+  @@index([organizationId, categoryEnum])
   @@map("stock_items")
+}
+
+// REL-301: Производители / Бренды
+model Brand {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @db.Uuid
+  name           String   @db.Text
+  
+  stockItems     StockItem[]
+  // vehicleModels VehicleModel[] // Optional back relation
+
+  @@unique([organizationId, name])
+  @@map("brands")
+}
+
+// REL-301: Идентификаторы номенклатуры (MPN, Barcode)
+model StockItemIdentifier {
+  id          String         @id @default(uuid()) @db.Uuid
+  stockItemId String         @db.Uuid
+  type        IdentifierType
+  value       String         @db.Text
+  brandId     String?        @db.Uuid // Для MPN + Brand
+
+  stockItem   StockItem @relation(fields: [stockItemId], references: [id], onDelete: Cascade)
+
+  @@unique([type, value, brandId])
+  @@map("stock_item_identifiers")
+}
+
+model VehicleSet {
+  id          String     @id @default(uuid()) @db.Uuid
+  vehicleId   String     @db.Uuid
+  kind        SetKind
+  season      SeasonType
+  spec        String     @db.Text // "R15 195/65"
+  status      SetStatus  @default(STORED)
+
+  // Location if STORED
+  stockLocationId String? @db.Uuid
+  stockLocation   StockLocation? @relation(fields: [stockLocationId], references: [id], onDelete: SetNull)
+
+  installedAt           DateTime? @db.Timestamp(6)
+  removedAt             DateTime? @db.Timestamp(6)
+  installedAtOdometerKm Int?
+  removedAtOdometerKm   Int?
+
+  wearPct      Decimal  @default(0) @db.Decimal(5, 2) // 0-100
+
+  vehicle     Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  @@index([vehicleId, kind, season, status])
+  @@map("vehicle_sets")
+}
+
+model VehicleAsset {
+  id          String     @id @default(uuid()) @db.Uuid
+  vehicleId   String     @db.Uuid
+  kind        AssetKind
+  stockItemId String?    @db.Uuid
+  stockItem   StockItem? @relation(fields: [stockItemId], references: [id], onDelete: SetNull)
+  serialNo    String?    @db.Text
+
+  installedAt           DateTime @db.Timestamp(6)
+  installedAtOdometerKm Int?
+
+  wearMode    WearMode
+  wearPct     Decimal  @default(0) @db.Decimal(5, 2)
+  
+  serviceLifeMonths Int?
+  wearPctPer1000km  Decimal? @db.Decimal(10, 4)
+
+  status      String     @default("IN_USE") @db.Text // IN_USE, SCRAPPED
+
+  vehicle     Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  @@index([vehicleId, kind, status])
+  @@map("vehicle_assets")
 }
 
 model Warehouse {
@@ -678,6 +840,9 @@ model StockLocation {
   
   // REL-105: Обратные связи для правил обнуления
   resetRulesAsTarget FuelCardResetRule[] @relation("ResetRuleTarget")
+  
+  // REL-301: Хранение комплектов
+  vehicleSets    VehicleSet[]
 
   @@index([organizationId, type])
   @@map("stock_locations")

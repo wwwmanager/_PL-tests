@@ -13,6 +13,8 @@ import {
     StockItemCreateInput,
     StockItemUpdateInput
 } from '../../services/stockItemApi';
+import { getStockLocations, StockLocation } from '../../services/stockApi'; // REL-205
+import { getBrands, Brand } from '../../services/brandApi'; // REL-301
 import { useToast } from '../../hooks/useToast';
 import { useAuth } from '../../services/auth';  // RLS-STOCK-FE-010
 import { PlusIcon, PencilIcon, TrashIcon, ArchiveBoxIcon, EyeIcon, NomenclatureIcon } from '../Icons';
@@ -26,6 +28,13 @@ interface StockItemFormData {
     categoryEnum: StockItemCategory | '';
     isFuel: boolean;
     density: string;
+    // REL-205: Reference screenshot fields
+    group: string;
+    description: string;
+    brandId: string;
+    initialBalance: string;
+    storageLocationId: string;
+    departmentId: string;
 }
 
 const CATEGORY_LABELS: Record<StockItemCategory, string> = {
@@ -36,9 +45,35 @@ const CATEGORY_LABELS: Record<StockItemCategory, string> = {
     OTHER: 'Прочее',
 };
 
+const STOCK_GROUPS = [
+    'ГСМ',
+    'Техжидкости',
+    'Запчасти',
+    'Шины',
+    'АКБ',
+    'Агрегаты',
+    'Услуги'
+] as const;
+
+type StockGroup = typeof STOCK_GROUPS[number];
+
+const GROUP_TO_CATEGORY: Record<StockGroup, StockItemCategory> = {
+    'ГСМ': 'FUEL',
+    'Техжидкости': 'MATERIAL',
+    'Запчасти': 'SPARE_PART',
+    'Шины': 'SPARE_PART',
+    'АКБ': 'SPARE_PART',
+    'Агрегаты': 'SPARE_PART',
+    'Услуги': 'SERVICE',
+};
+
+
+
 
 const StockItemList: React.FC = () => {
     const [items, setItems] = useState<StockItem[]>([]);
+    const [locations, setLocations] = useState<StockLocation[]>([]); // REL-205
+    const [brands, setBrands] = useState<Brand[]>([]); // REL-301
     const [loading, setLoading] = useState(false);
     const [showModal, setShowModal] = useState(false);
     const [editingItem, setEditingItem] = useState<StockItem | null>(null);
@@ -49,6 +84,12 @@ const StockItemList: React.FC = () => {
         categoryEnum: 'FUEL',
         isFuel: true,
         density: '',
+        group: 'ГСМ',
+        description: '',
+        brandId: '', // REL-301
+        initialBalance: '0',
+        storageLocationId: '',
+        departmentId: '',
     });
 
 
@@ -61,8 +102,14 @@ const StockItemList: React.FC = () => {
     const loadData = useCallback(async () => {
         setLoading(true);
         try {
-            const data = await getStockItems({});
-            setItems(data);
+            const [itemsData, locationsData, brandsData] = await Promise.all([
+                getStockItems({}),
+                getStockLocations(),
+                getBrands()
+            ]);
+            setItems(itemsData);
+            setLocations(locationsData.filter(l => l.type === 'WAREHOUSE'));
+            setBrands(brandsData);
         } catch (err: any) {
             showToast('Ошибка загрузки: ' + err.message, 'error');
         } finally {
@@ -84,6 +131,12 @@ const StockItemList: React.FC = () => {
             categoryEnum: 'FUEL',
             isFuel: true,
             density: '',
+            group: 'ГСМ',
+            description: '',
+            brandId: '',
+            initialBalance: '0',
+            storageLocationId: '',
+            departmentId: currentUser?.departmentId || '', // Default to user's department
         });
         setShowModal(true);
     };
@@ -97,17 +150,40 @@ const StockItemList: React.FC = () => {
             categoryEnum: item.categoryEnum || 'OTHER',
             isFuel: item.isFuel,
             density: item.density?.toString() || '',
+            group: item.group || '',
+            description: item.description || '',
+            initialBalance: '0',
+            storageLocationId: '',
+            departmentId: item.departmentId || '',
+            brandId: item.brandId || '',
         });
         setShowModal(true);
     };
 
-    const handleFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const handleFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
         const { name, value, type } = e.target;
+
+        if (name === 'group') {
+            // We treat "Group" as the primary selector now.
+            // If the value is one of our known groups, we map it to the category.
+            // Even if it's a new custom group (text input), we might default to something?
+            // But here we are making it a Select, so value will be one of STOCK_GROUPS.
+            const category = GROUP_TO_CATEGORY[value as StockGroup] || 'OTHER';
+            const isFuel = category === 'FUEL';
+            setFormData(prev => ({
+                ...prev,
+                group: value,
+                categoryEnum: category,
+                isFuel: isFuel,
+                unit: isFuel ? 'л' : (category === 'SERVICE' ? 'шт' : prev.unit)
+            }));
+            return;
+        }
+
         const isCheckbox = type === 'checkbox';
         setFormData(prev => ({
             ...prev,
             [name]: isCheckbox ? (e.target as HTMLInputElement).checked : value,
-            // Auto-update isFuel when category changes
             ...(name === 'categoryEnum' && { isFuel: value === 'FUEL' }),
             ...(name === 'categoryEnum' && value === 'FUEL' && { unit: 'л' }),
         }));
@@ -119,6 +195,12 @@ const StockItemList: React.FC = () => {
             showToast('Название обязательно', 'error');
             return;
         }
+        if (!formData.code.trim()) {
+            showToast('Артикул обязательно', 'error');
+            return;
+        }
+        // departmentId fallback handled by backend (stockItemController.ts)
+        const effectiveDeptId = formData.departmentId || currentUser?.departmentId || undefined;
 
         try {
             if (editingItem) {
@@ -129,6 +211,10 @@ const StockItemList: React.FC = () => {
                     categoryEnum: formData.categoryEnum as StockItemCategory || undefined,
                     isFuel: formData.isFuel,
                     density: formData.density ? parseFloat(formData.density) : undefined,
+                    group: formData.group,
+                    description: formData.description,
+                    departmentId: effectiveDeptId,
+                    brandId: formData.brandId || undefined,
                 };
                 await updateStockItem(editingItem.id, updateData);
                 showToast('Номенклатура обновлена', 'success');
@@ -140,6 +226,12 @@ const StockItemList: React.FC = () => {
                     categoryEnum: formData.categoryEnum as StockItemCategory || undefined,
                     isFuel: formData.isFuel,
                     density: formData.density ? parseFloat(formData.density) : undefined,
+                    group: formData.group,
+                    description: formData.description,
+                    departmentId: effectiveDeptId, // Required
+                    brandId: formData.brandId || undefined,
+                    initialBalance: formData.initialBalance ? parseFloat(formData.initialBalance) : 0,
+                    storageLocationId: formData.storageLocationId || undefined,
                 };
                 await createStockItem(createData);
                 showToast('Номенклатура создана', 'success');
@@ -184,6 +276,13 @@ const StockItemList: React.FC = () => {
                     )}
                 </div>
             )
+        },
+        {
+            key: 'group',
+            label: 'Группа',
+            sortable: true,
+            align: 'center' as const,
+            render: (row: StockItem) => row.group || '—'
         },
         {
             key: 'categoryEnum',
@@ -273,22 +372,44 @@ const StockItemList: React.FC = () => {
                             {editingItem ? 'Редактировать номенклатуру' : 'Новая номенклатура'}
                         </h3>
                         <form onSubmit={handleSubmit} className="space-y-4">
+
+
+                            {/* REL-205: Group and Description */}
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                    Категория *
+                                    Группа *
                                 </label>
                                 <select
-                                    name="categoryEnum"
-                                    value={formData.categoryEnum}
+                                    name="group"
+                                    value={formData.group}
                                     onChange={handleFormChange}
                                     className="w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-md shadow-sm"
                                     required
                                 >
-                                    {Object.entries(CATEGORY_LABELS).map(([key, label]) => (
-                                        <option key={key} value={key}>{label}</option>
+                                    <option value="" disabled>Выберите группу</option>
+                                    {STOCK_GROUPS.map(grp => (
+                                        <option key={grp} value={grp}>{grp}</option>
                                     ))}
                                 </select>
                             </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                    Производитель / Бренд
+                                </label>
+                                <select
+                                    name="brandId"
+                                    value={formData.brandId}
+                                    onChange={handleFormChange}
+                                    className="w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-md shadow-sm"
+                                >
+                                    <option value="">Не указано</option>
+                                    {brands.map(b => (
+                                        <option key={b.id} value={b.id}>{b.name}</option>
+                                    ))}
+                                </select>
+                            </div>
+
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                                     Код (артикул)
@@ -299,7 +420,8 @@ const StockItemList: React.FC = () => {
                                     value={formData.code}
                                     onChange={handleFormChange}
                                     className="w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-md shadow-sm"
-                                    placeholder="АИ-92"
+                                    placeholder="АИ-92 (Обязательно)"
+                                    required
                                 />
                             </div>
                             <div>
@@ -314,6 +436,18 @@ const StockItemList: React.FC = () => {
                                     className="w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-md shadow-sm"
                                     placeholder="Бензин АИ-92"
                                     required
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                    Описание
+                                </label>
+                                <textarea
+                                    value={formData.description}
+                                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                                    rows={2}
+                                    className="w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-md shadow-sm"
                                 />
                             </div>
                             <div className="grid grid-cols-2 gap-4">
@@ -347,6 +481,46 @@ const StockItemList: React.FC = () => {
                                     </div>
                                 )}
                             </div>
+
+                            {/* REL-205: Initial Balance (only for new items) */}
+                            {!editingItem && (
+                                <div className="p-3 bg-gray-50 dark:bg-gray-700/50 rounded-md border border-gray-200 dark:border-gray-700">
+                                    <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-3">Начальный остаток (Опционально)</h4>
+                                    <div className="space-y-3">
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                                Место хранения
+                                            </label>
+                                            <select
+                                                value={formData.storageLocationId}
+                                                onChange={(e) => setFormData({ ...formData, storageLocationId: e.target.value })}
+                                                className="w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-md shadow-sm"
+                                            >
+                                                <option value="">Не указано</option>
+                                                {locations.map(loc => (
+                                                    <option key={loc.id} value={loc.id}>
+                                                        {loc.name} {loc.type === 'WAREHOUSE' ? '(Склад)' : loc.type === 'VEHICLE_TANK' ? '(Бак)' : ''}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                                Количество
+                                            </label>
+                                            <input
+                                                type="number"
+                                                step="0.001"
+                                                value={formData.initialBalance}
+                                                onChange={(e) => setFormData({ ...formData, initialBalance: e.target.value })}
+                                                className="w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-md shadow-sm"
+                                                disabled={!formData.storageLocationId}
+                                                placeholder="0.00"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
                             <div className="flex justify-end gap-3 pt-4">
                                 <button
                                     type="button"

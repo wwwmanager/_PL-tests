@@ -220,12 +220,26 @@ export async function listLocations(
     isActive: boolean;
     createdAt: Date;
 }>> {
-    // Include child organizations to match vehicle visibility
-    const childOrgs = await prisma.organization.findMany({
-        where: { parentOrganizationId: organizationId },
-        select: { id: true }
-    });
-    const orgIds = [organizationId, ...childOrgs.map(o => o.id)];
+    // Include ALL descendant organizations recursively (multi-level hierarchy)
+    async function getAllDescendantOrgIds(parentId: string): Promise<string[]> {
+        const children = await prisma.organization.findMany({
+            where: { parentOrganizationId: parentId },
+            select: { id: true }
+        });
+
+        const childIds = children.map(c => c.id);
+        const grandchildIds: string[] = [];
+
+        for (const childId of childIds) {
+            const descendants = await getAllDescendantOrgIds(childId);
+            grandchildIds.push(...descendants);
+        }
+
+        return [...childIds, ...grandchildIds];
+    }
+
+    const descendantOrgIds = await getAllDescendantOrgIds(organizationId);
+    const orgIds = [organizationId, ...descendantOrgIds];
 
     const where: any = {
         organizationId: { in: orgIds },

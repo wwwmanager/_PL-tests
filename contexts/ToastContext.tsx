@@ -19,6 +19,8 @@ export const ToastProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   // Track last message to prevent duplicate toasts
   const lastMessageRef = useRef<string>('');
   const lastMessageTimeRef = useRef<number>(0);
+  // Counter to ensure unique IDs even when Date.now() returns same value
+  const idCounterRef = useRef<number>(0);
 
   // Use useCallback for removeToast to ensure stable reference
   const removeToast = useCallback((id: number) => {
@@ -35,7 +37,9 @@ export const ToastProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     lastMessageRef.current = message;
     lastMessageTimeRef.current = now;
 
-    const id = now;
+    // Generate unique ID using timestamp + counter
+    idCounterRef.current += 1;
+    const id = now * 1000 + (idCounterRef.current % 1000);
     setToasts(prevToasts => [...prevToasts, { id, message, type }]);
 
     // Auto-dismiss after 5 seconds

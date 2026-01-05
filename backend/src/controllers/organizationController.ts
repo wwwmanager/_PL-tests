@@ -135,12 +135,13 @@ export async function createOrganization(req: Request, res: Response, next: Next
         }
 
         // Sanitize input: remove id (auto-generated), fix empty DateTime fields
-        const { id, stockLockedAt, ...rest } = req.body;
+        const { id, stockLockedAt, parentOrganizationId, ...rest } = req.body;
 
         // name is required in Prisma schema, populate from shortName if not provided
         const data: any = {
             ...rest,
             name: rest.name || rest.shortName || 'Unnamed Organization',
+            parentOrganizationId: parentOrganizationId || null,
         };
 
         // Only set stockLockedAt if it's a valid non-empty string
@@ -179,10 +180,14 @@ export async function updateOrganization(req: Request, res: Response, next: Next
         const { id } = req.params;
 
         // Sanitize input: remove id from body (use URL param), fix empty DateTime fields
-        const { id: bodyId, stockLockedAt, ...rest } = req.body;
+        const { id: bodyId, stockLockedAt, parentOrganizationId, ...rest } = req.body;
 
         // If shortName is updated but name is not provided, update name too
         const data: any = { ...rest };
+
+        if (parentOrganizationId !== undefined) {
+            data.parentOrganizationId = parentOrganizationId || null;
+        }
         if (rest.shortName && !rest.name) {
             data.name = rest.shortName;
         }
