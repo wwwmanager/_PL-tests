@@ -67,21 +67,21 @@ export const getDataPreview = async (req: Request, res: Response) => {
             auditLogs,
             organizations
         ] = await Promise.all([
-            prisma.waybill.findMany({ select: { id: true, number: true, date: true }, take: 100 }),
-            prisma.blank.findMany({ select: { id: true, series: true, number: true, status: true }, take: 200 }),
+            prisma.waybill.findMany({ select: { id: true, number: true, date: true }, take: 1000, orderBy: { date: 'desc' } }),
+            prisma.blank.findMany({ select: { id: true, series: true, number: true, status: true }, take: 1000, orderBy: { number: 'asc' } }),
             prisma.blankBatch.findMany({ select: { id: true, series: true, numberFrom: true, numberTo: true } }),
-            prisma.employee.findMany({ select: { id: true, fullName: true, position: true } }),
+            prisma.employee.findMany({ select: { id: true, fullName: true, position: true }, orderBy: { fullName: 'asc' } }),
             prisma.driver.findMany({ select: { id: true, licenseNumber: true, employee: { select: { fullName: true } } } }),
-            prisma.vehicle.findMany({ select: { id: true, registrationNumber: true, brand: true, model: true } }),
+            prisma.vehicle.findMany({ select: { id: true, registrationNumber: true, brand: true, model: true }, orderBy: { registrationNumber: 'asc' } }),
             prisma.route.findMany({ select: { id: true, name: true } }),
             prisma.fuelType.findMany({ select: { id: true, code: true, name: true } }),
             prisma.fuelCard.findMany({ select: { id: true, cardNumber: true, provider: true } }),
             prisma.warehouse.findMany({ select: { id: true, name: true, address: true } }),
             prisma.stockItem.findMany({ select: { id: true, code: true, name: true, unit: true } }),
-            prisma.stockMovement.findMany({ select: { id: true, movementType: true, quantity: true, createdAt: true } }),
+            prisma.stockMovement.findMany({ select: { id: true, movementType: true, quantity: true, createdAt: true }, take: 1000, orderBy: { createdAt: 'desc' } }),
             prisma.department.findMany({ select: { id: true, code: true, name: true } }),
             prisma.setting.findMany({ select: { key: true } }),
-            prisma.auditLog.findMany({ select: { id: true, actionType: true, entityType: true, createdAt: true }, take: 100, orderBy: { createdAt: 'desc' } }),
+            prisma.auditLog.findMany({ select: { id: true, actionType: true, entityType: true, createdAt: true }, take: 1000, orderBy: { createdAt: 'desc' } }),
             prisma.organization.findMany({ select: { id: true, name: true, shortName: true, inn: true } })
         ]);
 

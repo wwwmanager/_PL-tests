@@ -378,6 +378,8 @@ const WaybillCheckModal: React.FC<WaybillCheckModalProps> = ({ isOpen, onClose, 
                   const rawCalc = (summary.distance * summary.rate) / 100;
                   const formulaString = `(Пробег: ${Math.round(summary.distance)} км × Норма ${summary.rate.toFixed(2)})/100`;
                   const fuelBalanceFormula = `= ${summary.startFuel.toFixed(2)} ${summary.fuelFilled > 0 ? `+ ${summary.fuelFilled.toFixed(2)}` : ''} - ${summary.consumption.toFixed(2)}`;
+                  // WB-CHECK-DISPLAY-001: Calculate expected fuelEnd for accurate display
+                  const displayFuelEnd = Math.round((summary.startFuel + summary.fuelFilled - summary.consumption) * 100) / 100;
 
                   return (
                     <div key={waybill.id} className={`rounded-lg border p-4 ${containerClass}`}>
@@ -415,7 +417,7 @@ const WaybillCheckModal: React.FC<WaybillCheckModalProps> = ({ isOpen, onClose, 
                         <div>
                           <span className="font-bold mr-2">Проверка:</span>
                           {formulaString} = Расход: {rawCalc.toFixed(3)} ~ <span className="font-semibold">{summary.consumption.toFixed(2)} л</span>;
-                          {' '}Ост: {fuelBalanceFormula} = <span className="font-semibold">{summary.fuelEnd.toFixed(2)} л</span>;
+                          {' '}Ост: {fuelBalanceFormula} = <span className="font-semibold">{displayFuelEnd.toFixed(2)} л</span>;
                         </div>
                       </div>
 

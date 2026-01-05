@@ -598,7 +598,7 @@ export async function reserveSpecificBlank(
 
 /**
  * Release a reserved or used blank back to ISSUED.
- * Blanks in RESERVED or USED status can be released.
+ * Also supports restoring SPOILED blanks (back to ISSUED or AVAILABLE).
  */
 export async function releaseBlank(
     organizationId: string,
@@ -609,26 +609,32 @@ export async function releaseBlank(
             where: {
                 id: blankId,
                 // organizationId, // WB-FIX: allow releasing blanks from sub-orgs (owner has access via hierarchy implicit or role)
-                status: { in: [BlankStatus.RESERVED, BlankStatus.USED] }  // UX: Accept both RESERVED and USED
+                status: { in: [BlankStatus.RESERVED, BlankStatus.USED, BlankStatus.SPOILED] }  // Support restoring spoiled blanks
             }
         });
 
         if (!blank) {
-            throw new Error('Бланк не найден или не находится в статусе RESERVED/USED');
+            throw new Error('Бланк не найден или не находится в статусе RESERVED/USED/SPOILED');
         }
 
-        // GP-03: Return blank to ISSUED status (back to driver), NOT AVAILABLE
-        // This allows the driver to use the blank for a new waybill
+        // Determine target status:
+        // If blank was spoiled but had a driver assigned, return it to the driver (ISSUED).
+        // If blank was spoiled and had no driver, return it to stock (AVAILABLE).
+        // For RESERVED/USED, they imply driver assignment, so ISSUED is correct.
+        const targetStatus = blank.issuedToDriverId ? BlankStatus.ISSUED : BlankStatus.AVAILABLE;
+
         await tx.blank.update({
             where: { id: blank.id },
             data: {
-                status: BlankStatus.ISSUED,
-                usedAt: null,  // Clear usedAt when returning to ISSUED
-                // Keep issuedToDriverId - blank stays with the driver
+                status: targetStatus,
+                usedAt: null,  // Clear usedAt
+                damagedReason: null // Clear reason if it was spoiled
+                // Keep issuedToDriverId if it exists
             }
         });
 
-        return { success: true, message: `Бланк ${blank.series}-${blank.number} возвращён водителю` };
+        const actionText = blank.status === BlankStatus.SPOILED ? 'восстановлен' : 'возвращён водителю';
+        return { success: true, message: `Бланк ${blank.series}-${blank.number} ${actionText}` };
     });
 }
 

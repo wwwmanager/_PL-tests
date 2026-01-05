@@ -53,9 +53,19 @@ const FuelMovements: React.FC = () => {
                 toLabel = m.stockLocationName || 'Не указано';
             } else if (m.movementType === 'EXPENSE') {
                 fromLabel = m.stockLocationName || 'Не указано';
-                // For EXPENSE, documentId can store the recipient organization ID
-                const recipient = organizations.find(o => o.id === m.documentId);
-                toLabel = recipient ? (recipient.shortName || recipient.fullName) : (m.documentId ? `Получатель ID: ${m.documentId.slice(0, 8)}` : '-');
+
+                if (m.documentType === 'WAYBILL') {
+                    // For Waybills, the "recipient" is the vehicle/engine itself.
+                    // We display the vehicle name derived from the source location (Tank).
+                    // Clean up "Бак: " prefix if present to just show car details
+                    toLabel = m.stockLocationName
+                        ? `ТС: ${m.stockLocationName.replace(/^Бак:?\s*/i, '')}`
+                        : 'ТС';
+                } else {
+                    // For standard EXPENSE, documentId can store the recipient organization ID
+                    const recipient = organizations.find(o => o.id === m.documentId);
+                    toLabel = recipient ? (recipient.shortName || recipient.fullName) : (m.documentId ? `Получатель ID: ${m.documentId.slice(0, 8)}` : '-');
+                }
             } else if (m.movementType === 'ADJUSTMENT') {
                 if (Number(m.quantity) > 0) {
                     // Income adjustment

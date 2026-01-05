@@ -98,6 +98,7 @@ export async function getAll(filter: StockItemFilter) {
 
     // REL-203: Calculate balance for each item from StockMovement
     // INCOME adds, EXPENSE subtracts, ADJUSTMENT can be +/-, TRANSFER is neutral on this item
+    // WB-STOCK-BAL-001: Must filter out isVoid = true movements
     const balanceResults = await prisma.$queryRaw<{ stockItemId: string; balance: number }[]>`
         SELECT 
             "stockItemId",
@@ -112,6 +113,7 @@ export async function getAll(filter: StockItemFilter) {
         FROM stock_movements
         WHERE "organizationId" = ${organizationId}::uuid
           AND "stockItemId" = ANY(${items.map(i => i.id)}::uuid[])
+          AND ("isVoid" = false OR "isVoid" IS NULL)
         GROUP BY "stockItemId"
     `;
 

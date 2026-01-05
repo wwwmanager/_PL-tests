@@ -498,9 +498,9 @@ export const WaybillDetail: React.FC<WaybillDetailProps> = ({ waybill, isPrefill
   );
 
   const actualFuelConsumption = useMemo(() => {
-    const start = Number(formData.fuelAtStart) || 0;
-    const filled = Number(formData.fuelFilled) || 0;
-    const end = Number(formData.fuelAtEnd) || 0;
+    const start = Math.round((Number(formData.fuelAtStart) || 0) * 100) / 100;
+    const filled = Math.round((Number(formData.fuelFilled) || 0) * 100) / 100;
+    const end = Math.round((Number(formData.fuelAtEnd) || 0) * 100) / 100;
     return start + filled - end;
   }, [formData.fuelAtStart, formData.fuelFilled, formData.fuelAtEnd]);
 
@@ -566,1419 +566,1422 @@ export const WaybillDetail: React.FC<WaybillDetailProps> = ({ waybill, isPrefill
     const newOdoEnd = startOdo + calculatedDist;
     const newFuelPlanned = plannedFuel;
 
-    const startFuel = Number(formData.fuelAtStart) || 0;
-    const filledFuel = Number(formData.fuelFilled) || 0;
+    const startFuel = Math.round((Number(formData.fuelAtStart) || 0) * 100) / 100;
+    const filledFuel = Math.round((Number(formData.fuelFilled) || 0) * 100) / 100;
     const newFuelAtEnd = Math.round((startFuel + filledFuel - newFuelPlanned) * 100) / 100;
 
-    setFormData(prev => ({
-      ...prev,
-      odometerEnd: Math.round(newOdoEnd),
-      fuelPlanned: newFuelPlanned,
-      fuelAtEnd: newFuelAtEnd,
-    }));
+    // Debug info for rounding check
+    // if (Math.abs(newFuelAtEnd - (startFuel + filledFuel - newFuelPlanned)) > 0.001) {
+    //   console.log('[WB-ROUNDING] Fixed floating point error:', {
+    //     raw: startFuel + filledFuel - newFuelPlanned,
+    //     rounded: newFuelAtEnd
+    //   });
+    // }
 
-  }, [totalDistance, formData.odometerStart, formData.fuelAtStart, formData.fuelFilled, selectedVehicle, formData.date, formData.routes, formData.fuelCalculationMethod, seasonSettings, dayMode]);
+  });
 
-  // REL-010: Removed incorrect auto-fill of dispatcherId/controllerId
-  // These are separate employees, not properties of the driver
-  // useEffect(() => {
-  //   if (selectedDriver) {
-  //     setFormData(prev => ({
-  //       ...prev,
-  //       dispatcherId: ...,
-  //       controllerId: ...,
-  //     }));
-  //   }
-  // }, [selectedDriver]);
+}, [totalDistance, formData.odometerStart, formData.fuelAtStart, formData.fuelFilled, selectedVehicle, formData.date, formData.routes, formData.fuelCalculationMethod, seasonSettings, dayMode]);
+
+// REL-010: Removed incorrect auto-fill of dispatcherId/controllerId
+// These are separate employees, not properties of the driver
+// useEffect(() => {
+//   if (selectedDriver) {
+//     setFormData(prev => ({
+//       ...prev,
+//       dispatcherId: ...,
+//       controllerId: ...,
+//     }));
+//   }
+// }, [selectedDriver]);
 
 
-  // WB-901: Removed updateWaybillNumberForDriver as number is now assigned by backend
+// WB-901: Removed updateWaybillNumberForDriver as number is now assigned by backend
 
 
-  const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value } = e.target;
+const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  const { name, value } = e.target;
 
-    if (name === 'driverId') {
-      const driver = drivers.find(d => d.id === value);
+  if (name === 'driverId') {
+    const driver = drivers.find(d => d.id === value);
 
-      setFormData(prev => {
-        const newFormData = { ...prev, driverId: value };
-        // If it's a new waybill, try to sync org from driver's department (if available)
-        // Since backend GET /drivers doesn't return orgId directly, we might need to rely on vehicle
-        return newFormData;
-      });
+    setFormData(prev => {
+      const newFormData = { ...prev, driverId: value };
+      // If it's a new waybill, try to sync org from driver's department (if available)
+      // Since backend GET /drivers doesn't return orgId directly, we might need to rely on vehicle
+      return newFormData;
+    });
 
-      if (value) {
-        // FUEL-CARD-SELECTOR-FE-011: Fetch all cards for driver and populate dropdown
-        getFuelCardsForDriver(value)
-          .then(cards => {
-            console.log('[FUEL-CARD-DEBUG] Cards received:', cards);
-            // Store all cards for dropdown
-            setDriverCards(cards.map(c => ({
-              id: c.id,
-              cardNumber: c.cardNumber,
-              provider: c.provider,
-              balanceLiters: Number(c.balanceLiters) || 0
-            })));
+    if (value) {
+      // FUEL-CARD-SELECTOR-FE-011: Fetch all cards for driver and populate dropdown
+      getFuelCardsForDriver(value)
+        .then(cards => {
+          console.log('[FUEL-CARD-DEBUG] Cards received:', cards);
+          // Store all cards for dropdown
+          setDriverCards(cards.map(c => ({
+            id: c.id,
+            cardNumber: c.cardNumber,
+            provider: c.provider,
+            balanceLiters: Number(c.balanceLiters) || 0
+          })));
 
-            const activeCard = cards.find(c => c.isActive !== false) || cards[0];
-            if (activeCard) {
-              setFuelCardInfo({
-                cardNumber: activeCard.cardNumber,
-                provider: activeCard.provider
-              });
-              setFuelCardBalance(Number(activeCard.balanceLiters) || 0);
-              const currentId = formData && 'id' in formData ? (formData as any).id : undefined;
-              getFuelCardDraftReserve(activeCard.id, currentId).then(res => setFuelCardReserve(res.reserved));
+          const activeCard = cards.find(c => c.isActive !== false) || cards[0];
+          if (activeCard) {
+            setFuelCardInfo({
+              cardNumber: activeCard.cardNumber,
+              provider: activeCard.provider
+            });
+            setFuelCardBalance(Number(activeCard.balanceLiters) || 0);
+            const currentId = formData && 'id' in formData ? (formData as any).id : undefined;
+            getFuelCardDraftReserve(activeCard.id, currentId).then(res => setFuelCardReserve(res.reserved));
 
-              // FUEL-CARD-SELECTOR-FE-011: Auto-select first card into formData
-              setFormData(prev => ({ ...prev, fuelCardId: activeCard.id }));
-            } else {
-              setFuelCardInfo(null);
-              setFuelCardBalance(null);
-              setFuelCardReserve(0);
-              setFormData(prev => ({ ...prev, fuelCardId: null }));
-            }
-          })
-          .catch(err => {
-            console.error('[FUEL-CARD-DEBUG] Error:', err);
-            setDriverCards([]);
+            // FUEL-CARD-SELECTOR-FE-011: Auto-select first card into formData
+            setFormData(prev => ({ ...prev, fuelCardId: activeCard.id }));
+          } else {
             setFuelCardInfo(null);
             setFuelCardBalance(null);
             setFuelCardReserve(0);
-          });
-      } else {
-        setDriverCards([]);
-        setFuelCardBalance(null);
-        setFuelCardInfo(null);
-      }
+            setFormData(prev => ({ ...prev, fuelCardId: null }));
+          }
+        })
+        .catch(err => {
+          console.error('[FUEL-CARD-DEBUG] Error:', err);
+          setDriverCards([]);
+          setFuelCardInfo(null);
+          setFuelCardBalance(null);
+          setFuelCardReserve(0);
+        });
     } else {
-      setFormData(prev => {
-        let newFormData = { ...prev, [name]: value };
-
-        if (dayMode === 'single' && name === 'validFrom') {
-          const datePart = value.split('T')[0];
-          const timePart = prev.validTo.split('T')[1] || '18:00';
-          newFormData.validTo = `${datePart}T${timePart}`;
-        }
-
-        newFormData.date = newFormData.validFrom.split('T')[0];
-        return newFormData;
-      });
+      setDriverCards([]);
+      setFuelCardBalance(null);
+      setFuelCardInfo(null);
     }
-  }, [employees, isPrefill, dayMode]);
-
-  const handleNumericChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    let numericValue = value === '' ? undefined : Number(value);
-
-    if ((name === 'odometerStart' || name === 'odometerEnd') && numericValue !== undefined) {
-      numericValue = Math.round(numericValue);
-    }
-
-    if (name === 'fuelFilled') {
-      setLinkedTxId(null); // Manual change breaks the link
-      if (fuelCardBalance != null && numericValue != null && !isNaN(numericValue) && numericValue > fuelCardBalance) {
-        setFuelFilledError(`Введённый объём (${numericValue} л) превышает баланс на карте (${fuelCardBalance} л)`);
-      } else {
-        setFuelFilledError(null);
-      }
-    }
-    setFormData(prev => ({ ...prev, [name]: numericValue }));
-  }, [fuelCardBalance]);
-
-  /* WB-PREFILL-030: Safe Prefill Logic */
-  const [prefillData, setPrefillData] = useState<any>(null); // Staged prefill data
-  const [isPrefillModalOpen, setIsPrefillModalOpen] = useState(false);
-
-  const applyPrefill = (data: any, mode: 'overwrite' | 'fill-empty') => {
+  } else {
     setFormData(prev => {
-      const newData = { ...prev };
+      let newFormData = { ...prev, [name]: value };
 
-      // Helper: apply if empty or overwrite
-      const applyField = (field: keyof Waybill, value: any) => {
-        const isEmpty = !newData[field] || newData[field] === 0 || newData[field] === '' || newData[field] === '0';
-        if (value !== null && value !== undefined && (mode === 'overwrite' || isEmpty)) {
-          // Special handling for numeric fields to avoid "0" overwrite issues if needed
-          // But generally 0 is a valid value for odometer/fuel, so "isEmpty" check should be careful.
-          // If existing is 0 and new is > 0, we should probably update even in fill-empty mode?
-          // Let's assume 0 is "empty" for fuel/odometer in context of prefill? 
-          // Usually prefill comes from last waybill, so if last waybill had 0, we apply 0.
-          // If user entered 100 manually, we don't overwrite in 'fill-empty'.
-          (newData as any)[field] = value;
-        }
-      };
-
-      applyField('driverId', data.driverId);
-      applyField('fuelCardId', data.fuelCardId); // WB-FUELCARD-FE-010: Auto-fill fuelCardId
-      applyField('dispatcherEmployeeId', data.dispatcherEmployeeId);
-      applyField('controllerEmployeeId', data.controllerEmployeeId);
-      // Dispatcher/Controller are now fully migrated to EmployeeId fields
-      // Legacy fields (dispatcherId/controllerId) are ignored for prefill if present
-
-      // Odometer/Fuel: Usually strict numbers
-      if (data.odometerStart !== null) {
-        const currentOdo = Number(newData.odometerStart || 0);
-        if (mode === 'overwrite' || currentOdo === 0) {
-          newData.odometerStart = data.odometerStart;
-        }
+      if (dayMode === 'single' && name === 'validFrom') {
+        const datePart = value.split('T')[0];
+        const timePart = prev.validTo.split('T')[1] || '18:00';
+        newFormData.validTo = `${datePart}T${timePart}`;
       }
 
-      if (data.fuelStart !== null) {
-        const currentFuel = Number(newData.fuelAtStart || 0);
-        if (mode === 'overwrite' || currentFuel === 0) {
-          newData.fuelAtStart = data.fuelStart;
-        }
-      }
-
-      return newData;
+      newFormData.date = newFormData.validFrom.split('T')[0];
+      return newFormData;
     });
+  }
+}, [employees, isPrefill, dayMode]);
 
-    // Message
-    if (data.lastWaybillDate) {
-      setAutoFillMessage(`Данные загружены на основе ПЛ №${data.lastWaybillNumber} от ${new Date(data.lastWaybillDate).toLocaleDateString()}.`);
-      setMinDate(data.lastWaybillDate);
+const handleNumericChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+  const { name, value } = e.target;
+  let numericValue = value === '' ? undefined : Number(value);
+
+  if ((name === 'odometerStart' || name === 'odometerEnd') && numericValue !== undefined) {
+    numericValue = Math.round(numericValue);
+  }
+
+  if (name === 'fuelFilled') {
+    setLinkedTxId(null); // Manual change breaks the link
+    if (fuelCardBalance != null && numericValue != null && !isNaN(numericValue) && numericValue > fuelCardBalance) {
+      setFuelFilledError(`Введённый объём (${numericValue} л) превышает баланс на карте (${fuelCardBalance} л)`);
     } else {
-      setAutoFillMessage(`Данные загружены из карточки ТС (история ПЛ не найдена).`);
-      setMinDate('');
+      setFuelFilledError(null);
+    }
+  }
+  setFormData(prev => ({ ...prev, [name]: numericValue }));
+}, [fuelCardBalance]);
+
+/* WB-PREFILL-030: Safe Prefill Logic */
+const [prefillData, setPrefillData] = useState<any>(null); // Staged prefill data
+const [isPrefillModalOpen, setIsPrefillModalOpen] = useState(false);
+
+const applyPrefill = (data: any, mode: 'overwrite' | 'fill-empty') => {
+  setFormData(prev => {
+    const newData = { ...prev };
+
+    // Helper: apply if empty or overwrite
+    const applyField = (field: keyof Waybill, value: any) => {
+      const isEmpty = !newData[field] || newData[field] === 0 || newData[field] === '' || newData[field] === '0';
+      if (value !== null && value !== undefined && (mode === 'overwrite' || isEmpty)) {
+        // Special handling for numeric fields to avoid "0" overwrite issues if needed
+        // But generally 0 is a valid value for odometer/fuel, so "isEmpty" check should be careful.
+        // If existing is 0 and new is > 0, we should probably update even in fill-empty mode?
+        // Let's assume 0 is "empty" for fuel/odometer in context of prefill? 
+        // Usually prefill comes from last waybill, so if last waybill had 0, we apply 0.
+        // If user entered 100 manually, we don't overwrite in 'fill-empty'.
+        (newData as any)[field] = value;
+      }
+    };
+
+    applyField('driverId', data.driverId);
+    applyField('fuelCardId', data.fuelCardId); // WB-FUELCARD-FE-010: Auto-fill fuelCardId
+    applyField('dispatcherEmployeeId', data.dispatcherEmployeeId);
+    applyField('controllerEmployeeId', data.controllerEmployeeId);
+    // Dispatcher/Controller are now fully migrated to EmployeeId fields
+    // Legacy fields (dispatcherId/controllerId) are ignored for prefill if present
+
+    // Odometer/Fuel: Usually strict numbers
+    if (data.odometerStart !== null) {
+      const currentOdo = Number(newData.odometerStart || 0);
+      if (mode === 'overwrite' || currentOdo === 0) {
+        newData.odometerStart = data.odometerStart;
+      }
     }
 
-    setIsPrefillModalOpen(false);
-  };
+    if (data.fuelStart !== null) {
+      const currentFuel = Number(newData.fuelAtStart || 0);
+      if (mode === 'overwrite' || currentFuel === 0) {
+        newData.fuelAtStart = data.fuelStart;
+      }
+    }
 
-  const handleVehicleChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const vehicleId = e.target.value;
-    const selectedVehicle = vehicles.find(v => v.id === vehicleId);
-    setAutoFillMessage('');
+    return newData;
+  });
+
+  // Message
+  if (data.lastWaybillDate) {
+    setAutoFillMessage(`Данные загружены на основе ПЛ №${data.lastWaybillNumber} от ${new Date(data.lastWaybillDate).toLocaleDateString()}.`);
+    setMinDate(data.lastWaybillDate);
+  } else {
+    setAutoFillMessage(`Данные загружены из карточки ТС (история ПЛ не найдена).`);
     setMinDate('');
+  }
 
-    // Clear prefill state
-    setPrefillData(null);
+  setIsPrefillModalOpen(false);
+};
 
-    if (selectedVehicle) {
-      // 1. Basic update of vehicleId
-      setFormData(prev => ({
-        ...prev,
-        vehicleId: selectedVehicle.id,
-        // prefill organization if missing or empty
-        organizationId: (!prev.organizationId || prev.organizationId === 'undefined') ? selectedVehicle.organizationId : prev.organizationId,
-      }));
+const handleVehicleChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
+  const vehicleId = e.target.value;
+  const selectedVehicle = vehicles.find(v => v.id === vehicleId);
+  setAutoFillMessage('');
+  setMinDate('');
 
-      // 2. Fetch Prefill Data (WB-PREFILL-020)
-      if (!('id' in formData) || !formData.id || isPrefill) {
-        try {
-          // Static import used above
-          const data = await getWaybillPrefill(selectedVehicle.id, formData.date); // Pass date to get relevant history
+  // Clear prefill state
+  setPrefillData(null);
 
-          // 3. Conflict Detection (WB-PREFILL-030)
-          // Check if user has already entered data that might be overwritten
-          const hasUserEnteredData =
-            (formData.driverId && formData.driverId !== selectedVehicle.assignedDriverId) ||
-            (Number(formData.odometerStart) > 0) ||
-            (Number(formData.fuelAtStart) > 0) ||
-            (Number(formData.fuelAtStart) > 0) ||
-            (formData.dispatcherEmployeeId) ||
-            (formData.controllerEmployeeId);
-
-          if (hasUserEnteredData) {
-            // Staging for modal
-            setPrefillData(data);
-            setIsPrefillModalOpen(true);
-          } else {
-            // Auto-apply if form is clean
-            applyPrefill(data, 'fill-empty');
-          }
-        } catch (err) {
-          console.error('Failed to load prefill data', err);
-          showToast('Не удалось загрузить данные автозаполнения', 'error');
-        }
-      }
-
-      const newRoutes = formData.routes.map(r => ({
-        ...r,
-        isCityDriving: selectedVehicle.useCityModifier ? r.isCityDriving : false,
-        isWarming: selectedVehicle.useWarmingModifier ? r.isWarming : false,
-      }));
-
-      setFormData(prev => ({ ...prev, routes: newRoutes }));
-
-    } else {
-      setFormData(prev => ({
-        ...prev,
-        vehicleId: '',
-        driverId: '',
-        dispatcherId: '',
-        controllerId: ''
-      }));
-    }
-  };
-
-  const isRouteDateValid = (routeDate?: string): boolean => {
-    // Skip validation for single-day mode or empty route date
-    if (!routeDate || dayMode === 'single') return true;
-
-    // Skip validation if waybill date range is not set
-    if (!formData.validFrom || !formData.validTo) return true;
-
-    try {
-      // Parse dates - input type="date" gives YYYY-MM-DD format
-      const routeDateStr = routeDate.split('T')[0];  // Handle if datetime string passed
-      const validFromStr = formData.validFrom.split('T')[0];
-      const validToStr = formData.validTo.split('T')[0];
-
-      const rDate = new Date(routeDateStr + 'T00:00:00');
-      const sDate = new Date(validFromStr + 'T00:00:00');
-      const eDate = new Date(validToStr + 'T00:00:00');
-
-      // Check for invalid dates
-      if (isNaN(rDate.getTime()) || isNaN(sDate.getTime()) || isNaN(eDate.getTime())) {
-        console.warn('[isRouteDateValid] Invalid date detected:', { routeDateStr, validFromStr, validToStr });
-        return true; // Allow if parsing fails - don't block user
-      }
-
-      const isValid = rDate >= sDate && rDate <= eDate;
-      if (!isValid) {
-        console.log('[isRouteDateValid] Date out of range:', { route: routeDateStr, from: validFromStr, to: validToStr });
-      }
-      return isValid;
-    } catch (e) {
-      console.error('[isRouteDateValid] Error:', e);
-      return true; // Allow on error - don't block user
-    }
-  };
-
-  const handleAddRoute = useCallback(() => {
-    setFormData(prev => {
-      const lastRoute = prev.routes.length > 0 ? prev.routes[prev.routes.length - 1] : null;
-      const newRoute = {
-        id: generateId(),
-        from: lastRoute ? lastRoute.to : '',
-        to: '',
-        distanceKm: 0,
-        isCityDriving: false,
-        isWarming: false,
-        date: lastRoute?.date ? lastRoute.date : (dayMode === 'multi' ? prev.validFrom.split('T')[0] : undefined)
-      };
-      return {
-        ...prev,
-        routes: [...prev.routes, newRoute],
-      };
-    });
-  }, [dayMode]);
-
-
-
-  const savedRoutesIndex = useMemo(() => {
-    const map = new Map<string, SavedRoute>();
-    for (const sr of savedRoutes) {
-      if (!sr.from || !sr.to) continue;
-      const key = sr.from.trim().toLowerCase() + '|' + sr.to.trim().toLowerCase();
-      map.set(key, sr);
-    }
-    return map;
-  }, [savedRoutes]);
-
-  // WB-ROUTE-DATE-FIX: Validate date on blur and BLOCK invalid dates
-  const handleRouteDateBlur = useCallback((id: string, value: string) => {
-    if (!value || value.length !== 10) return;  // Only validate complete dates
-
-    if (!isRouteDateValid(value)) {
-      const validStartDate = formData.validFrom?.split('T')[0] || '';
-      showToast(`Дата маршрута должна быть в пределах действия ПЛ (${validStartDate} - ${formData.validTo?.split('T')[0]}). Дата сброшена.`, 'error');
-
-      // Reset the date to validFrom
-      setFormData(prev => ({
-        ...prev,
-        routes: prev.routes.map(r =>
-          r.id === id ? { ...r, date: validStartDate } : r
-        )
-      }));
-    }
-  }, [formData.validFrom, formData.validTo, showToast]);
-
-  const handleRouteChance = (id: string, field: keyof Route, value: string | number | boolean) => {
-    // No date validation here - moved to onBlur handler
-
-    setFormData(prev => {
-      let changed = false;
-      const newRoutes = prev.routes.map(r => {
-        if (r.id !== id) {
-          return r;
-        }
-
-        const oldValue = r[field] as any;
-        if (oldValue === value) return r; // Nothing changed
-
-        changed = true;
-        const updatedRoute = { ...r, [field]: value } as Route;
-
-        if ((field === 'from' || field === 'to')) {
-          const fromKey = (updatedRoute.from ?? '').trim().toLowerCase();
-          const toKey = (updatedRoute.to ?? '').trim().toLowerCase();
-          if (fromKey && toKey) {
-            const key = fromKey + '|' + toKey;
-            const matching = savedRoutesIndex.get(key);
-            if (matching && typeof matching.distanceKm === 'number') {
-              updatedRoute.distanceKm = matching.distanceKm;
-            }
-          }
-        }
-        return updatedRoute;
-      });
-
-      if (!changed) return prev;
-
-      return {
-        ...prev,
-        routes: newRoutes,
-      };
-    });
-  };
-
-  const handleRemoveRoute = useCallback((id: string) => {
+  if (selectedVehicle) {
+    // 1. Basic update of vehicleId
     setFormData(prev => ({
       ...prev,
-      routes: prev.routes.filter(r => r.id !== id),
+      vehicleId: selectedVehicle.id,
+      // prefill organization if missing or empty
+      organizationId: (!prev.organizationId || prev.organizationId === 'undefined') ? selectedVehicle.organizationId : prev.organizationId,
     }));
-  }, []);
 
-  const handleGenerateRoutes = async () => {
-    if (!aiPrompt) return;
-    setIsGenerating(true);
-    try {
-      const generatedRoutes = await generateRouteFromPrompt(aiPrompt);
-      setFormData(prev => ({ ...prev, routes: [...prev.routes, ...generatedRoutes] }));
-      setAiPrompt('');
-    } catch (error) {
-      showToast((error as Error).message, 'error');
-    } finally {
-      setIsGenerating(false);
+    // 2. Fetch Prefill Data (WB-PREFILL-020)
+    if (!('id' in formData) || !formData.id || isPrefill) {
+      try {
+        // Static import used above
+        const data = await getWaybillPrefill(selectedVehicle.id, formData.date); // Pass date to get relevant history
+
+        // 3. Conflict Detection (WB-PREFILL-030)
+        // Check if user has already entered data that might be overwritten
+        const hasUserEnteredData =
+          (formData.driverId && formData.driverId !== selectedVehicle.assignedDriverId) ||
+          (Number(formData.odometerStart) > 0) ||
+          (Number(formData.fuelAtStart) > 0) ||
+          (Number(formData.fuelAtStart) > 0) ||
+          (formData.dispatcherEmployeeId) ||
+          (formData.controllerEmployeeId);
+
+        if (hasUserEnteredData) {
+          // Staging for modal
+          setPrefillData(data);
+          setIsPrefillModalOpen(true);
+        } else {
+          // Auto-apply if form is clean
+          applyPrefill(data, 'fill-empty');
+        }
+      } catch (err) {
+        console.error('Failed to load prefill data', err);
+        showToast('Не удалось загрузить данные автозаполнения', 'error');
+      }
     }
-  };
 
-  const handleDayModeChange = (mode: 'single' | 'multi') => {
-    setDayMode(mode);
-    if (mode === 'single') {
-      const datePart = formData.validFrom.split('T')[0];
-      const timePart = formData.validTo.split('T')[1] || '18:00';
+    const newRoutes = formData.routes.map(r => ({
+      ...r,
+      isCityDriving: selectedVehicle.useCityModifier ? r.isCityDriving : false,
+      isWarming: selectedVehicle.useWarmingModifier ? r.isWarming : false,
+    }));
+
+    setFormData(prev => ({ ...prev, routes: newRoutes }));
+
+  } else {
+    setFormData(prev => ({
+      ...prev,
+      vehicleId: '',
+      driverId: '',
+      dispatcherId: '',
+      controllerId: ''
+    }));
+  }
+};
+
+const isRouteDateValid = (routeDate?: string): boolean => {
+  // Skip validation for single-day mode or empty route date
+  if (!routeDate || dayMode === 'single') return true;
+
+  // Skip validation if waybill date range is not set
+  if (!formData.validFrom || !formData.validTo) return true;
+
+  try {
+    // Parse dates - input type="date" gives YYYY-MM-DD format
+    const routeDateStr = routeDate.split('T')[0];  // Handle if datetime string passed
+    const validFromStr = formData.validFrom.split('T')[0];
+    const validToStr = formData.validTo.split('T')[0];
+
+    const rDate = new Date(routeDateStr + 'T00:00:00');
+    const sDate = new Date(validFromStr + 'T00:00:00');
+    const eDate = new Date(validToStr + 'T00:00:00');
+
+    // Check for invalid dates
+    if (isNaN(rDate.getTime()) || isNaN(sDate.getTime()) || isNaN(eDate.getTime())) {
+      console.warn('[isRouteDateValid] Invalid date detected:', { routeDateStr, validFromStr, validToStr });
+      return true; // Allow if parsing fails - don't block user
+    }
+
+    const isValid = rDate >= sDate && rDate <= eDate;
+    if (!isValid) {
+      console.log('[isRouteDateValid] Date out of range:', { route: routeDateStr, from: validFromStr, to: validToStr });
+    }
+    return isValid;
+  } catch (e) {
+    console.error('[isRouteDateValid] Error:', e);
+    return true; // Allow on error - don't block user
+  }
+};
+
+const handleAddRoute = useCallback(() => {
+  setFormData(prev => {
+    const lastRoute = prev.routes.length > 0 ? prev.routes[prev.routes.length - 1] : null;
+    const newRoute = {
+      id: generateId(),
+      from: lastRoute ? lastRoute.to : '',
+      to: '',
+      distanceKm: 0,
+      isCityDriving: false,
+      isWarming: false,
+      date: lastRoute?.date ? lastRoute.date : (dayMode === 'multi' ? prev.validFrom.split('T')[0] : undefined)
+    };
+    return {
+      ...prev,
+      routes: [...prev.routes, newRoute],
+    };
+  });
+}, [dayMode]);
+
+
+
+const savedRoutesIndex = useMemo(() => {
+  const map = new Map<string, SavedRoute>();
+  for (const sr of savedRoutes) {
+    if (!sr.from || !sr.to) continue;
+    const key = sr.from.trim().toLowerCase() + '|' + sr.to.trim().toLowerCase();
+    map.set(key, sr);
+  }
+  return map;
+}, [savedRoutes]);
+
+// WB-ROUTE-DATE-FIX: Validate date on blur and BLOCK invalid dates
+const handleRouteDateBlur = useCallback((id: string, value: string) => {
+  if (!value || value.length !== 10) return;  // Only validate complete dates
+
+  if (!isRouteDateValid(value)) {
+    const validStartDate = formData.validFrom?.split('T')[0] || '';
+    showToast(`Дата маршрута должна быть в пределах действия ПЛ (${validStartDate} - ${formData.validTo?.split('T')[0]}). Дата сброшена.`, 'error');
+
+    // Reset the date to validFrom
+    setFormData(prev => ({
+      ...prev,
+      routes: prev.routes.map(r =>
+        r.id === id ? { ...r, date: validStartDate } : r
+      )
+    }));
+  }
+}, [formData.validFrom, formData.validTo, showToast]);
+
+const handleRouteChance = (id: string, field: keyof Route, value: string | number | boolean) => {
+  // No date validation here - moved to onBlur handler
+
+  setFormData(prev => {
+    let changed = false;
+    const newRoutes = prev.routes.map(r => {
+      if (r.id !== id) {
+        return r;
+      }
+
+      const oldValue = r[field] as any;
+      if (oldValue === value) return r; // Nothing changed
+
+      changed = true;
+      const updatedRoute = { ...r, [field]: value } as Route;
+
+      if ((field === 'from' || field === 'to')) {
+        const fromKey = (updatedRoute.from ?? '').trim().toLowerCase();
+        const toKey = (updatedRoute.to ?? '').trim().toLowerCase();
+        if (fromKey && toKey) {
+          const key = fromKey + '|' + toKey;
+          const matching = savedRoutesIndex.get(key);
+          if (matching && typeof matching.distanceKm === 'number') {
+            updatedRoute.distanceKm = matching.distanceKm;
+          }
+        }
+      }
+      return updatedRoute;
+    });
+
+    if (!changed) return prev;
+
+    return {
+      ...prev,
+      routes: newRoutes,
+    };
+  });
+};
+
+const handleRemoveRoute = useCallback((id: string) => {
+  setFormData(prev => ({
+    ...prev,
+    routes: prev.routes.filter(r => r.id !== id),
+  }));
+}, []);
+
+const handleGenerateRoutes = async () => {
+  if (!aiPrompt) return;
+  setIsGenerating(true);
+  try {
+    const generatedRoutes = await generateRouteFromPrompt(aiPrompt);
+    setFormData(prev => ({ ...prev, routes: [...prev.routes, ...generatedRoutes] }));
+    setAiPrompt('');
+  } catch (error) {
+    showToast((error as Error).message, 'error');
+  } finally {
+    setIsGenerating(false);
+  }
+};
+
+const handleDayModeChange = (mode: 'single' | 'multi') => {
+  setDayMode(mode);
+  if (mode === 'single') {
+    const datePart = formData.validFrom.split('T')[0];
+    const timePart = formData.validTo.split('T')[1] || '18:00';
+    setFormData(prev => ({
+      ...prev,
+      validTo: `${datePart}T${timePart}`
+    }));
+  } else { // When switching back to 'multi'
+    const fromDate = new Date(formData.validFrom);
+    const toDate = new Date(formData.validTo);
+    // If it's currently a single-day range, expand it to the next day
+    if (fromDate.toISOString().split('T')[0] === toDate.toISOString().split('T')[0]) {
+      const newToDate = new Date(fromDate.getTime() + 24 * 60 * 60 * 1000);
       setFormData(prev => ({
         ...prev,
-        validTo: `${datePart}T${timePart}`
+        validTo: newToDate.toISOString().slice(0, 16)
       }));
-    } else { // When switching back to 'multi'
-      const fromDate = new Date(formData.validFrom);
-      const toDate = new Date(formData.validTo);
-      // If it's currently a single-day range, expand it to the next day
-      if (fromDate.toISOString().split('T')[0] === toDate.toISOString().split('T')[0]) {
-        const newToDate = new Date(fromDate.getTime() + 24 * 60 * 60 * 1000);
-        setFormData(prev => ({
-          ...prev,
-          validTo: newToDate.toISOString().slice(0, 16)
-        }));
-      }
     }
-  };
+  }
+};
 
-  const validateForm = async (): Promise<boolean> => {
-    // WB-DISP-FIX: Allow DRAFT without dispatcher
-    if (!formData.dispatcherEmployeeId && formData.status !== 'DRAFT') {
-      showToast('Диспетчер не назначен. Пожалуйста, укажите его в карточке сотрудника или выберите вручную.', 'error');
-      return false;
-    }
+const validateForm = async (): Promise<boolean> => {
+  // WB-DISP-FIX: Allow DRAFT without dispatcher
+  if (!formData.dispatcherEmployeeId && formData.status !== 'DRAFT') {
+    showToast('Диспетчер не назначен. Пожалуйста, укажите его в карточке сотрудника или выберите вручную.', 'error');
+    return false;
+  }
 
-    const method = formData.fuelCalculationMethod || 'BOILER';
-    if ((method === 'SEGMENTS' || method === 'MIXED') && (formData.routes || []).length === 0) {
-      showToast('Маршруты обязательны для выбранного метода расчета.', 'error');
-      return false;
-    }
-    if ((method === 'BOILER' || method === 'MIXED') && (formData.odometerStart == null || formData.odometerEnd == null)) {
-      showToast('Показания одометра обязательны для выбранного метода расчета.', 'error');
-      return false;
-    }
+  const method = formData.fuelCalculationMethod || 'BOILER';
+  if ((method === 'SEGMENTS' || method === 'MIXED') && (formData.routes || []).length === 0) {
+    showToast('Маршруты обязательны для выбранного метода расчета.', 'error');
+    return false;
+  }
+  if ((method === 'BOILER' || method === 'MIXED') && (formData.odometerStart == null || formData.odometerEnd == null)) {
+    showToast('Показания одометра обязательны для выбранного метода расчета.', 'error');
+    return false;
+  }
 
-    const isNew = !('id' in formData && formData.id);
-    if (!isNew && (!formData.number || formData.number === 'БЛАНКОВ НЕТ')) {
-      showToast('Путевой лист должен иметь номер.', 'error');
-      return false;
-    }
+  const isNew = !('id' in formData && formData.id);
+  if (!isNew && (!formData.number || formData.number === 'БЛАНКОВ НЕТ')) {
+    showToast('Путевой лист должен иметь номер.', 'error');
+    return false;
+  }
 
-    if (formData.fuelAtEnd !== undefined && formData.fuelAtEnd < 0) {
-      showToast('Расчетный остаток топлива не может быть отрицательным.', 'error');
-      return false;
-    }
+  if (formData.fuelAtEnd !== undefined && formData.fuelAtEnd < 0) {
+    showToast('Расчетный остаток топлива не может быть отрицательным.', 'error');
+    return false;
+  }
 
-    if (selectedVehicle) {
-      if (!selectedVehicle.disableFuelCapacityCheck && selectedVehicle.fuelTankCapacity) {
-        const startFuel = Number(formData.fuelAtStart) || 0;
-        const tankCapacity = Number(selectedVehicle.fuelTankCapacity) || 0;
+  if (selectedVehicle) {
+    if (!selectedVehicle.disableFuelCapacityCheck && selectedVehicle.fuelTankCapacity) {
+      const startFuel = Number(formData.fuelAtStart) || 0;
+      const tankCapacity = Number(selectedVehicle.fuelTankCapacity) || 0;
 
-        if (startFuel > tankCapacity) {
-          showToast(`Начальный остаток топлива (${startFuel} л) не может превышать объем бака (${tankCapacity} л).`, 'error');
-          return false;
-        }
-
-        const endFuel = Number(formData.fuelAtEnd) || 0;
-        if (endFuel > tankCapacity) {
-          // Если остаток в конце больше бака, значит в какой-то момент точно было переполнение.
-          // Расход в процессе учитывается в расчете endFuel.
-          showToast(`Конечный остаток топлива (${endFuel.toFixed(2)} л) не может превышать объем бака (${tankCapacity} л).`, 'error');
-          return false;
-        }
-      }
-    }
-
-    for (const route of formData.routes) {
-      if (!isRouteDateValid(route.date)) {
-        const formattedRouteDate = route.date ? new Date(route.date).toLocaleDateString('ru-RU') : 'не указана';
-        showToast(`Дата маршрута (${formattedRouteDate}) выходит за пределы срока действия путевого листа.`, 'error');
-        return false;
-      }
-    }
-
-    if ((!('id' in formData) || !formData.id) && formData.vehicleId) {
-      if (selectedVehicle && Number(formData.odometerStart) < Number(selectedVehicle.mileage)) {
-        showToast(`Начальный пробег (${Number(formData.odometerStart).toFixed(0)}) не может быть меньше последнего в карточке ТС (${Number(selectedVehicle.mileage).toFixed(0)}).`, 'error');
+      if (startFuel > tankCapacity) {
+        showToast(`Начальный остаток топлива (${startFuel} л) не может превышать объем бака (${tankCapacity} л).`, 'error');
         return false;
       }
 
-      const lastWaybill = await getLastWaybillForVehicle(formData.vehicleId);
-      if (lastWaybill) {
-        const waybillDate = new Date(formData.date);
-        const lastWaybillDate = new Date(lastWaybill.date);
-        if (waybillDate.getTime() < lastWaybillDate.getTime()) {
-          showToast(`Дата ПЛ (${formData.date}) не может быть раньше даты последнего учтенного ПЛ (${lastWaybill.date}).`, 'error');
-          return false;
-        }
+      const endFuel = Number(formData.fuelAtEnd) || 0;
+      if (endFuel > tankCapacity) {
+        // Если остаток в конце больше бака, значит в какой-то момент точно было переполнение.
+        // Расход в процессе учитывается в расчете endFuel.
+        showToast(`Конечный остаток топлива (${endFuel.toFixed(2)} л) не может превышать объем бака (${tankCapacity} л).`, 'error');
+        return false;
       }
     }
-    return true;
-  };
+  }
 
-  const handleSave = async (suppressNotifications = false): Promise<Waybill | null> => {
-    if (!(await validateForm())) return null;
+  for (const route of formData.routes) {
+    if (!isRouteDateValid(route.date)) {
+      const formattedRouteDate = route.date ? new Date(route.date).toLocaleDateString('ru-RU') : 'не указана';
+      showToast(`Дата маршрута (${formattedRouteDate}) выходит за пределы срока действия путевого листа.`, 'error');
+      return false;
+    }
+  }
 
-    try {
-      let savedWaybill: Waybill;
+  if ((!('id' in formData) || !formData.id) && formData.vehicleId) {
+    if (selectedVehicle && Number(formData.odometerStart) < Number(selectedVehicle.mileage)) {
+      showToast(`Начальный пробег (${Number(formData.odometerStart).toFixed(0)}) не может быть меньше последнего в карточке ТС (${Number(selectedVehicle.mileage).toFixed(0)}).`, 'error');
+      return false;
+    }
 
-      // WB-FIX-PL-001: Construct payload with fuel object for aggregate upsert
-      // WB-FIX-ODOMETER-001: Explicit Number conversion to avoid "expected number, received string" error
-      const payload: any = {
-        ...formData,
-        odometerStart: formData.odometerStart != null ? Number(formData.odometerStart) : null,
-        odometerEnd: formData.odometerEnd != null ? Number(formData.odometerEnd) : null,
+    const lastWaybill = await getLastWaybillForVehicle(formData.vehicleId);
+    if (lastWaybill) {
+      const waybillDate = new Date(formData.date);
+      const lastWaybillDate = new Date(lastWaybill.date);
+      if (waybillDate.getTime() < lastWaybillDate.getTime()) {
+        showToast(`Дата ПЛ (${formData.date}) не может быть раньше даты последнего учтенного ПЛ (${lastWaybill.date}).`, 'error');
+        return false;
+      }
+    }
+  }
+  return true;
+};
+
+const handleSave = async (suppressNotifications = false): Promise<Waybill | null> => {
+  if (!(await validateForm())) return null;
+
+  try {
+    let savedWaybill: Waybill;
+
+    // WB-FIX-PL-001: Construct payload with fuel object for aggregate upsert
+    // WB-FIX-ODOMETER-001: Explicit Number conversion to avoid "expected number, received string" error
+    const payload: any = {
+      ...formData,
+      odometerStart: formData.odometerStart != null ? Number(formData.odometerStart) : null,
+      odometerEnd: formData.odometerEnd != null ? Number(formData.odometerEnd) : null,
+    };
+
+    // Check if we have fuel data to save
+    // We prioritize form data. 
+    if (selectedVehicle?.fuelStockItemId || Number(formData.fuelAtStart) > 0 || Number(formData.fuelFilled) > 0) {
+      payload.fuel = {
+        stockItemId: selectedVehicle?.fuelStockItemId || null,
+        fuelStart: Number(formData.fuelAtStart) || 0,
+        fuelReceived: Number(formData.fuelFilled) || 0,
+        // Calculate consumption or use form if available? Form doesn't have fuelConsumed field usually, it's calc.
+        // Let's pass calculated.
+        fuelConsumed: actualFuelConsumption || 0,
+        fuelEnd: Number(formData.fuelAtEnd) || 0,
+        fuelPlanned: Number(formData.fuelPlanned) || 0,
+        sourceType: linkedTxId ? 'GAS_STATION' : 'MANUAL',
+        // Add timestamp if we had it, or null
+        // comment: ...
+      };
+    }
+
+    if ('id' in formData && formData.id) {
+      // Ensure required fields for FrontWaybill are present in payload
+      const updatePayload = {
+        ...payload,
+        // WB-FIX-PL-001: Dates are handled by mapper now (WB-DATE-060)
+
+        // Send only new fields, rely on normalization or DTO aliases if needed
+        dispatcherEmployeeId: payload.dispatcherEmployeeId || null,
+        controllerEmployeeId: payload.controllerEmployeeId || null,
+        // Legacy dispatcherId is removed to prevent overwriting with ''
+      };
+      savedWaybill = await updateWaybill(updatePayload as any);
+    } else {
+      const createPayload = {
+        ...payload,
+        // WB-FIX-PL-001
+        dispatcherEmployeeId: payload.dispatcherEmployeeId || null,
+        controllerEmployeeId: payload.controllerEmployeeId || null,
+      };
+      savedWaybill = await addWaybill(createPayload as any);
+    }
+
+    if (savedWaybill) {
+      // WB-HOTFIX-UI-STATE-001: Safe date helpers
+      const toDateInput = (val: any): string => {
+        if (!val) return '';
+        if (typeof val === 'string') return val.slice(0, 10);
+        return new Date(val).toISOString().slice(0, 10);
       };
 
-      // Check if we have fuel data to save
-      // We prioritize form data. 
-      if (selectedVehicle?.fuelStockItemId || Number(formData.fuelAtStart) > 0 || Number(formData.fuelFilled) > 0) {
-        payload.fuel = {
-          stockItemId: selectedVehicle?.fuelStockItemId || null,
-          fuelStart: Number(formData.fuelAtStart) || 0,
-          fuelReceived: Number(formData.fuelFilled) || 0,
-          // Calculate consumption or use form if available? Form doesn't have fuelConsumed field usually, it's calc.
-          // Let's pass calculated.
-          fuelConsumed: actualFuelConsumption || 0,
-          fuelEnd: Number(formData.fuelAtEnd) || 0,
-          fuelPlanned: Number(formData.fuelPlanned) || 0,
-          sourceType: linkedTxId ? 'GAS_STATION' : 'MANUAL',
-          // Add timestamp if we had it, or null
-          // comment: ...
-        };
+      const toDateTimeInput = (val: any): string => {
+        if (!val) return '';
+        if (typeof val === 'string') {
+          // ISO -> yyyy-MM-ddTHH:mm, datetime-local already fits
+          return val.includes('T') ? val.slice(0, 16) : `${val.slice(0, 10)}T00:00`;
+        }
+        return new Date(val).toISOString().slice(0, 16);
+      };
+
+      // WB-HOTFIX-UI-STATE-001: Use savedWaybill.fuel (flattened aggregate) instead of fuelLines[0]
+      const f = (savedWaybill as any).fuel;
+      const mappedFormData = {
+        ...savedWaybill,
+        routes: savedWaybill.routes || [],
+        // P0-B: Apply backend-assigned blank number and blankId
+        number: savedWaybill.number || formData.number,
+        blankId: savedWaybill.blankId || formData.blankId,
+        // Map fuel from flattened aggregate
+        fuelAtStart: f?.fuelStart != null ? Number(f.fuelStart) : (savedWaybill.fuelAtStart || 0),
+        fuelFilled: f?.fuelReceived != null ? Number(f.fuelReceived) : (savedWaybill.fuelFilled || 0),
+        fuelAtEnd: f?.fuelEnd != null ? Number(f.fuelEnd) : (savedWaybill.fuelAtEnd || 0),
+        fuelPlanned: f?.fuelPlanned != null ? Number(f.fuelPlanned) : (savedWaybill.fuelPlanned || 0),
+        // Format dates for HTML inputs
+        date: toDateInput(savedWaybill.date),
+        validFrom: toDateTimeInput(savedWaybill.validFrom),
+        validTo: toDateTimeInput(savedWaybill.validTo),
+        // Preserve dispatcher/controller
+        dispatcherEmployeeId: savedWaybill.dispatcherEmployeeId || '',
+        controllerEmployeeId: savedWaybill.controllerEmployeeId || '',
+      };
+
+      console.log('[WB-SAVE] Mapped form data:', {
+        date: mappedFormData.date,
+        validFrom: mappedFormData.validFrom,
+        validTo: mappedFormData.validTo,
+        fuelAtStart: mappedFormData.fuelAtStart,
+        fuelFilled: mappedFormData.fuelFilled
+      });
+
+      setFormData(mappedFormData as any);
+      setInitialFormData(JSON.parse(JSON.stringify(mappedFormData)));
+
+      // WB-HOTFIX-UI-STATE-001: Recalculate dayMode after save
+      const fromDate = (mappedFormData.validFrom || mappedFormData.date || '').split('T')[0];
+      const toDate = (mappedFormData.validTo || mappedFormData.date || '').split('T')[0];
+      setDayMode(fromDate && toDate && fromDate !== toDate ? 'multi' : 'single');
+
+      // Show toast only once
+      if (!suppressNotifications) {
+        showToast(
+          `Путевой лист ${savedWaybill.number ? `№${savedWaybill.number} ` : ''}успешно сохранен`,
+          'success'
+        );
       }
 
-      if ('id' in formData && formData.id) {
-        // Ensure required fields for FrontWaybill are present in payload
-        const updatePayload = {
-          ...payload,
-          // WB-FIX-PL-001: Dates are handled by mapper now (WB-DATE-060)
-
-          // Send only new fields, rely on normalization or DTO aliases if needed
-          dispatcherEmployeeId: payload.dispatcherEmployeeId || null,
-          controllerEmployeeId: payload.controllerEmployeeId || null,
-          // Legacy dispatcherId is removed to prevent overwriting with ''
-        };
-        savedWaybill = await updateWaybill(updatePayload as any);
-      } else {
-        const createPayload = {
-          ...payload,
-          // WB-FIX-PL-001
-          dispatcherEmployeeId: payload.dispatcherEmployeeId || null,
-          controllerEmployeeId: payload.controllerEmployeeId || null,
-        };
-        savedWaybill = await addWaybill(createPayload as any);
+      if (savedWaybill && savedWaybill.routes.length > 0) {
+        await addSavedRoutesFromWaybill(savedWaybill.routes);
+        const updatedRoutes = await getSavedRoutes();
+        setSavedRoutes(updatedRoutes);
       }
 
-      if (savedWaybill) {
-        // WB-HOTFIX-UI-STATE-001: Safe date helpers
-        const toDateInput = (val: any): string => {
-          if (!val) return '';
-          if (typeof val === 'string') return val.slice(0, 10);
-          return new Date(val).toISOString().slice(0, 10);
-        };
+      // Handle transaction linking
+      const allTransactions = await getStockTransactions();
+      const originalLinkedTx = allTransactions.find(tx => tx.id === initialLinkedTxId);
 
-        const toDateTimeInput = (val: any): string => {
-          if (!val) return '';
-          if (typeof val === 'string') {
-            // ISO -> yyyy-MM-ddTHH:mm, datetime-local already fits
-            return val.includes('T') ? val.slice(0, 16) : `${val.slice(0, 10)}T00:00`;
-          }
-          return new Date(val).toISOString().slice(0, 16);
-        };
-
-        // WB-HOTFIX-UI-STATE-001: Use savedWaybill.fuel (flattened aggregate) instead of fuelLines[0]
-        const f = (savedWaybill as any).fuel;
-        const mappedFormData = {
-          ...savedWaybill,
-          routes: savedWaybill.routes || [],
-          // P0-B: Apply backend-assigned blank number and blankId
-          number: savedWaybill.number || formData.number,
-          blankId: savedWaybill.blankId || formData.blankId,
-          // Map fuel from flattened aggregate
-          fuelAtStart: f?.fuelStart != null ? Number(f.fuelStart) : (savedWaybill.fuelAtStart || 0),
-          fuelFilled: f?.fuelReceived != null ? Number(f.fuelReceived) : (savedWaybill.fuelFilled || 0),
-          fuelAtEnd: f?.fuelEnd != null ? Number(f.fuelEnd) : (savedWaybill.fuelAtEnd || 0),
-          fuelPlanned: f?.fuelPlanned != null ? Number(f.fuelPlanned) : (savedWaybill.fuelPlanned || 0),
-          // Format dates for HTML inputs
-          date: toDateInput(savedWaybill.date),
-          validFrom: toDateTimeInput(savedWaybill.validFrom),
-          validTo: toDateTimeInput(savedWaybill.validTo),
-          // Preserve dispatcher/controller
-          dispatcherEmployeeId: savedWaybill.dispatcherEmployeeId || '',
-          controllerEmployeeId: savedWaybill.controllerEmployeeId || '',
-        };
-
-        console.log('[WB-SAVE] Mapped form data:', {
-          date: mappedFormData.date,
-          validFrom: mappedFormData.validFrom,
-          validTo: mappedFormData.validTo,
-          fuelAtStart: mappedFormData.fuelAtStart,
-          fuelFilled: mappedFormData.fuelFilled
-        });
-
-        setFormData(mappedFormData as any);
-        setInitialFormData(JSON.parse(JSON.stringify(mappedFormData)));
-
-        // WB-HOTFIX-UI-STATE-001: Recalculate dayMode after save
-        const fromDate = (mappedFormData.validFrom || mappedFormData.date || '').split('T')[0];
-        const toDate = (mappedFormData.validTo || mappedFormData.date || '').split('T')[0];
-        setDayMode(fromDate && toDate && fromDate !== toDate ? 'multi' : 'single');
-
-        // Show toast only once
-        if (!suppressNotifications) {
-          showToast(
-            `Путевой лист ${savedWaybill.number ? `№${savedWaybill.number} ` : ''}успешно сохранен`,
-            'success'
-          );
-        }
-
-        if (savedWaybill && savedWaybill.routes.length > 0) {
-          await addSavedRoutesFromWaybill(savedWaybill.routes);
-          const updatedRoutes = await getSavedRoutes();
-          setSavedRoutes(updatedRoutes);
-        }
-
-        // Handle transaction linking
-        const allTransactions = await getStockTransactions();
-        const originalLinkedTx = allTransactions.find(tx => tx.id === initialLinkedTxId);
-
-        if (originalLinkedTx && originalLinkedTx.id !== linkedTxId) {
-          await updateStockTransaction({ ...originalLinkedTx, waybillId: null });
-        }
-
-        if (linkedTxId && linkedTxId !== originalLinkedTx?.id) {
-          const newLinkedTx = allTransactions.find(tx => tx.id === linkedTxId);
-          if (newLinkedTx) {
-            await updateStockTransaction({ ...newLinkedTx, waybillId: savedWaybill.id });
-          }
-        }
-
-        setInitialLinkedTxId(linkedTxId);
-
-        return savedWaybill;
+      if (originalLinkedTx && originalLinkedTx.id !== linkedTxId) {
+        await updateStockTransaction({ ...originalLinkedTx, waybillId: null });
       }
-      return null;
-    } catch (err: any) {
-      console.error('Error saving waybill:', err);
-      showToast('Ошибка при сохранении: ' + (err.message || 'Неизвестная ошибка'), 'error');
-      return null;
-    }
-  };
 
-  const handleCloseRequest = () => {
-    if (isDirty) {
-      setIsConfirmationModalOpen(true);
-    } else {
-      onClose();
-    }
-  };
+      if (linkedTxId && linkedTxId !== originalLinkedTx?.id) {
+        const newLinkedTx = allTransactions.find(tx => tx.id === linkedTxId);
+        if (newLinkedTx) {
+          await updateStockTransaction({ ...newLinkedTx, waybillId: savedWaybill.id });
+        }
+      }
 
-  const handleSaveAndClose = async () => {
-    const saved = await handleSave(true);
-    if (saved) {
-      setIsConfirmationModalOpen(false);
-      onClose();
-    }
-  };
+      setInitialLinkedTxId(linkedTxId);
 
-  const handleCloseWithoutSaving = () => {
+      return savedWaybill;
+    }
+    return null;
+  } catch (err: any) {
+    console.error('Error saving waybill:', err);
+    showToast('Ошибка при сохранении: ' + (err.message || 'Неизвестная ошибка'), 'error');
+    return null;
+  }
+};
+
+const handleCloseRequest = () => {
+  if (isDirty) {
+    setIsConfirmationModalOpen(true);
+  } else {
+    onClose();
+  }
+};
+
+const handleSaveAndClose = async () => {
+  const saved = await handleSave(true);
+  if (saved) {
     setIsConfirmationModalOpen(false);
     onClose();
-  };
+  }
+};
 
-  const handleAttachmentUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
+const handleCloseWithoutSaving = () => {
+  setIsConfirmationModalOpen(false);
+  onClose();
+};
 
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const newAttachment: Attachment = {
-        name: file.name,
-        size: file.size,
-        type: file.type,
-        content: e.target?.result as string,
-        userId: 'local-user',
-      };
-      setFormData(prev => ({ ...prev, attachments: [...(prev.attachments || []), newAttachment] }));
+const handleAttachmentUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const file = event.target.files?.[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const newAttachment: Attachment = {
+      name: file.name,
+      size: file.size,
+      type: file.type,
+      content: e.target?.result as string,
+      userId: 'local-user',
     };
-    reader.readAsDataURL(file);
+    setFormData(prev => ({ ...prev, attachments: [...(prev.attachments || []), newAttachment] }));
   };
+  reader.readAsDataURL(file);
+};
 
-  const removeAttachment = (name: string) => {
-    setFormData(prev => ({ ...prev, attachments: prev.attachments?.filter(att => att.name !== name) }));
-  };
+const removeAttachment = (name: string) => {
+  setFormData(prev => ({ ...prev, attachments: prev.attachments?.filter(att => att.name !== name) }));
+};
 
-  const handleImportConfirm = (segments: RouteSegment[]) => {
-    try {
-      const newWaybillRoutes: Route[] = segments.map(seg => {
-        // Convert date from dd.mm.yyyy to yyyy-mm-dd
-        const dateParts = seg.date.split('.');
-        const formattedDate = dateParts.length === 3 ? `${dateParts[2]}-${dateParts[1]}-${dateParts[0]}` : undefined;
+const handleImportConfirm = (segments: RouteSegment[]) => {
+  try {
+    const newWaybillRoutes: Route[] = segments.map(seg => {
+      // Convert date from dd.mm.yyyy to yyyy-mm-dd
+      const dateParts = seg.date.split('.');
+      const formattedDate = dateParts.length === 3 ? `${dateParts[2]}-${dateParts[1]}-${dateParts[0]}` : undefined;
 
-        return {
-          id: generateId(),
-          from: seg.from,
-          to: seg.to,
-          distanceKm: seg.distanceKm,
-          isCityDriving: selectedVehicle?.useCityModifier || false,
-          isWarming: false, // This info is not available in the parsed file
-          date: dayMode === 'multi' ? formattedDate : undefined,
-        };
-      });
-
-      if (newWaybillRoutes.length > 0) {
-        setFormData(prev => ({ ...prev, routes: [...prev.routes, ...newWaybillRoutes] }));
-        showToast(`Добавлено ${newWaybillRoutes.length} сегментов маршрута.`, 'success');
-      } else {
-        showToast('Не выбрано ни одного маршрута для импорта.', 'info');
-      }
-    } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Ошибка импорта', 'error');
-    } finally {
-      setIsImportModalOpen(false);
-    }
-  };
-
-  const handleOpenGarageModal = async () => {
-    if (!formData.driverId) {
-      showToast('Сначала выберите водителя.', 'info');
-      return;
-    }
-    const expenses = await getAvailableFuelExpenses(formData.driverId, 'id' in formData ? formData.id : null);
-    setAvailableExpenses(expenses);
-    setIsGarageModalOpen(true);
-  };
-
-  const handleSelectExpense = (tx: StockTransaction) => {
-    // FIX: Use categoryEnum='FUEL' instead of fuelTypeId check. Also support legacy fuelTypeId if category missing
-    const fuelItem = tx.items.find(item => {
-      const stockItem = stockItems.find(si => si.id === item.stockItemId);
-      return stockItem && (stockItem.categoryEnum === 'FUEL' || stockItem.fuelTypeId);
-    });
-    if (fuelItem) {
-      setFormData(prev => ({ ...prev, fuelFilled: fuelItem.quantity }));
-      setLinkedTxId(tx.id);
-      setIsGarageModalOpen(false);
-    } else {
-      showToast('В накладной не найдено топливо.', 'error');
-    }
-  };
-
-  const handleStatusChange = async (nextStatus: WaybillStatus) => {
-    let savedWaybill = 'id' in formData ? formData : null;
-    if (isDirty) {
-      savedWaybill = await handleSave(true);
-      if (!savedWaybill) return; // Save failed, stop status change
-    }
-
-    if (!savedWaybill || !('id' in savedWaybill)) {
-      showToast('Сначала сохраните путевой лист.', 'error');
-      return;
-    }
-
-    try {
-      const frontStatus = nextStatus.toLowerCase() as FrontWaybillStatus;
-      await changeWaybillStatus(savedWaybill.id, frontStatus, {
-        userId: currentUser?.id,
-        appMode: appSettings?.appMode || 'driver',
-      });
-
-      // P0-2: WB-POSTED-UI-002 - Reload full waybill to preserve all fields
-      const freshWaybill = await getWaybillById(savedWaybill.id);
-
-      // Map fuel from backend to form fields
-      const f = freshWaybill.fuel;
-      const mappedFormData = {
-        ...freshWaybill,
-        routes: freshWaybill.routes || [],
-        date: freshWaybill.date?.split('T')[0] || new Date().toISOString().split('T')[0],
-        fuelAtStart: f?.fuelStart ? Number(f.fuelStart) : (freshWaybill.fuelAtStart || 0),
-        fuelFilled: f?.fuelReceived ? Number(f.fuelReceived) : (freshWaybill.fuelFilled || 0),
-        fuelAtEnd: f?.fuelEnd ? Number(f.fuelEnd) : (freshWaybill.fuelAtEnd || 0),
-        fuelPlanned: f?.fuelPlanned ? Number(f.fuelPlanned) : (freshWaybill.fuelPlanned || 0),
-        fuelCardId: freshWaybill.fuelCardId || '',
-        dispatcherEmployeeId: freshWaybill.dispatcherEmployeeId || '',
-        controllerEmployeeId: freshWaybill.controllerEmployeeId || '',
-        validFrom: freshWaybill.validFrom?.slice(0, 16) || '',
-        validTo: freshWaybill.validTo?.slice(0, 16) || '',
+      return {
+        id: generateId(),
+        from: seg.from,
+        to: seg.to,
+        distanceKm: seg.distanceKm,
+        isCityDriving: selectedVehicle?.useCityModifier || false,
+        isWarming: false, // This info is not available in the parsed file
+        date: dayMode === 'multi' ? formattedDate : undefined,
       };
+    });
 
-      setFormData(mappedFormData as Waybill);
-      setInitialFormData(JSON.parse(JSON.stringify(mappedFormData)));
-      showToast(`Статус изменен на "${WAYBILL_STATUS_TRANSLATIONS[nextStatus]}"`, 'success');
-
-      // UX fix: Auto-close after status change
-      if (nextStatus === WaybillStatus.POSTED || nextStatus === WaybillStatus.SUBMITTED) {
-        onClose();
-      }
-    } catch (e) {
-      showToast((e as Error).message, 'error');
+    if (newWaybillRoutes.length > 0) {
+      setFormData(prev => ({ ...prev, routes: [...prev.routes, ...newWaybillRoutes] }));
+      showToast(`Добавлено ${newWaybillRoutes.length} сегментов маршрута.`, 'success');
+    } else {
+      showToast('Не выбрано ни одного маршрута для импорта.', 'info');
     }
-  };
+  } catch (e) {
+    showToast(e instanceof Error ? e.message : 'Ошибка импорта', 'error');
+  } finally {
+    setIsImportModalOpen(false);
+  }
+};
 
-  const handleReturnToDraft = async (comment: string) => {
-    if (!('id' in formData && formData.id)) {
-      showToast('Сначала сохраните путевой лист.', 'error');
-      return;
-    }
+const handleOpenGarageModal = async () => {
+  if (!formData.driverId) {
+    showToast('Сначала выберите водителя.', 'info');
+    return;
+  }
+  const expenses = await getAvailableFuelExpenses(formData.driverId, 'id' in formData ? formData.id : null);
+  setAvailableExpenses(expenses);
+  setIsGarageModalOpen(true);
+};
 
-    try {
-      const updatedWaybill = await changeWaybillStatus(formData.id, 'draft', {
-        userId: currentUser?.id,
-        appMode: appSettings?.appMode || 'driver',
-        reason: comment.trim(),
-      });
-      setFormData(updatedWaybill as Waybill);
-      setInitialFormData(JSON.parse(JSON.stringify(updatedWaybill)));
-      showToast('Путевой лист возвращен на доработку.', 'success');
-      setIsCorrectionModalOpen(false);
+const handleSelectExpense = (tx: StockTransaction) => {
+  // FIX: Use categoryEnum='FUEL' instead of fuelTypeId check. Also support legacy fuelTypeId if category missing
+  const fuelItem = tx.items.find(item => {
+    const stockItem = stockItems.find(si => si.id === item.stockItemId);
+    return stockItem && (stockItem.categoryEnum === 'FUEL' || stockItem.fuelTypeId);
+  });
+  if (fuelItem) {
+    setFormData(prev => ({ ...prev, fuelFilled: fuelItem.quantity }));
+    setLinkedTxId(tx.id);
+    setIsGarageModalOpen(false);
+  } else {
+    showToast('В накладной не найдено топливо.', 'error');
+  }
+};
+
+const handleStatusChange = async (nextStatus: WaybillStatus) => {
+  let savedWaybill = 'id' in formData ? formData : null;
+  if (isDirty) {
+    savedWaybill = await handleSave(true);
+    if (!savedWaybill) return; // Save failed, stop status change
+  }
+
+  if (!savedWaybill || !('id' in savedWaybill)) {
+    showToast('Сначала сохраните путевой лист.', 'error');
+    return;
+  }
+
+  try {
+    const frontStatus = nextStatus.toLowerCase() as FrontWaybillStatus;
+    await changeWaybillStatus(savedWaybill.id, frontStatus, {
+      userId: currentUser?.id,
+      appMode: appSettings?.appMode || 'driver',
+    });
+
+    // P0-2: WB-POSTED-UI-002 - Reload full waybill to preserve all fields
+    const freshWaybill = await getWaybillById(savedWaybill.id);
+
+    // Map fuel from backend to form fields
+    const f = freshWaybill.fuel;
+    const mappedFormData = {
+      ...freshWaybill,
+      routes: freshWaybill.routes || [],
+      date: freshWaybill.date?.split('T')[0] || new Date().toISOString().split('T')[0],
+      fuelAtStart: f?.fuelStart ? Number(f.fuelStart) : (freshWaybill.fuelAtStart || 0),
+      fuelFilled: f?.fuelReceived ? Number(f.fuelReceived) : (freshWaybill.fuelFilled || 0),
+      fuelAtEnd: f?.fuelEnd ? Number(f.fuelEnd) : (freshWaybill.fuelAtEnd || 0),
+      fuelPlanned: f?.fuelPlanned ? Number(f.fuelPlanned) : (freshWaybill.fuelPlanned || 0),
+      fuelCardId: freshWaybill.fuelCardId || '',
+      dispatcherEmployeeId: freshWaybill.dispatcherEmployeeId || '',
+      controllerEmployeeId: freshWaybill.controllerEmployeeId || '',
+      validFrom: freshWaybill.validFrom?.slice(0, 16) || '',
+      validTo: freshWaybill.validTo?.slice(0, 16) || '',
+    };
+
+    setFormData(mappedFormData as Waybill);
+    setInitialFormData(JSON.parse(JSON.stringify(mappedFormData)));
+    showToast(`Статус изменен на "${WAYBILL_STATUS_TRANSLATIONS[nextStatus]}"`, 'success');
+
+    // UX fix: Auto-close after status change
+    if (nextStatus === WaybillStatus.POSTED || nextStatus === WaybillStatus.SUBMITTED) {
       onClose();
-    } catch (e) {
-      showToast((e as Error).message, 'error');
     }
-  };
+  } catch (e) {
+    showToast((e as Error).message, 'error');
+  }
+};
 
-  const handleConfirmCorrection = async (reason: string) => {
-    if (!('id' in formData && formData.id)) {
-      return; // Should not happen for a POSTED waybill
-    }
+const handleReturnToDraft = async (comment: string) => {
+  if (!('id' in formData && formData.id)) {
+    showToast('Сначала сохраните путевой лист.', 'error');
+    return;
+  }
 
-    try {
-      const updatedWaybill = await changeWaybillStatus(formData.id, 'draft', {
-        userId: currentUser?.id,
-        appMode: appSettings?.appMode || 'driver',
-        reason: reason.trim(),
-      });
-      setFormData(updatedWaybill as Waybill);
-      setInitialFormData(JSON.parse(JSON.stringify(updatedWaybill)));
-      showToast('Путевой лист возвращен в черновики для корректировки.', 'success');
-      setIsCorrectionReasonModalOpen(false);
-      onClose();  // UX: Auto-close after correction
-    } catch (e) {
-      showToast((e as Error).message, 'error');
-    }
-  };
+  try {
+    const updatedWaybill = await changeWaybillStatus(formData.id, 'draft', {
+      userId: currentUser?.id,
+      appMode: appSettings?.appMode || 'driver',
+      reason: comment.trim(),
+    });
+    setFormData(updatedWaybill as Waybill);
+    setInitialFormData(JSON.parse(JSON.stringify(updatedWaybill)));
+    showToast('Путевой лист возвращен на доработку.', 'success');
+    setIsCorrectionModalOpen(false);
+    onClose();
+  } catch (e) {
+    showToast((e as Error).message, 'error');
+  }
+};
 
-  const renderFooterActions = () => {
-    const isNew = !('id' in formData && formData.id);
+const handleConfirmCorrection = async (reason: string) => {
+  if (!('id' in formData && formData.id)) {
+    return; // Should not happen for a POSTED waybill
+  }
 
-    return <>
-      <button
-        onClick={handleCloseRequest}
-        className="bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-100 font-semibold py-2 px-6 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
-        aria-label="Закрыть"
-      >
-        Закрыть
-      </button>
+  try {
+    const updatedWaybill = await changeWaybillStatus(formData.id, 'draft', {
+      userId: currentUser?.id,
+      appMode: appSettings?.appMode || 'driver',
+      reason: reason.trim(),
+    });
+    setFormData(updatedWaybill as Waybill);
+    setInitialFormData(JSON.parse(JSON.stringify(updatedWaybill)));
+    showToast('Путевой лист возвращен в черновики для корректировки.', 'success');
+    setIsCorrectionReasonModalOpen(false);
+    onClose();  // UX: Auto-close after correction
+  } catch (e) {
+    showToast((e as Error).message, 'error');
+  }
+};
 
-      <button
-        onClick={() => setIsPrintModalOpen(true)}
-        className="flex items-center gap-2 bg-teal-600 text-white font-semibold py-2 px-6 rounded-lg shadow-md hover:bg-teal-700 transition-colors disabled:opacity-50"
-        aria-label="Печать на бланке"
-        disabled={isNew}
-      >
-        <PrinterIcon className="h-5 w-5" />
-        Печать
-      </button>
+const renderFooterActions = () => {
+  const isNew = !('id' in formData && formData.id);
 
-      {canEdit && (
-        <button onClick={handleSaveAndClose} className="bg-blue-600 text-white font-semibold py-2 px-6 rounded-lg shadow-md hover:bg-blue-700">Сохранить и закрыть</button>
-      )}
-    </>;
-  };
+  return <>
+    <button
+      onClick={handleCloseRequest}
+      className="bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-100 font-semibold py-2 px-6 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+      aria-label="Закрыть"
+    >
+      Закрыть
+    </button>
 
-  const statusColors = WAYBILL_STATUS_COLORS[formData.status];
+    <button
+      onClick={() => setIsPrintModalOpen(true)}
+      className="flex items-center gap-2 bg-teal-600 text-white font-semibold py-2 px-6 rounded-lg shadow-md hover:bg-teal-700 transition-colors disabled:opacity-50"
+      aria-label="Печать на бланке"
+      disabled={isNew}
+    >
+      <PrinterIcon className="h-5 w-5" />
+      Печать
+    </button>
 
-  const formattedOverrun = fuelEconomyOrOverrun.toFixed(2);
-  const displayOverrun = formattedOverrun === '-0.00' ? '0.00' : formattedOverrun;
-  const isOverrun = fuelEconomyOrOverrun < -0.005; // Use a small tolerance for floating point issues
+    {canEdit && (
+      <button onClick={handleSaveAndClose} className="bg-blue-600 text-white font-semibold py-2 px-6 rounded-lg shadow-md hover:bg-blue-700">Сохранить и закрыть</button>
+    )}
+  </>;
+};
+
+const statusColors = WAYBILL_STATUS_COLORS[formData.status];
+
+const formattedOverrun = fuelEconomyOrOverrun.toFixed(2);
+const displayOverrun = formattedOverrun === '-0.00' ? '0.00' : formattedOverrun;
+const isOverrun = fuelEconomyOrOverrun < -0.005; // Use a small tolerance for floating point issues
 
 
-  return (
-    <>
-      <ConfirmationModal
-        isOpen={isConfirmationModalOpen}
-        onClose={() => setIsConfirmationModalOpen(false)}
-        onConfirm={handleSaveAndClose}
-        title="Сохранить изменения?"
-        message="У вас есть несохранённые изменения. Хотите сохранить их перед закрытием?"
-        confirmText="Сохранить и закрыть"
-        confirmButtonClass="bg-blue-600 hover:bg-blue-700"
-        secondaryAction={{
-          text: "Закрыть без сохранения",
-          className: "bg-red-600 hover:bg-red-700",
-          onClick: handleCloseWithoutSaving
-        }}
-      />
-      {/* WB-PREFILL-030: Prefill Confirmation Modal */}
-      <ConfirmationModal
-        isOpen={isPrefillModalOpen}
-        title="Обновить данные автозаполнения?"
-        message={`Для выбранного ТС найдены актуальные данные (ПЛ №${prefillData?.lastWaybillNumber || 'нет'}, пробег ${prefillData?.odometerStart || 0}). \n\nВы хотите обновить поля?`}
-        confirmText="Обновить (только пустые)"
-        onConfirm={() => applyPrefill(prefillData, 'fill-empty')}
-        onClose={() => setIsPrefillModalOpen(false)}
-      />
+return (
+  <>
+    <ConfirmationModal
+      isOpen={isConfirmationModalOpen}
+      onClose={() => setIsConfirmationModalOpen(false)}
+      onConfirm={handleSaveAndClose}
+      title="Сохранить изменения?"
+      message="У вас есть несохранённые изменения. Хотите сохранить их перед закрытием?"
+      confirmText="Сохранить и закрыть"
+      confirmButtonClass="bg-blue-600 hover:bg-blue-700"
+      secondaryAction={{
+        text: "Закрыть без сохранения",
+        className: "bg-red-600 hover:bg-red-700",
+        onClick: handleCloseWithoutSaving
+      }}
+    />
+    {/* WB-PREFILL-030: Prefill Confirmation Modal */}
+    <ConfirmationModal
+      isOpen={isPrefillModalOpen}
+      title="Обновить данные автозаполнения?"
+      message={`Для выбранного ТС найдены актуальные данные (ПЛ №${prefillData?.lastWaybillNumber || 'нет'}, пробег ${prefillData?.odometerStart || 0}). \n\nВы хотите обновить поля?`}
+      confirmText="Обновить (только пустые)"
+      onConfirm={() => applyPrefill(prefillData, 'fill-empty')}
+      onClose={() => setIsPrefillModalOpen(false)}
+    />
 
-      {/* Custom Modal for Prefill Options if ConfirmationModal is too simple */}
-      {isPrefillModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full shadow-xl">
-            <h3 className="text-lg font-bold mb-4 text-gray-900 dark:text-white">Обновить данные автозаполнения?</h3>
-            <p className="mb-4 text-gray-600 dark:text-gray-300">
-              Для выбранного ТС найдены актуальные данные:
-              <ul className="list-disc pl-5 mt-2">
-                <li>Водитель: {prefillData?.driverId ? 'Найден' : 'Нет'}</li>
-                <li>Пробег: {prefillData?.odometerStart}</li>
-                <li>Топливо: {prefillData?.fuelStart}</li>
-                {prefillData?.tankBalance !== null && <li>Бак (датчик): {prefillData.tankBalance}</li>}
-              </ul>
-              <br />
-              Текущие значения в форме будут изменены.
-            </p>
-            <div className="flex flex-col space-y-2">
-              <button
-                onClick={() => applyPrefill(prefillData, 'fill-empty')}
-                className="w-full px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-              >
-                Заполнить только пустые поля
-              </button>
-              <button
-                onClick={() => applyPrefill(prefillData, 'overwrite')}
-                className="w-full px-4 py-2 bg-yellow-600 text-white rounded hover:bg-yellow-700"
-              >
-                Перезаписать все поля
-              </button>
-              <button
-                onClick={() => setIsPrefillModalOpen(false)}
-                className="w-full px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 dark:bg-gray-700 dark:text-white"
-              >
-                Отмена
-              </button>
-            </div>
+    {/* Custom Modal for Prefill Options if ConfirmationModal is too simple */}
+    {isPrefillModalOpen && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+        <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full shadow-xl">
+          <h3 className="text-lg font-bold mb-4 text-gray-900 dark:text-white">Обновить данные автозаполнения?</h3>
+          <p className="mb-4 text-gray-600 dark:text-gray-300">
+            Для выбранного ТС найдены актуальные данные:
+            <ul className="list-disc pl-5 mt-2">
+              <li>Водитель: {prefillData?.driverId ? 'Найден' : 'Нет'}</li>
+              <li>Пробег: {prefillData?.odometerStart}</li>
+              <li>Топливо: {prefillData?.fuelStart}</li>
+              {prefillData?.tankBalance !== null && <li>Бак (датчик): {prefillData.tankBalance}</li>}
+            </ul>
+            <br />
+            Текущие значения в форме будут изменены.
+          </p>
+          <div className="flex flex-col space-y-2">
+            <button
+              onClick={() => applyPrefill(prefillData, 'fill-empty')}
+              className="w-full px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+            >
+              Заполнить только пустые поля
+            </button>
+            <button
+              onClick={() => applyPrefill(prefillData, 'overwrite')}
+              className="w-full px-4 py-2 bg-yellow-600 text-white rounded hover:bg-yellow-700"
+            >
+              Перезаписать все поля
+            </button>
+            <button
+              onClick={() => setIsPrefillModalOpen(false)}
+              className="w-full px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 dark:bg-gray-700 dark:text-white"
+            >
+              Отмена
+            </button>
           </div>
         </div>
-      )}
+      </div>
+    )}
 
-      {isCorrectionModalOpen && formData && 'id' in formData && (
-        <CorrectionModal
-          isOpen={isCorrectionModalOpen}
-          onClose={() => setIsCorrectionModalOpen(false)}
-          onSubmit={handleReturnToDraft}
-        />
-      )}
+    {isCorrectionModalOpen && formData && 'id' in formData && (
+      <CorrectionModal
+        isOpen={isCorrectionModalOpen}
+        onClose={() => setIsCorrectionModalOpen(false)}
+        onSubmit={handleReturnToDraft}
+      />
+    )}
 
-      {isCorrectionReasonModalOpen && (
-        <CorrectionReasonModal
-          isOpen={isCorrectionReasonModalOpen}
-          onClose={() => setIsCorrectionReasonModalOpen(false)}
-          onSubmit={handleConfirmCorrection}  // UX fix: Actually call the handler that changes status to DRAFT
-        />
-      )}
-      {isPrintModalOpen && (
-        <PrintableWaybill
-          waybill={formData as Waybill}
-          vehicle={selectedVehicle}
-          driver={selectedDriver ? { fullName: selectedDriver.fullName, shortName: selectedDriver.shortName } as any : undefined} // REL-304: Pass driver data for print
-          organization={selectedOrg}
-          dispatcher={selectedDispatcher}
-          controller={selectedController}
-          // StockItem structure is compatible with FuelType expected by PrintableWaybill (id, name, code, density)
-          fuelType={selectedFuelType as any}
-          allOrganizations={organizations}
-          onClose={() => setIsPrintModalOpen(false)}
+    {isCorrectionReasonModalOpen && (
+      <CorrectionReasonModal
+        isOpen={isCorrectionReasonModalOpen}
+        onClose={() => setIsCorrectionReasonModalOpen(false)}
+        onSubmit={handleConfirmCorrection}  // UX fix: Actually call the handler that changes status to DRAFT
+      />
+    )}
+    {isPrintModalOpen && (
+      <PrintableWaybill
+        waybill={formData as Waybill}
+        vehicle={selectedVehicle}
+        driver={selectedDriver ? { fullName: selectedDriver.fullName, shortName: selectedDriver.shortName } as any : undefined} // REL-304: Pass driver data for print
+        organization={selectedOrg}
+        dispatcher={selectedDispatcher}
+        controller={selectedController}
+        // StockItem structure is compatible with FuelType expected by PrintableWaybill (id, name, code, density)
+        fuelType={selectedFuelType as any}
+        allOrganizations={organizations}
+        onClose={() => setIsPrintModalOpen(false)}
 
-        />
-      )}
-      {isImportModalOpen && <RouteImportModal onClose={() => setIsImportModalOpen(false)} onConfirm={handleImportConfirm} />}
-      <Modal isOpen={isGarageModalOpen} onClose={() => setIsGarageModalOpen(false)} title="Выбрать расходную накладную">
-        <div className="space-y-2">
-          {availableExpenses.length > 0 ? availableExpenses.map(tx => {
-            const fuelItem = tx.items.find(item => {
-              // Same logic as handleSelectExpense
-              const stockItem = stockItems.find(si => si.id === item.stockItemId);
-              return stockItem && (stockItem.categoryEnum === 'FUEL' || stockItem.fuelTypeId);
-            });
-            if (!fuelItem) return null;
-            const stockItemDetails = stockItems.find(si => si.id === fuelItem.stockItemId);
-            return (
-              <div key={tx.id} className="flex justify-between items-center p-3 bg-gray-100 dark:bg-gray-700 rounded-lg">
-                <div>
-                  <p>Накладная №{tx.docNumber} от {tx.date}</p>
-                  <p className="text-sm text-gray-600 dark:text-gray-300">{stockItemDetails?.name}: {fuelItem.quantity} {stockItemDetails?.unit}</p>
-                </div>
-                <button onClick={() => handleSelectExpense(tx)} className="bg-blue-600 text-white font-semibold py-1 px-3 rounded-lg">Выбрать</button>
+      />
+    )}
+    {isImportModalOpen && <RouteImportModal onClose={() => setIsImportModalOpen(false)} onConfirm={handleImportConfirm} />}
+    <Modal isOpen={isGarageModalOpen} onClose={() => setIsGarageModalOpen(false)} title="Выбрать расходную накладную">
+      <div className="space-y-2">
+        {availableExpenses.length > 0 ? availableExpenses.map(tx => {
+          const fuelItem = tx.items.find(item => {
+            // Same logic as handleSelectExpense
+            const stockItem = stockItems.find(si => si.id === item.stockItemId);
+            return stockItem && (stockItem.categoryEnum === 'FUEL' || stockItem.fuelTypeId);
+          });
+          if (!fuelItem) return null;
+          const stockItemDetails = stockItems.find(si => si.id === fuelItem.stockItemId);
+          return (
+            <div key={tx.id} className="flex justify-between items-center p-3 bg-gray-100 dark:bg-gray-700 rounded-lg">
+              <div>
+                <p>Накладная №{tx.docNumber} от {tx.date}</p>
+                <p className="text-sm text-gray-600 dark:text-gray-300">{stockItemDetails?.name}: {fuelItem.quantity} {stockItemDetails?.unit}</p>
               </div>
-            )
-          }) : <p>Нет доступных накладных для этого водителя.</p>}
-        </div>
-      </Modal>
-
-      <div className="bg-gray-100 dark:bg-gray-800 p-6 rounded-2xl shadow-lg space-y-6">
-        <header className="flex flex-wrap items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <h2 className="text-2xl font-bold text-gray-800 dark:text-white">
-              {('id' in formData && formData.id) ? `Путевой лист №${formData.number}` : 'Новый путевой лист'}
-            </h2>
-            <span className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm font-semibold ${statusColors?.bg} ${statusColors?.text}`}>
-              {WAYBILL_STATUS_TRANSLATIONS[formData.status]}
-            </span>
-          </div>
-          <div className="flex items-center gap-3">
-            <span className={`text-sm font-medium transition-colors ${dayMode === 'single' ? 'text-gray-800 dark:text-white' : 'text-gray-500 dark:text-gray-400'}`}>
-              Однодневный
-            </span>
-            <label htmlFor="dayModeToggle" className="relative inline-flex items-center cursor-pointer">
-              <input
-                type="checkbox"
-                id="dayModeToggle"
-                className="sr-only peer"
-                checked={dayMode === 'multi'}
-                onChange={(e) => handleDayModeChange(e.target.checked ? 'multi' : 'single')}
-                disabled={!canEdit}
-              />
-              <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
-            </label>
-            <span className={`text-sm font-medium transition-colors ${dayMode === 'multi' ? 'text-gray-800 dark:text-white' : 'text-gray-500 dark:text-gray-400'}`}>
-              Многодневный
-            </span>
-          </div>
-        </header>
-
-        {formData.reviewerComment && formData.status === WaybillStatus.DRAFT && (
-          <div className="p-4 bg-orange-100 dark:bg-orange-900/50 border-l-4 border-orange-500 rounded-r-lg">
-            <div className="flex items-center gap-2 text-orange-800 dark:text-orange-200 font-semibold">
-              <ChatBubbleLeftRightIcon className="h-5 w-5" />
-              <span>Комментарий проверяющего:</span>
+              <button onClick={() => handleSelectExpense(tx)} className="bg-blue-600 text-white font-semibold py-1 px-3 rounded-lg">Выбрать</button>
             </div>
-            <p className="mt-2 text-orange-700 dark:text-orange-300 ml-7">{formData.reviewerComment}</p>
-          </div>
-        )}
+          )
+        }) : <p>Нет доступных накладных для этого водителя.</p>}
+      </div>
+    </Modal>
 
-        <CollapsibleSection title="Основная информация" isCollapsed={collapsedSections.basicInfo || false} onToggle={() => toggleSection('basicInfo')}>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <FormField label="Организация"><FormSelect name="organizationId" value={formData.organizationId} onChange={handleChange} disabled={!canEdit || isDriver}><option value="">Выберите</option>{organizations.map(o => <option key={o.id} value={o.id}>{o.shortName}</option>)}</FormSelect></FormField>
-            <FormField label="Номер ПЛ">
-              {availableBlanks.length > 0 && (!('id' in formData) || !formData.id || !formData.number) ? (
-                <FormSelect
-                  name="blankId"
-                  value={(formData as any).blankId || (availableBlanks.find(b => b.formattedNumber === formData.number)?.id) || ''}
-                  onChange={handleBlankChange}
-                  disabled={!canEdit}
-                >
-                  <option value="">-- Выберите бланк --</option>
-                  {availableBlanks.map(b => (
-                    <option key={b.id} value={b.id}>
-                      {b.formattedNumber}
-                    </option>
-                  ))}
-                  <option value="manual">Ввести вручную / Автоматически</option>
-                </FormSelect>
-              ) : (
-                <FormInput
-                  type="text"
-                  name="number"
-                  value={formData.number || (('id' in formData && formData.id) ? '' : 'Автоматически')}
-                  readOnly
-                  className="bg-gray-100 font-semibold"
-                />
-              )}
-            </FormField>
-            <div />
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-4">
-            <FormField label="Дата ПЛ"><FormInput type="date" name="date" value={formData.date} readOnly className="!bg-gray-200 dark:!bg-gray-800" /></FormField>
-            <FormField label="Действителен с">
-              <FormInput
-                type="datetime-local"
-                name="validFrom"
-                value={formData.validFrom}
-                min={minDate ? `${minDate}T00:00` : undefined}
-                onChange={handleChange}
-                disabled={!canEdit}
-              />
-            </FormField>
-            <FormField label="Действителен по">
-              <FormInput
-                type={dayMode === 'single' ? 'time' : 'datetime-local'}
-                name="validTo"
-                value={dayMode === 'single' ? (formData.validTo?.split('T')[1] || '') : (formData.validTo || '')}
-                onChange={(e) => {
-                  if (dayMode === 'single') {
-                    const datePart = formData.validFrom?.split('T')[0] || formData.date?.split('T')[0] || '';
-                    setFormData({ ...formData, validTo: `${datePart}T${e.target.value}` });
-                  } else {
-                    handleChange(e);
-                  }
-                }}
-                min={dayMode === 'multi' ? (formData.validFrom || '') : undefined}
-                disabled={!canEdit}
-              />
-            </FormField>
-          </div>
-        </CollapsibleSection>
+    <div className="bg-gray-100 dark:bg-gray-800 p-6 rounded-2xl shadow-lg space-y-6">
+      <header className="flex flex-wrap items-center justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <h2 className="text-2xl font-bold text-gray-800 dark:text-white">
+            {('id' in formData && formData.id) ? `Путевой лист №${formData.number}` : 'Новый путевой лист'}
+          </h2>
+          <span className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm font-semibold ${statusColors?.bg} ${statusColors?.text}`}>
+            {WAYBILL_STATUS_TRANSLATIONS[formData.status]}
+          </span>
+        </div>
+        <div className="flex items-center gap-3">
+          <span className={`text-sm font-medium transition-colors ${dayMode === 'single' ? 'text-gray-800 dark:text-white' : 'text-gray-500 dark:text-gray-400'}`}>
+            Однодневный
+          </span>
+          <label htmlFor="dayModeToggle" className="relative inline-flex items-center cursor-pointer">
+            <input
+              type="checkbox"
+              id="dayModeToggle"
+              className="sr-only peer"
+              checked={dayMode === 'multi'}
+              onChange={(e) => handleDayModeChange(e.target.checked ? 'multi' : 'single')}
+              disabled={!canEdit}
+            />
+            <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
+          </label>
+          <span className={`text-sm font-medium transition-colors ${dayMode === 'multi' ? 'text-gray-800 dark:text-white' : 'text-gray-500 dark:text-gray-400'}`}>
+            Многодневный
+          </span>
+        </div>
+      </header>
 
-        <CollapsibleSection title="ТС и Водитель" isCollapsed={collapsedSections.vehicleDriver || false} onToggle={() => toggleSection('vehicleDriver')}>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <FormField label="Транспортное средство">
-              <FormSelect name="vehicleId" value={formData.vehicleId} onChange={handleVehicleChange} disabled={!canEdit}>
-                <option value="">Выберите ТС</option>
-                {vehicles.map(v => <option key={v.id} value={v.id}>{v.registrationNumber} ({v.brand})</option>)}
-              </FormSelect>
-              {autoFillMessage && <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">{autoFillMessage}</p>}
-            </FormField>
-            {/* REL-304: Usage of drivers list (Driver.id) instead of employees */}
-            <FormField label="Водитель">
+      {formData.reviewerComment && formData.status === WaybillStatus.DRAFT && (
+        <div className="p-4 bg-orange-100 dark:bg-orange-900/50 border-l-4 border-orange-500 rounded-r-lg">
+          <div className="flex items-center gap-2 text-orange-800 dark:text-orange-200 font-semibold">
+            <ChatBubbleLeftRightIcon className="h-5 w-5" />
+            <span>Комментарий проверяющего:</span>
+          </div>
+          <p className="mt-2 text-orange-700 dark:text-orange-300 ml-7">{formData.reviewerComment}</p>
+        </div>
+      )}
+
+      <CollapsibleSection title="Основная информация" isCollapsed={collapsedSections.basicInfo || false} onToggle={() => toggleSection('basicInfo')}>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <FormField label="Организация"><FormSelect name="organizationId" value={formData.organizationId} onChange={handleChange} disabled={!canEdit || isDriver}><option value="">Выберите</option>{organizations.map(o => <option key={o.id} value={o.id}>{o.shortName}</option>)}</FormSelect></FormField>
+          <FormField label="Номер ПЛ">
+            {availableBlanks.length > 0 && (!('id' in formData) || !formData.id || !formData.number) ? (
               <FormSelect
-                name="driverId"
-                value={formData.driverId}
-                onChange={handleChange}
-                disabled={!canEdit || isDriver}
+                name="blankId"
+                value={(formData as any).blankId || (availableBlanks.find(b => b.formattedNumber === formData.number)?.id) || ''}
+                onChange={handleBlankChange}
+                disabled={!canEdit}
               >
-                <option value="">Выберите водителя...</option>
-                {drivers.map(d => (
-                  <option key={d.id} value={d.id}>
-                    {d.fullName} {d.isActive ? '' : '(неактивен)'}
+                <option value="">-- Выберите бланк --</option>
+                {availableBlanks.map(b => (
+                  <option key={b.id} value={b.id}>
+                    {b.formattedNumber}
                   </option>
                 ))}
+                <option value="manual">Ввести вручную / Автоматически</option>
               </FormSelect>
+            ) : (
+              <FormInput
+                type="text"
+                name="number"
+                value={formData.number || (('id' in formData && formData.id) ? '' : 'Автоматически')}
+                readOnly
+                className="bg-gray-100 font-semibold"
+              />
+            )}
+          </FormField>
+          <div />
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-4">
+          <FormField label="Дата ПЛ"><FormInput type="date" name="date" value={formData.date} readOnly className="!bg-gray-200 dark:!bg-gray-800" /></FormField>
+          <FormField label="Действителен с">
+            <FormInput
+              type="datetime-local"
+              name="validFrom"
+              value={formData.validFrom}
+              min={minDate ? `${minDate}T00:00` : undefined}
+              onChange={handleChange}
+              disabled={!canEdit}
+            />
+          </FormField>
+          <FormField label="Действителен по">
+            <FormInput
+              type={dayMode === 'single' ? 'time' : 'datetime-local'}
+              name="validTo"
+              value={dayMode === 'single' ? (formData.validTo?.split('T')[1] || '') : (formData.validTo || '')}
+              onChange={(e) => {
+                if (dayMode === 'single') {
+                  const datePart = formData.validFrom?.split('T')[0] || formData.date?.split('T')[0] || '';
+                  setFormData({ ...formData, validTo: `${datePart}T${e.target.value}` });
+                } else {
+                  handleChange(e);
+                }
+              }}
+              min={dayMode === 'multi' ? (formData.validFrom || '') : undefined}
+              disabled={!canEdit}
+            />
+          </FormField>
+        </div>
+      </CollapsibleSection>
 
-              {/* FUEL-CARD-SELECTOR-FE-011: Dropdown when driver has multiple cards */}
-              {driverCards.length > 1 ? (
-                <div className="mt-2">
-                  <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Топливная карта</label>
-                  <select
-                    className="w-full bg-gray-50 dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded-md p-2 text-sm text-gray-700 dark:text-gray-200"
-                    value={(formData as any).fuelCardId || ''}
-                    onChange={(e) => {
-                      const cardId = e.target.value || null;
-                      setFormData(prev => ({ ...prev, fuelCardId: cardId }));
-                      const selectedCard = driverCards.find(c => c.id === cardId);
-                      if (selectedCard) {
-                        setFuelCardInfo({ cardNumber: selectedCard.cardNumber, provider: selectedCard.provider });
-                        setFuelCardBalance(selectedCard.balanceLiters);
-                        const currentId = formData && 'id' in formData ? (formData as any).id : undefined;
-                        getFuelCardDraftReserve(selectedCard.id, currentId).then(res => setFuelCardReserve(res.reserved));
-                      } else {
-                        setFuelCardInfo(null);
-                        setFuelCardBalance(null);
-                        setFuelCardReserve(0);
-                      }
-                    }}
-                    disabled={!canEdit}
-                  >
-                    <option value="">Не выбрана</option>
-                    {driverCards.map(c => (
-                      <option key={c.id} value={c.id}>
-                        {c.cardNumber} {c.provider ? `(${c.provider})` : ''} — {c.balanceLiters.toFixed(2)} л
-                      </option>
-                    ))}
-                  </select>
-                  {fuelCardReserve > 0 && (
-                    <div className="mt-1 text-xs text-orange-600 dark:text-orange-400">
-                      Резерв в черновиках: {fuelCardReserve.toFixed(2)} л
-                    </div>
-                  )}
-                </div>
-              ) : (fuelCardBalance != null || fuelCardInfo) && (
-                <div className="mt-1 text-xs space-y-1">
-                  {fuelCardInfo && (
-                    <div className="text-blue-600 dark:text-blue-400 font-medium">
-                      Карта: {fuelCardInfo.cardNumber} {fuelCardInfo.provider ? `(${fuelCardInfo.provider})` : ''}
-                    </div>
-                  )}
-                  {fuelCardBalance != null && (
-                    <div className="text-gray-500 dark:text-gray-400">
-                      Доступно на карте: {fuelCardBalance.toFixed(2)} л
-                      {fuelCardReserve > 0 && (
-                        <span className="ml-2 text-orange-600 dark:text-orange-400 font-medium">
-                          (Резерв в черновиках: {fuelCardReserve.toFixed(2)} л)
-                        </span>
-                      )}
-                    </div>
-                  )}
-                </div>
-              )}
+      <CollapsibleSection title="ТС и Водитель" isCollapsed={collapsedSections.vehicleDriver || false} onToggle={() => toggleSection('vehicleDriver')}>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <FormField label="Транспортное средство">
+            <FormSelect name="vehicleId" value={formData.vehicleId} onChange={handleVehicleChange} disabled={!canEdit}>
+              <option value="">Выберите ТС</option>
+              {vehicles.map(v => <option key={v.id} value={v.id}>{v.registrationNumber} ({v.brand})</option>)}
+            </FormSelect>
+            {autoFillMessage && <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">{autoFillMessage}</p>}
+          </FormField>
+          {/* REL-304: Usage of drivers list (Driver.id) instead of employees */}
+          <FormField label="Водитель">
+            <FormSelect
+              name="driverId"
+              value={formData.driverId}
+              onChange={handleChange}
+              disabled={!canEdit || isDriver}
+            >
+              <option value="">Выберите водителя...</option>
+              {drivers.map(d => (
+                <option key={d.id} value={d.id}>
+                  {d.fullName} {d.isActive ? '' : '(неактивен)'}
+                </option>
+              ))}
+            </FormSelect>
+
+            {/* FUEL-CARD-SELECTOR-FE-011: Dropdown when driver has multiple cards */}
+            {driverCards.length > 1 ? (
+              <div className="mt-2">
+                <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Топливная карта</label>
+                <select
+                  className="w-full bg-gray-50 dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded-md p-2 text-sm text-gray-700 dark:text-gray-200"
+                  value={(formData as any).fuelCardId || ''}
+                  onChange={(e) => {
+                    const cardId = e.target.value || null;
+                    setFormData(prev => ({ ...prev, fuelCardId: cardId }));
+                    const selectedCard = driverCards.find(c => c.id === cardId);
+                    if (selectedCard) {
+                      setFuelCardInfo({ cardNumber: selectedCard.cardNumber, provider: selectedCard.provider });
+                      setFuelCardBalance(selectedCard.balanceLiters);
+                      const currentId = formData && 'id' in formData ? (formData as any).id : undefined;
+                      getFuelCardDraftReserve(selectedCard.id, currentId).then(res => setFuelCardReserve(res.reserved));
+                    } else {
+                      setFuelCardInfo(null);
+                      setFuelCardBalance(null);
+                      setFuelCardReserve(0);
+                    }
+                  }}
+                  disabled={!canEdit}
+                >
+                  <option value="">Не выбрана</option>
+                  {driverCards.map(c => (
+                    <option key={c.id} value={c.id}>
+                      {c.cardNumber} {c.provider ? `(${c.provider})` : ''} — {c.balanceLiters.toFixed(2)} л
+                    </option>
+                  ))}
+                </select>
+                {fuelCardReserve > 0 && (
+                  <div className="mt-1 text-xs text-orange-600 dark:text-orange-400">
+                    Резерв в черновиках: {fuelCardReserve.toFixed(2)} л
+                  </div>
+                )}
+              </div>
+            ) : (fuelCardBalance != null || fuelCardInfo) && (
+              <div className="mt-1 text-xs space-y-1">
+                {fuelCardInfo && (
+                  <div className="text-blue-600 dark:text-blue-400 font-medium">
+                    Карта: {fuelCardInfo.cardNumber} {fuelCardInfo.provider ? `(${fuelCardInfo.provider})` : ''}
+                  </div>
+                )}
+                {fuelCardBalance != null && (
+                  <div className="text-gray-500 dark:text-gray-400">
+                    Доступно на карте: {fuelCardBalance.toFixed(2)} л
+                    {fuelCardReserve > 0 && (
+                      <span className="ml-2 text-orange-600 dark:text-orange-400 font-medium">
+                        (Резерв в черновиках: {fuelCardReserve.toFixed(2)} л)
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </FormField>
+        </div>
+      </CollapsibleSection>
+
+      {!isDriver && (
+        <CollapsibleSection title="Ответственные лица" isCollapsed={collapsedSections.staff || false} onToggle={() => toggleSection('staff')}>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <FormField label="Выезд разрешил (Диспетчер)">
+              <FormSelect name="dispatcherEmployeeId" value={formData.dispatcherEmployeeId || ''} onChange={handleChange} disabled={!canEdit}>
+                <option value="">Выберите</option>
+                {employees.map(e => <option key={e.id} value={e.id}>{e.fullName}</option>)}
+              </FormSelect>
+            </FormField>
+            <FormField label="Расчет произвел (Контролер/Бухгалтер)">
+              <FormSelect name="controllerEmployeeId" value={formData.controllerEmployeeId || ''} onChange={handleChange} disabled={!canEdit}>
+                <option value="">Выберите</option>
+                {employees.map(e => <option key={e.id} value={e.id}>{e.fullName}</option>)}
+              </FormSelect>
             </FormField>
           </div>
         </CollapsibleSection>
+      )}
 
-        {!isDriver && (
-          <CollapsibleSection title="Ответственные лица" isCollapsed={collapsedSections.staff || false} onToggle={() => toggleSection('staff')}>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <FormField label="Выезд разрешил (Диспетчер)">
-                <FormSelect name="dispatcherEmployeeId" value={formData.dispatcherEmployeeId || ''} onChange={handleChange} disabled={!canEdit}>
-                  <option value="">Выберите</option>
-                  {employees.map(e => <option key={e.id} value={e.id}>{e.fullName}</option>)}
-                </FormSelect>
-              </FormField>
-              <FormField label="Расчет произвел (Контролер/Бухгалтер)">
-                <FormSelect name="controllerEmployeeId" value={formData.controllerEmployeeId || ''} onChange={handleChange} disabled={!canEdit}>
-                  <option value="">Выберите</option>
-                  {employees.map(e => <option key={e.id} value={e.id}>{e.fullName}</option>)}
-                </FormSelect>
-              </FormField>
-            </div>
-          </CollapsibleSection>
-        )}
-
-        <CollapsibleSection title="Пробег и топливо" isCollapsed={collapsedSections.fuelMileage || false} onToggle={() => toggleSection('fuelMileage')}>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-            <div>
-              <FormField label="Пробег (выезд)"><FormInput type="number" step="1" name="odometerStart" value={formData.odometerStart || ''} onChange={handleNumericChange} disabled={!canEdit} /></FormField>
-              <FormField label="Пробег (возврат)"><FormInput type="number" step="1" name="odometerEnd" value={formData.odometerEnd || ''} onChange={handleNumericChange} disabled={!canEdit} /></FormField>
-            </div>
-            <div>
-              <FormField label="Топливо (выезд)"><FormInput type="number" name="fuelAtStart" value={formData.fuelAtStart || ''} onChange={handleNumericChange} disabled={!canEdit} /></FormField>
-              <FormField label="Заправлено">
-                <div className="flex items-center gap-1">
-                  <FormInput type="number" name="fuelFilled" value={formData.fuelFilled || ''} onChange={handleNumericChange} disabled={!canEdit} className={`${linkedTxId ? '!bg-green-100 dark:!bg-green-900' : ''} ${fuelFilledError ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}`} />
-                  <button onClick={handleOpenGarageModal} title="Заполнить из Гаража" className="p-2 bg-gray-200 dark:bg-gray-600 rounded-md hover:bg-gray-300 dark:hover:bg-gray-500 disabled:opacity-50" disabled={!formData.driverId}><BanknotesIcon className="h-5 w-5" /></button>
-                </div>
-                {fuelFilledError && (<div className="mt-1 text-xs text-red-500">{fuelFilledError}</div>)}
-              </FormField>
-              <FormField label="Топливо (возврат)"><FormInput type="number" name="fuelAtEnd" value={formData.fuelAtEnd || ''} onChange={handleNumericChange} disabled={!canEdit} /></FormField>
-            </div>
-            <div>
-              <FormField label="Расход (норма)"><FormInput type="number" name="fuelPlanned" value={formData.fuelPlanned || ''} onChange={handleNumericChange} readOnly className="!bg-gray-200 dark:!bg-gray-800" /></FormField>
-              <p className="text-xs text-gray-500 mt-1">Факт: {actualFuelConsumption.toFixed(2)}</p>
-              <p className={`text-xs mt-1 ${fuelEconomyOrOverrun > 0.005 ? 'text-green-600' : isOverrun ? 'text-red-600' : 'text-gray-500'}`}>
-                {fuelEconomyOrOverrun > 0.005 ? `Экономия: ${displayOverrun}` : isOverrun ? `Перерасход: ${Math.abs(fuelEconomyOrOverrun).toFixed(2)}` : 'Совпадает'}
-              </p>
-            </div>
-            <div>
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-300 mb-2">Пройдено, км: {totalDistance}</p>
-              <div className="bg-green-100 dark:bg-green-900/50 p-2 rounded-lg text-center mb-4">
-                <p className="text-xs text-green-700 dark:text-green-300">Расчетная норма</p>
-                <p className="font-bold text-green-800 dark:text-green-200">{calculatedFuelRate.toFixed(2)} л/100км</p>
+      <CollapsibleSection title="Пробег и топливо" isCollapsed={collapsedSections.fuelMileage || false} onToggle={() => toggleSection('fuelMileage')}>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+          <div>
+            <FormField label="Пробег (выезд)"><FormInput type="number" step="1" name="odometerStart" value={formData.odometerStart || ''} onChange={handleNumericChange} disabled={!canEdit} /></FormField>
+            <FormField label="Пробег (возврат)"><FormInput type="number" step="1" name="odometerEnd" value={formData.odometerEnd || ''} onChange={handleNumericChange} disabled={!canEdit} /></FormField>
+          </div>
+          <div>
+            <FormField label="Топливо (выезд)"><FormInput type="number" name="fuelAtStart" value={formData.fuelAtStart || ''} onChange={handleNumericChange} disabled={!canEdit} /></FormField>
+            <FormField label="Заправлено">
+              <div className="flex items-center gap-1">
+                <FormInput type="number" name="fuelFilled" value={formData.fuelFilled || ''} onChange={handleNumericChange} disabled={!canEdit} className={`${linkedTxId ? '!bg-green-100 dark:!bg-green-900' : ''} ${fuelFilledError ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}`} />
+                <button onClick={handleOpenGarageModal} title="Заполнить из Гаража" className="p-2 bg-gray-200 dark:bg-gray-600 rounded-md hover:bg-gray-300 dark:hover:bg-gray-500 disabled:opacity-50" disabled={!formData.driverId}><BanknotesIcon className="h-5 w-5" /></button>
               </div>
-              <FormField label="Метод расчета">
-                <FormSelect
-                  name="fuelCalculationMethod"
-                  value={formData.fuelCalculationMethod || 'BOILER'}
-                  onChange={handleChange}
-                  disabled={!canEdit}
-                >
-                  <option value="BOILER">Общий метод (без коэф.)</option>
-                  <option value="SEGMENTS">По сегментам (с коэф.)</option>
-                  <option value="MIXED">Смешанный (одометр + сегменты)</option>
-                </FormSelect>
-              </FormField>
-            </div>
+              {fuelFilledError && (<div className="mt-1 text-xs text-red-500">{fuelFilledError}</div>)}
+            </FormField>
+            <FormField label="Топливо (возврат)"><FormInput type="number" name="fuelAtEnd" value={formData.fuelAtEnd || ''} onChange={handleNumericChange} disabled={!canEdit} /></FormField>
           </div>
-          {isOverrun && (
-            <div className="mt-4">
-              <FormField label="Причина перерасхода">
-                <input name="deviationReason" value={formData.deviationReason || ''} onChange={handleChange} className="w-full bg-gray-50 dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded-md p-2" />
-              </FormField>
-            </div>
-          )}
-        </CollapsibleSection>
-
-        {('id' in formData) && formData.id && (
-          <CollapsibleSection
-            title="Связанные складские операции"
-            isCollapsed={collapsedSections.stockLinks || false}
-            onToggle={() => toggleSection('stockLinks')}
-          >
-            <div className="bg-white dark:bg-gray-700/50 rounded-xl border border-gray-200 dark:border-gray-600 overflow-hidden shadow-sm">
-              {linkedTransactions.length === 0 ? (
-                <div className="text-sm text-gray-500 dark:text-gray-400">
-                  Нет связанных операций на складе.
-                </div>
-              ) : (
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="text-left">
-                      <th className="p-2">Дата</th>
-                      <th className="p-2">Тип</th>
-                      <th className="p-2">Причина</th>
-                      <th className="p-2">Номенклатура</th>
-                      <th className="p-2">Количество</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {linkedTransactions.flatMap(tx => {
-                      const isIncome = tx.type === 'income';
-                      const reason =
-                        tx.expenseReason === 'waybill'
-                          ? 'Списание по ПЛ'
-                          : tx.expenseReason === 'fuelCardTopUp'
-                            ? 'Пополнение карты'
-                            : tx.type === 'income'
-                              ? 'Приход'
-                              : 'Расход';
-                      const rowCount = tx.items?.length || 1;
-
-                      if (!tx.items || tx.items.length === 0) {
-                        return (
-                          <tr key={tx.id} className="border-t dark:border-gray-700">
-                            <td className="p-2">{tx.date}</td>
-                            <td className={`p-2 font-semibold ${isIncome ? 'text-green-600' : 'text-red-600'}`}>
-                              {isIncome ? 'Приход' : 'Расход'}
-                            </td>
-                            <td className="p-2">{reason}</td>
-                            <td className="p-2 text-gray-400" colSpan={2}>Нет позиций в документе</td>
-                          </tr>
-                        );
-                      }
-
-                      return tx.items.map((item, itemIndex) => {
-                        const stockItem = stockItems.find(i => i.id === item.stockItemId);
-                        return (
-                          <tr key={`${tx.id}-${itemIndex}`} className="border-t dark:border-gray-700">
-                            {itemIndex === 0 && (
-                              <>
-                                <td className="p-2 align-top" rowSpan={rowCount}>{tx.date}</td>
-                                <td className={`p-2 align-top font-semibold ${isIncome ? 'text-green-600' : 'text-red-600'}`} rowSpan={rowCount}>
-                                  {isIncome ? 'Приход' : 'Расход'}
-                                </td>
-                                <td className="p-2 align-top" rowSpan={rowCount}>{reason}</td>
-                              </>
-                            )}
-                            <td className="p-2">{stockItem?.name ?? '—'}</td>
-                            <td className="p-2">
-                              {item.quantity != null ? `${item.quantity} ${stockItem?.unit ?? ''}` : '—'}
-                            </td>
-                          </tr>
-                        );
-                      });
-                    })}
-                  </tbody>
-                </table>
-              )}
-            </div>
-          </CollapsibleSection>
-        )}
-
-        <CollapsibleSection title="Маршрут" isCollapsed={collapsedSections.route || false} onToggle={() => toggleSection('route')}>
-          {(isAIAvailable || appSettings?.isParserEnabled) && (
-            <div className="flex gap-4 mb-4 items-center">
-              {isAIAvailable && (
-                <>
-                  <input
-                    type="text"
-                    value={aiPrompt}
-                    onChange={e => setAiPrompt(e.target.value)}
-                    placeholder="Например: Гараж - Склад А - Клиент - Гараж"
-                    className="flex-grow bg-gray-50 dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded-md p-2"
-                  />
-                  <button
-                    onClick={handleGenerateRoutes}
-                    disabled={isGenerating || !aiPrompt}
-                    className="flex items-center gap-2 bg-purple-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md hover:bg-purple-700 disabled:opacity-50"
-                  >
-                    <SparklesIcon className="h-5 w-5" />
-                    {isGenerating ? 'Генерация...' : 'Сгенерировать (AI)'}
-                  </button>
-                </>
-              )}
-              {appSettings?.isParserEnabled && (
-                <button
-                  onClick={() => setIsImportModalOpen(true)}
-                  className="flex items-center gap-2 bg-green-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md hover:bg-green-700"
-                >
-                  <UploadIcon className="h-5 w-5" /> Импорт из файла
-                </button>
-              )}
-            </div>
-          )}
-          <div className="space-y-4">
-            {(formData.routes || []).map(route => (<RouteRow
-              key={route.id}
-              route={route}
-              dayMode={dayMode}
-              selectedVehicle={selectedVehicle}
-              onChange={handleRouteChance}
-              onRemove={handleRemoveRoute}
-              onDateBlur={handleRouteDateBlur}
-            />
-            ))}
+          <div>
+            <FormField label="Расход (норма)"><FormInput type="number" name="fuelPlanned" value={formData.fuelPlanned || ''} onChange={handleNumericChange} readOnly className="!bg-gray-200 dark:!bg-gray-800" /></FormField>
+            <p className="text-xs text-gray-500 mt-1">Факт: {actualFuelConsumption.toFixed(2)}</p>
+            <p className={`text-xs mt-1 ${fuelEconomyOrOverrun > 0.005 ? 'text-green-600' : isOverrun ? 'text-red-600' : 'text-gray-500'}`}>
+              {fuelEconomyOrOverrun > 0.005 ? `Экономия: ${displayOverrun}` : isOverrun ? `Перерасход: ${Math.abs(fuelEconomyOrOverrun).toFixed(2)}` : 'Совпадает'}
+            </p>
           </div>
-          <button onClick={handleAddRoute} className="mt-4 text-blue-600 hover:text-blue-800">
-            + Добавить маршрут
-          </button>
-        </CollapsibleSection>
-
-        <CollapsibleSection title="Приложения" isCollapsed={collapsedSections.attachments || false} onToggle={() => toggleSection('attachments')}>
-          <div className="mt-4 space-y-2">
-            {(formData.attachments || []).map(att => (
-              <div key={att.name} className="flex justify-between items-center p-2 bg-gray-100 dark:bg-gray-700 rounded-md">
-                <div>
-                  <p className="font-medium text-gray-800 dark:text-white">{att.name}</p>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">{(att.size / 1024).toFixed(1)} KB</p>
-                </div>
-                <button onClick={() => removeAttachment(att.name)} className="text-red-500 hover:text-red-700">
-                  <TrashIcon className="h-5 w-5" />
-                </button>
-              </div>
-            ))}
-          </div>
-        </CollapsibleSection>
-
-        {/* Status Actions */}
-        <div className="pt-6 border-t dark:border-gray-600 flex flex-wrap justify-between items-center gap-4">
-          <div className="flex flex-wrap items-center gap-2">
-            {formData.status === WaybillStatus.DRAFT && can('waybill.submit') && appSettings?.appMode === 'central' && (
-              <button onClick={() => handleStatusChange(WaybillStatus.SUBMITTED)} className="flex items-center gap-2 bg-blue-500 text-white py-2 px-4 rounded-lg shadow hover:bg-blue-600"><PaperAirplaneIcon className="h-5 w-5" /> Отправить на проверку</button>
-            )}
-            {formData.status === WaybillStatus.DRAFT && can('waybill.post') && (appSettings?.appMode === 'driver' || !appSettings?.appMode) && (
-              <button onClick={() => handleStatusChange(WaybillStatus.POSTED)} className="flex items-center gap-2 bg-green-600 text-white py-2 px-4 rounded-lg shadow hover:bg-green-700"><CheckCircleIcon className="h-5 w-5" /> Провести</button>
-            )}
-            {formData.status === WaybillStatus.SUBMITTED && can('waybill.post') && (
-              <button onClick={() => handleStatusChange(WaybillStatus.POSTED)} className="flex items-center gap-2 bg-green-600 text-white py-2 px-4 rounded-lg shadow hover:bg-green-700"><CheckCircleIcon className="h-5 w-5" /> Провести</button>
-            )}
-            {formData.status === WaybillStatus.SUBMITTED && can('waybill.submit') && ( // Assuming same capability for returning
-              <button onClick={() => setIsCorrectionModalOpen(true)} className="flex items-center gap-2 bg-yellow-500 text-white py-2 px-4 rounded-lg shadow hover:bg-yellow-600"><ArrowUturnLeftIcon className="h-5 w-5" /> Вернуть на доработку</button>
-            )}
-            {formData.status === WaybillStatus.POSTED && can('waybill.correct') && (
-              <button onClick={() => setIsCorrectionReasonModalOpen(true)} className="flex items-center gap-2 bg-yellow-500 text-white py-2 px-4 rounded-lg shadow hover:bg-yellow-600"><PencilIcon className="h-5 w-5" /> Скорректировать</button>
-            )}
-          </div>
-          <div className="flex flex-wrap items-center gap-4">
-            {renderFooterActions()}
+          <div>
+            <p className="text-sm font-medium text-gray-600 dark:text-gray-300 mb-2">Пройдено, км: {totalDistance}</p>
+            <div className="bg-green-100 dark:bg-green-900/50 p-2 rounded-lg text-center mb-4">
+              <p className="text-xs text-green-700 dark:text-green-300">Расчетная норма</p>
+              <p className="font-bold text-green-800 dark:text-green-200">{calculatedFuelRate.toFixed(2)} л/100км</p>
+            </div>
+            <FormField label="Метод расчета">
+              <FormSelect
+                name="fuelCalculationMethod"
+                value={formData.fuelCalculationMethod || 'BOILER'}
+                onChange={handleChange}
+                disabled={!canEdit}
+              >
+                <option value="BOILER">Общий метод (без коэф.)</option>
+                <option value="SEGMENTS">По сегментам (с коэф.)</option>
+                <option value="MIXED">Смешанный (одометр + сегменты)</option>
+              </FormSelect>
+            </FormField>
           </div>
         </div>
-      </div >
-    </>
-  );
+        {isOverrun && (
+          <div className="mt-4">
+            <FormField label="Причина перерасхода">
+              <input name="deviationReason" value={formData.deviationReason || ''} onChange={handleChange} className="w-full bg-gray-50 dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded-md p-2" />
+            </FormField>
+          </div>
+        )}
+      </CollapsibleSection>
+
+      {('id' in formData) && formData.id && (
+        <CollapsibleSection
+          title="Связанные складские операции"
+          isCollapsed={collapsedSections.stockLinks || false}
+          onToggle={() => toggleSection('stockLinks')}
+        >
+          <div className="bg-white dark:bg-gray-700/50 rounded-xl border border-gray-200 dark:border-gray-600 overflow-hidden shadow-sm">
+            {linkedTransactions.length === 0 ? (
+              <div className="text-sm text-gray-500 dark:text-gray-400">
+                Нет связанных операций на складе.
+              </div>
+            ) : (
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left">
+                    <th className="p-2">Дата</th>
+                    <th className="p-2">Тип</th>
+                    <th className="p-2">Причина</th>
+                    <th className="p-2">Номенклатура</th>
+                    <th className="p-2">Количество</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {linkedTransactions.flatMap(tx => {
+                    const isIncome = tx.type === 'income';
+                    const reason =
+                      tx.expenseReason === 'waybill'
+                        ? 'Списание по ПЛ'
+                        : tx.expenseReason === 'fuelCardTopUp'
+                          ? 'Пополнение карты'
+                          : tx.type === 'income'
+                            ? 'Приход'
+                            : 'Расход';
+                    const rowCount = tx.items?.length || 1;
+
+                    if (!tx.items || tx.items.length === 0) {
+                      return (
+                        <tr key={tx.id} className="border-t dark:border-gray-700">
+                          <td className="p-2">{tx.date}</td>
+                          <td className={`p-2 font-semibold ${isIncome ? 'text-green-600' : 'text-red-600'}`}>
+                            {isIncome ? 'Приход' : 'Расход'}
+                          </td>
+                          <td className="p-2">{reason}</td>
+                          <td className="p-2 text-gray-400" colSpan={2}>Нет позиций в документе</td>
+                        </tr>
+                      );
+                    }
+
+                    return tx.items.map((item, itemIndex) => {
+                      const stockItem = stockItems.find(i => i.id === item.stockItemId);
+                      return (
+                        <tr key={`${tx.id}-${itemIndex}`} className="border-t dark:border-gray-700">
+                          {itemIndex === 0 && (
+                            <>
+                              <td className="p-2 align-top" rowSpan={rowCount}>{tx.date}</td>
+                              <td className={`p-2 align-top font-semibold ${isIncome ? 'text-green-600' : 'text-red-600'}`} rowSpan={rowCount}>
+                                {isIncome ? 'Приход' : 'Расход'}
+                              </td>
+                              <td className="p-2 align-top" rowSpan={rowCount}>{reason}</td>
+                            </>
+                          )}
+                          <td className="p-2">{stockItem?.name ?? '—'}</td>
+                          <td className="p-2">
+                            {item.quantity != null ? `${item.quantity} ${stockItem?.unit ?? ''}` : '—'}
+                          </td>
+                        </tr>
+                      );
+                    });
+                  })}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </CollapsibleSection>
+      )}
+
+      <CollapsibleSection title="Маршрут" isCollapsed={collapsedSections.route || false} onToggle={() => toggleSection('route')}>
+        {(isAIAvailable || appSettings?.isParserEnabled) && (
+          <div className="flex gap-4 mb-4 items-center">
+            {isAIAvailable && (
+              <>
+                <input
+                  type="text"
+                  value={aiPrompt}
+                  onChange={e => setAiPrompt(e.target.value)}
+                  placeholder="Например: Гараж - Склад А - Клиент - Гараж"
+                  className="flex-grow bg-gray-50 dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded-md p-2"
+                />
+                <button
+                  onClick={handleGenerateRoutes}
+                  disabled={isGenerating || !aiPrompt}
+                  className="flex items-center gap-2 bg-purple-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md hover:bg-purple-700 disabled:opacity-50"
+                >
+                  <SparklesIcon className="h-5 w-5" />
+                  {isGenerating ? 'Генерация...' : 'Сгенерировать (AI)'}
+                </button>
+              </>
+            )}
+            {appSettings?.isParserEnabled && (
+              <button
+                onClick={() => setIsImportModalOpen(true)}
+                className="flex items-center gap-2 bg-green-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md hover:bg-green-700"
+              >
+                <UploadIcon className="h-5 w-5" /> Импорт из файла
+              </button>
+            )}
+          </div>
+        )}
+        <div className="space-y-4">
+          {(formData.routes || []).map(route => (<RouteRow
+            key={route.id}
+            route={route}
+            dayMode={dayMode}
+            selectedVehicle={selectedVehicle}
+            onChange={handleRouteChance}
+            onRemove={handleRemoveRoute}
+            onDateBlur={handleRouteDateBlur}
+          />
+          ))}
+        </div>
+        <button onClick={handleAddRoute} className="mt-4 text-blue-600 hover:text-blue-800">
+          + Добавить маршрут
+        </button>
+      </CollapsibleSection>
+
+      <CollapsibleSection title="Приложения" isCollapsed={collapsedSections.attachments || false} onToggle={() => toggleSection('attachments')}>
+        <div className="mt-4 space-y-2">
+          {(formData.attachments || []).map(att => (
+            <div key={att.name} className="flex justify-between items-center p-2 bg-gray-100 dark:bg-gray-700 rounded-md">
+              <div>
+                <p className="font-medium text-gray-800 dark:text-white">{att.name}</p>
+                <p className="text-sm text-gray-500 dark:text-gray-400">{(att.size / 1024).toFixed(1)} KB</p>
+              </div>
+              <button onClick={() => removeAttachment(att.name)} className="text-red-500 hover:text-red-700">
+                <TrashIcon className="h-5 w-5" />
+              </button>
+            </div>
+          ))}
+        </div>
+      </CollapsibleSection>
+
+      {/* Status Actions */}
+      <div className="pt-6 border-t dark:border-gray-600 flex flex-wrap justify-between items-center gap-4">
+        <div className="flex flex-wrap items-center gap-2">
+          {formData.status === WaybillStatus.DRAFT && can('waybill.submit') && appSettings?.appMode === 'central' && (
+            <button onClick={() => handleStatusChange(WaybillStatus.SUBMITTED)} className="flex items-center gap-2 bg-blue-500 text-white py-2 px-4 rounded-lg shadow hover:bg-blue-600"><PaperAirplaneIcon className="h-5 w-5" /> Отправить на проверку</button>
+          )}
+          {formData.status === WaybillStatus.DRAFT && can('waybill.post') && (appSettings?.appMode === 'driver' || !appSettings?.appMode) && (
+            <button onClick={() => handleStatusChange(WaybillStatus.POSTED)} className="flex items-center gap-2 bg-green-600 text-white py-2 px-4 rounded-lg shadow hover:bg-green-700"><CheckCircleIcon className="h-5 w-5" /> Провести</button>
+          )}
+          {formData.status === WaybillStatus.SUBMITTED && can('waybill.post') && (
+            <button onClick={() => handleStatusChange(WaybillStatus.POSTED)} className="flex items-center gap-2 bg-green-600 text-white py-2 px-4 rounded-lg shadow hover:bg-green-700"><CheckCircleIcon className="h-5 w-5" /> Провести</button>
+          )}
+          {formData.status === WaybillStatus.SUBMITTED && can('waybill.submit') && ( // Assuming same capability for returning
+            <button onClick={() => setIsCorrectionModalOpen(true)} className="flex items-center gap-2 bg-yellow-500 text-white py-2 px-4 rounded-lg shadow hover:bg-yellow-600"><ArrowUturnLeftIcon className="h-5 w-5" /> Вернуть на доработку</button>
+          )}
+          {formData.status === WaybillStatus.POSTED && can('waybill.correct') && (
+            <button onClick={() => setIsCorrectionReasonModalOpen(true)} className="flex items-center gap-2 bg-yellow-500 text-white py-2 px-4 rounded-lg shadow hover:bg-yellow-600"><PencilIcon className="h-5 w-5" /> Скорректировать</button>
+          )}
+        </div>
+        <div className="flex flex-wrap items-center gap-4">
+          {renderFooterActions()}
+        </div>
+      </div>
+    </div >
+  </>
+);
 };

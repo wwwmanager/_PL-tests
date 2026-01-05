@@ -20,7 +20,7 @@ import { Badge } from '../shared/Badge';
 import { Button } from '../shared/Button';
 import Modal from '../shared/Modal';
 import ConfirmationModal from '../shared/ConfirmationModal';
-import { PlusIcon, TrashIcon, DocumentTextIcon, SparklesIcon, ArrowUpTrayIcon } from '../Icons';
+import { PlusIcon, TrashIcon, DocumentTextIcon, SparklesIcon, ArrowUpTrayIcon, ArrowUturnLeftIcon } from '../Icons';
 import { useAuth } from '../../services/auth';
 import { BlankFiltersSchema } from '../../services/schemas';
 import { BLANK_STATUS_TRANSLATIONS, BLANK_STATUS_COLORS, SPOIL_REASON_TRANSLATIONS } from '../../constants';
@@ -393,6 +393,7 @@ const BlankList: React.FC<{ key: number }> = () => {
     const canBeSpoiled = (status: BlankStatus) => status === 'available' || status === 'issued';
     const canBeReleased = (status: BlankStatus) => status === 'reserved';
     const canBeReturned = (status: BlankStatus) => status === 'used';
+    const canBeRestored = (status: BlankStatus) => status === 'spoiled';
     const isSpoilAllowed = can('blanks.spoil.self') || can('blanks.spoil.warehouse') || can('blanks.spoil.override');
 
     // Selection Logic
@@ -585,6 +586,11 @@ const BlankList: React.FC<{ key: number }> = () => {
                                             {canBeReturned(b.status) && (
                                                 <button onClick={() => handleReleaseBlank(b.id)} className="text-green-600 hover:text-green-800 p-1" title="Вернуть в статус Выдан">
                                                     <span className="text-lg">🔄</span>
+                                                </button>
+                                            )}
+                                            {canBeRestored(b.status) && (
+                                                <button onClick={() => handleReleaseBlank(b.id)} className="text-blue-600 hover:text-blue-800 p-1" title="Восстановить бланк">
+                                                    <ArrowUturnLeftIcon className="h-4 w-4" />
                                                 </button>
                                             )}
                                         </div>

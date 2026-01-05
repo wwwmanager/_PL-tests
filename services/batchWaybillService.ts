@@ -1,7 +1,7 @@
 import { parseAndPreviewRouteFile, RouteSegment } from './routeParserService';
 import { isWorkingDayStandard, getHolidayName, getWorkingWeekRange, calendarApi } from './productionCalendarService';
 import { Waybill, WaybillStatus, Vehicle, Employee, SeasonSettings, CalendarEvent, Route } from '../types';
-import { addWaybill } from './api/waybillApi';
+import { addWaybill, getWaybills } from './api/waybillApi';
 import { getAvailableBlanksForDriver } from './blankApi';
 import { calculateDistance, WaybillCalculationMethod } from './waybillCalculations';
 import { calculatePlannedFuelByMethod, FuelCalculationMethod, mapLegacyMethod } from './fuelCalculationService';
@@ -250,9 +250,18 @@ const createWaybillFromGroup = async (
         validToStr = toLocalISO(finalEnd);
     }
 
+    // WB-BATCH-FIX-001: Calculate distance and consumption ONCE and return them
     const { distance, consumption } = calculateGroupConsumption(group, vehicle, seasonSettings || null, mapLegacyMethod(config.calculationMethod));
     const endOdo = Number(startOdo) + Number(distance);
-    const endFuel = startFuel + fuelFilledSum - consumption;
+    // WB-BATCH-FIX-003: Round all values to prevent floating-point errors
+    const startFuelRounded = Math.round(startFuel * 100) / 100;
+    const rawEndFuel = startFuelRounded + fuelFilledSum - consumption;
+    const endFuel = Math.round(rawEndFuel * 100) / 100;
+    console.log(`[WB-BATCH-FIX-003] start=${startFuel}→${startFuelRounded}, filled=${fuelFilledSum}, cons=${consumption}, raw=${rawEndFuel.toFixed(4)}, end=${endFuel}`);
+
+    // Store for return value
+    const usedDistance = distance;
+    const usedConsumption = consumption;
 
     // WB-FUEL-NEG-001: Warn if calculated fuel end is negative
     let notes = 'Пакетная генерация';
@@ -329,7 +338,8 @@ const createWaybillFromGroup = async (
     // Note: Backend already reserves blank when blankId is provided in waybill creation
     // No need to call useBlankForWaybill separately
 
-    return wb;
+    // WB-BATCH-FIX-001: Return the exact distance and consumption used for chain consistency
+    return { waybill: wb, usedDistance, usedConsumption };
 };
 
 export const saveBatchWaybills = async (
@@ -343,8 +353,44 @@ export const saveBatchWaybills = async (
     seasonSettings?: SeasonSettings
 ): Promise<void> => {
 
+    // WB-BATCH-CHAIN-001: Get starting values from last waybill for this vehicle
+    // This ensures proper chain continuity when running batch load multiple times
     let runningOdometer = Number(vehicle.mileage) || 0;
     let runningFuel = Number(vehicle.currentFuel) || 0;
+
+    try {
+        // Fetch latest waybill for this vehicle (any status - DRAFT, POSTED, etc.)
+        // This ensures chain continuity even if previous batch wasn't posted yet
+        const waybillsResponse = await getWaybills({
+            vehicleId: config.vehicleId,
+            limit: 100  // Get enough to find the latest by date
+        });
+
+        if (waybillsResponse.waybills.length > 0) {
+            // Sort by date descending, then by waybill number to get the most recent one
+            const sortedWaybills = waybillsResponse.waybills.sort((a, b) => {
+                const dateDiff = new Date(b.date).getTime() - new Date(a.date).getTime();
+                if (dateDiff !== 0) return dateDiff;
+                // If same date, compare by number (assumes number is sortable)
+                return String(b.number).localeCompare(String(a.number));
+            });
+            const lastWaybill = sortedWaybills[0];
+
+            // Use end values from last waybill
+            runningOdometer = Number(lastWaybill.odometerEnd) || runningOdometer;
+            // Check fuelLines first (new structure), then fallback to fuelAtEnd
+            const lastFuelEnd = Number((lastWaybill as any).fuelLines?.[0]?.fuelEnd ?? lastWaybill.fuelAtEnd);
+            runningFuel = !isNaN(lastFuelEnd) ? lastFuelEnd : runningFuel;
+
+            console.log(`[BatchWaybill] Chain continuity: Using values from last waybill #${lastWaybill.number} (status: ${lastWaybill.status})`);
+            console.log(`[BatchWaybill] Starting odometer: ${runningOdometer}, Starting fuel: ${runningFuel}`);
+        } else {
+            console.log(`[BatchWaybill] No waybills found for vehicle, using vehicle values`);
+            console.log(`[BatchWaybill] Starting odometer: ${runningOdometer}, Starting fuel: ${runningFuel}`);
+        }
+    } catch (err) {
+        console.warn(`[BatchWaybill] Failed to fetch last waybill, using vehicle values:`, err);
+    }
 
     // Get available blanks for this driver (uses Driver.id, status=ISSUED)
     const availableBlanks = await getAvailableBlanksForDriver(config.driverId);
@@ -448,7 +494,8 @@ export const saveBatchWaybills = async (
         if (startNewGroup && currentGroup.length > 0) {
             const groupFuelFilled = currentGroup.reduce((sum, it) => sum + (it.fuelFilled || 0), 0);
 
-            await createWaybillFromGroup(
+            // WB-BATCH-FIX-001: Get the exact distance/consumption used by createWaybillFromGroup
+            const { usedDistance, usedConsumption } = await createWaybillFromGroup(
                 currentGroup,
                 config,
                 vehicle,
@@ -461,11 +508,12 @@ export const saveBatchWaybills = async (
                 calendarEvents
             );
 
-            const groupDist = currentGroup.reduce((sum, it) => sum + (Number(it.totalDistance) || 0), 0);
-            const { consumption } = calculateGroupConsumption(currentGroup, vehicle, seasonSettings || null, mapLegacyMethod(config.calculationMethod));
-
-            runningOdometer += groupDist;
-            runningFuel = runningFuel + groupFuelFilled - consumption;
+            // WB-BATCH-FIX-001: Use SAME values for chain consistency (no more sum-of-rounded vs round-of-sum issue)
+            runningOdometer += usedDistance;
+            // WB-BATCH-FIX-002: Round runningFuel to prevent floating-point accumulation errors
+            const rawFuel = runningFuel + groupFuelFilled - usedConsumption;
+            runningFuel = Math.round(rawFuel * 100) / 100;
+            console.log(`[WB-BATCH-FIX-002] Fuel: ${rawFuel.toFixed(6)} → ${runningFuel} (rounded)`);
 
             if (availableBlanks[blankIndex]) blankIndex++;
             processedGroups++;
@@ -479,6 +527,7 @@ export const saveBatchWaybills = async (
     if (currentGroup.length > 0) {
         const groupFuelFilled = currentGroup.reduce((sum, it) => sum + (it.fuelFilled || 0), 0);
 
+        // WB-BATCH-FIX-001: Last group - we still call it for consistency, but don't need to track running values
         await createWaybillFromGroup(
             currentGroup,
             config,

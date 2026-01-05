@@ -986,7 +986,8 @@ export async function recalculateDraftChain(
 
     const updatedIds: string[] = [];
     let currentOdometerEnd = previousOdometerEnd;
-    let currentFuelEnd = previousFuelEnd;
+    // WB-ROUNDING-FIX: Ensure initial fuel is clean
+    let currentFuelEnd = Math.round(previousFuelEnd * 100) / 100;
 
     for (const draft of subsequentDrafts) {
         const oldOdometerStart = Number(draft.odometerStart || 0);
@@ -1018,7 +1019,9 @@ export async function recalculateDraftChain(
             }
 
             // Calculate consumption: distance * rate / 100 * modifiers
-            fuelConsumed = (draftDistance * baseRate / 100) * cityModifier;
+            const rawConsumed = (draftDistance * baseRate / 100) * cityModifier;
+            // WB-ROUNDING-FIX: Round consumption
+            fuelConsumed = Math.round(rawConsumed * 100) / 100;
         } else {
             // Fallback: use existing fuelConsumed or calculate from old values
             const existingConsumed = draft.fuelLines[0]?.fuelConsumed
@@ -1033,7 +1036,8 @@ export async function recalculateDraftChain(
             : 0;
 
         // Calculate fuelEnd
-        const newFuelEnd = newFuelStart + fuelReceived - fuelConsumed;
+        // WB-ROUNDING-FIX: Round result
+        const newFuelEnd = Math.round((newFuelStart + fuelReceived - fuelConsumed) * 100) / 100;
 
         // Check if update is needed
         if (oldOdometerStart !== newOdometerStart ||
@@ -1429,8 +1433,36 @@ export async function changeWaybillStatus(
             // Let's enforce Strict Odometer only for now as requested.
             // "waybill.odometerStart не устарел относительно последнего POSTED" -> Covered.
 
-            // Allow backdating if odometer is correct? (e.g. gaps). 
+            // Allow backdating if odometer is correct? (e.g. gaps).
             // If odometer is correct, let it pass.
+        }
+
+        // WB-CHAIN-INTEGRITY-001: Check for unposted waybills with earlier dates
+        // This prevents posting waybills out of order, which would create gaps in the chain
+        const unpostedEarlier = await prisma.waybill.findMany({
+            where: {
+                organizationId,
+                vehicleId: waybill.vehicleId,
+                status: { in: [WaybillStatus.DRAFT, WaybillStatus.SUBMITTED] },
+                id: { not: id },
+                date: { lt: waybill.date }  // Earlier date than current waybill
+            },
+            orderBy: { date: 'asc' },
+            select: { id: true, number: true, date: true, status: true }
+        });
+
+        if (unpostedEarlier.length > 0) {
+            const unpostedNumbers = unpostedEarlier.map(w => {
+                const dateStr = w.date instanceof Date
+                    ? w.date.toLocaleDateString('ru-RU')
+                    : new Date(w.date).toLocaleDateString('ru-RU');
+                return `№${w.number} (${dateStr})`;
+            }).join(', ');
+
+            throw new BadRequestError(
+                `Невозможно провести ПЛ. Сначала проведите или удалите более ранние ПЛ: ${unpostedNumbers}`,
+                'CHAIN_INTEGRITY_ERROR'
+            );
         }
 
         // Validation 3: Future Conflicts (if inserting in the middle)
