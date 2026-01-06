@@ -13,7 +13,7 @@ import { getEmployees } from '../../services/api/employeeApi';
 import { getOrganizations } from '../../services/organizationApi';
 import { getStockItems, StockItem } from '../../services/stockItemApi';
 import { WAYBILL_STATUS_COLORS, WAYBILL_STATUS_TRANSLATIONS } from '../../constants';
-import { PlusIcon, PencilIcon, TrashIcon, ArrowUpIcon, ArrowDownIcon, StatusCompletedIcon, CalendarDaysIcon, DocumentArrowUpIcon, ClipboardCheckIcon, FunnelIcon, CheckCircleIcon, PrintIcon } from '../Icons';
+import { PlusIcon, PencilIcon, TrashIcon, ArrowUpIcon, ArrowDownIcon, StatusCompletedIcon, CalendarDaysIcon, DocumentArrowUpIcon, ClipboardCheckIcon, FunnelIcon, CheckCircleIcon, PrintIcon, CalculatorIcon } from '../Icons';
 import { Button } from '../shared/Button';
 import { WaybillStatusBadge } from '../shared/StatusBadges';
 // FIX: Changed import to a named import to resolve module resolution error.
@@ -25,6 +25,7 @@ import { useToast } from '../../hooks/useToast';
 import SeasonSettingsModal from './SeasonSettingsModal';
 import BatchGeneratorModal from './BatchGeneratorModal';
 import WaybillCheckModal from './WaybillCheckModal';
+import { RecalculateModal } from './RecalculateModal';
 import { subscribe } from '../../services/bus';
 import { EmptyState, getEmptyStateFromError } from '../common/EmptyState';
 import { HttpError } from '../../services/httpClient';
@@ -79,6 +80,7 @@ const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpene
   const [isSeasonModalOpen, setIsSeasonModalOpen] = useState(false);
   const [isBatchModalOpen, setIsBatchModalOpen] = useState(false);
   const [isCheckModalOpen, setIsCheckModalOpen] = useState(false);
+  const [isRecalculateModalOpen, setIsRecalculateModalOpen] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
 
   // Print modal state
@@ -738,6 +740,15 @@ const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpene
           onOpenWaybill={(id) => { setIsCheckModalOpen(false); handleEdit({ id } as any); }}
         />
       )}
+      {isRecalculateModalOpen && (
+        <RecalculateModal
+          isOpen={isRecalculateModalOpen}
+          onClose={() => setIsRecalculateModalOpen(false)}
+          onSuccess={() => { setIsRecalculateModalOpen(false); fetchData(); }}
+          vehicles={vehicles}
+          onOpenWaybill={(id) => { setIsRecalculateModalOpen(false); handleEdit({ id } as any); }}
+        />
+      )}
       {isPrintModalOpen && printData && (
         <PrintableWaybill
           waybill={printData.waybill}
@@ -800,6 +811,9 @@ const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpene
             <div className="hidden xl:block w-px h-6 bg-gray-200 dark:bg-gray-700 mx-1"></div>
             <Button onClick={() => setIsSeasonModalOpen(true)} variant="ghost" size="sm" leftIcon={<CalendarDaysIcon className="h-4 w-4 text-gray-500" />}>
               Сезоны
+            </Button>
+            <Button onClick={() => setIsRecalculateModalOpen(true)} variant="ghost" size="sm" leftIcon={<CalculatorIcon className="h-4 w-4 text-gray-500" />}>
+              Пересчёт
             </Button>
             <Button onClick={() => setIsCheckModalOpen(true)} variant="ghost" size="sm" leftIcon={<ClipboardCheckIcon className="h-4 w-4 text-gray-500" />}>
               Проверка

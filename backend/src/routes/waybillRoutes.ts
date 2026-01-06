@@ -31,3 +31,5 @@ router.patch('/bulk-status', checkPermission('waybill.post'), waybillController.
 // WB-601: Status-specific permissions (waybill.submit, waybill.post, waybill.cancel)
 router.patch('/:id/status', checkWaybillStatusPermission(), validateDto(changeStatusSchema), waybillController.changeWaybillStatus);
 
+// WB-RECALC-001: Recalculate endpoint
+router.post('/recalculate', checkPermission('waybill.update'), waybillController.recalculateFuel);

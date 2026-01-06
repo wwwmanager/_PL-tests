@@ -140,4 +140,20 @@ export async function getWaybillPrefill(vehicleId: string, date?: string): Promi
     return await httpClient.get<WaybillPrefillData>(`/waybills/prefill/${vehicleId}?${params.toString()}`);
 }
 
+// WB-RECALC-001: Bulk recalculate fuel consumption
+export interface RecalculateParams {
+    dateFrom: string;
+    dateTo: string;
+    vehicleId?: string;
+}
+
+export interface RecalculateResult {
+    updated: number;
+    total: number;
+}
+
+export async function recalculateWaybills(params: RecalculateParams): Promise<RecalculateResult> {
+    return await httpClient.post<RecalculateResult>('/waybills/recalculate', params);
+}
+
 export { createWaybill as addWaybill };

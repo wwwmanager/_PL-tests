@@ -190,3 +190,25 @@ export async function changeWaybillStatus(req: Request, res: Response, next: Nex
         next(err);
     }
 }
+// WB-RECALC-001: Bulk recalculate endpoint
+export async function recalculateFuel(req: Request, res: Response, next: NextFunction) {
+    try {
+        const orgId = req.user!.organizationId;
+        const { dateFrom, dateTo, vehicleId } = req.body;
+
+        if (!dateFrom || !dateTo) {
+            throw new BadRequestError('Не указан период (dateFrom, dateTo)');
+        }
+
+        const result = await waybillService.bulkRecalculateFuel(
+            orgId,
+            new Date(dateFrom),
+            new Date(dateTo),
+            vehicleId
+        );
+
+        res.json(result);
+    } catch (err) {
+        next(err);
+    }
+}

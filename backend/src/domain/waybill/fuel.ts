@@ -15,47 +15,36 @@ import Decimal from 'decimal.js';
  */
 export type FuelCalculationMethod = 'BOILER' | 'MIXED' | 'SEGMENTS';
 
-/**
- * Route segment data for fuel calculation
- */
 export interface FuelSegment {
     distanceKm: number;
     isCityDriving?: boolean;
     isWarming?: boolean;
+    isMountainDriving?: boolean; // COEF-MOUNTAIN-001
 }
 
-/**
- * Fuel consumption rates from Vehicle
- */
 export interface FuelConsumptionRates {
     winterRate?: number;
     summerRate?: number;
     cityIncreasePercent?: number;
     warmingIncreasePercent?: number;
+    mountainIncreasePercent?: number; // COEF-MOUNTAIN-001
 }
 
-/**
- * Coefficients for fuel calculation
- * Values should be in decimal form (0.1 = 10%, 0.05 = 5%)
- */
 export interface FuelCoefficients {
-    /** Winter coefficient (e.g., 0.1 for 10% increase) */
     winter?: number;
-    /** City driving coefficient */
     city?: number;
-    /** Engine warming coefficient */
     warming?: number;
-    /** Other coefficients */
+    mountain?: number; // COEF-MOUNTAIN-001
     other?: number;
 }
 
-/**
- * Flags indicating driving conditions
- */
 export interface DrivingFlags {
     isCityDriving?: boolean;
     isWarming?: boolean;
+    isMountainDriving?: boolean; // COEF-MOUNTAIN-001
 }
+
+// ... unchanged ...
 
 /**
  * Calculate distance in kilometers from odometer readings
@@ -83,21 +72,6 @@ export function calculateDistanceKm(
     return distance >= 0 ? distance : null;
 }
 
-/**
- * Рассчитывает нормативный расход топлива на заданное расстояние.
- * 
- * Formula: (distanceKm / 100) * baseNormRate * (1 + totalCoefficients)
- * 
- * @param distanceKm - Distance in kilometers
- * @param baseNormRate - Base consumption rate (liters per 100km)
- * @param coefficients - Additional coefficients (winter, city, warming, etc.)
- * @returns Planned fuel consumption in liters (rounded to 2 decimal places)
- * 
- * @example
- * calculateNormConsumption(100, 10, {}) // 10
- * calculateNormConsumption(100, 10, { winter: 0.1 }) // 11 (10% winter increase)
- * calculateNormConsumption(100, 20, { winter: 0.1, city: 0.05 }) // 23 (15% total increase)
- */
 export function calculateNormConsumption(
     distanceKm: number,
     baseNormRate: number,
@@ -107,29 +81,17 @@ export function calculateNormConsumption(
         return 0;
     }
 
-    // Sum all coefficients
     const totalCoeff =
         (coefficients.winter || 0) +
         (coefficients.city || 0) +
         (coefficients.warming || 0) +
+        (coefficients.mountain || 0) + // COEF-MOUNTAIN-001
         (coefficients.other || 0);
 
-    // Calculate consumption: (km / 100) * baseRate * (1 + coeff)
     const totalConsumption = (distanceKm / 100) * baseNormRate * (1 + totalCoeff);
-
-    // Round to 2 decimal places (standard for fuel accounting)
     return Math.round(totalConsumption * 100) / 100;
 }
 
-/**
- * Calculate planned fuel consumption based on vehicle rates and driving conditions
- * 
- * @param distanceKm - Distance in kilometers
- * @param rates - Vehicle fuel consumption rates
- * @param flags - Driving condition flags
- * @param isWinter - Whether the date is in winter period
- * @returns Planned fuel consumption in liters
- */
 export function calculatePlannedFuel(
     distanceKm: number,
     rates: FuelConsumptionRates | null | undefined,
@@ -140,7 +102,6 @@ export function calculatePlannedFuel(
         return 0;
     }
 
-    // Select base rate based on season
     const baseRate = isWinter
         ? (rates.winterRate ?? rates.summerRate ?? 0)
         : (rates.summerRate ?? rates.winterRate ?? 0);
@@ -149,25 +110,24 @@ export function calculatePlannedFuel(
         return 0;
     }
 
-    // Build coefficients from flags and rates
     const coefficients: FuelCoefficients = {};
 
-    // City driving coefficient
     if (flags.isCityDriving && rates.cityIncreasePercent) {
         coefficients.city = rates.cityIncreasePercent / 100;
     }
 
-    // Warming coefficient
     if (flags.isWarming && rates.warmingIncreasePercent) {
         coefficients.warming = rates.warmingIncreasePercent / 100;
+    }
+
+    // COEF-MOUNTAIN-001
+    if (flags.isMountainDriving && rates.mountainIncreasePercent) {
+        coefficients.mountain = rates.mountainIncreasePercent / 100;
     }
 
     return calculateNormConsumption(distanceKm, baseRate, coefficients);
 }
 
-/**
- * Calculate planned fuel consumption based on chosen method
- */
 export function calculatePlannedFuelByMethod(params: {
     method: FuelCalculationMethod;
     baseRate: number;
@@ -182,7 +142,6 @@ export function calculatePlannedFuelByMethod(params: {
     switch (method) {
         case 'BOILER': {
             if (odometerDistanceKm == null || odometerDistanceKm <= 0) return 0;
-            // Boiler method ignores city/warming modifiers as per spec
             return calculateNormConsumption(odometerDistanceKm, baseRate, {});
         }
 
@@ -209,8 +168,12 @@ export function calculatePlannedFuelByMethod(params: {
                 if (seg.distanceKm <= 0) continue;
                 const coeff = getCoefficientsForSegment(seg, rates);
 
-                // Calculate exact (non-rounded) consumption for the segment
-                const totalCoeff = (coeff.winter || 0) + (coeff.city || 0) + (coeff.warming || 0);
+                const totalCoeff =
+                    (coeff.winter || 0) +
+                    (coeff.city || 0) +
+                    (coeff.warming || 0) +
+                    (coeff.mountain || 0); // COEF-MOUNTAIN-001
+
                 const segConsRaw = (seg.distanceKm / 100) * baseRate * (1 + totalCoeff);
 
                 totalConsExact += segConsRaw;
@@ -219,10 +182,7 @@ export function calculatePlannedFuelByMethod(params: {
 
             if (totalSegmentsKm <= 0) return 0;
 
-            // Average rate in L/100km
             const avgRate = totalConsExact / (totalSegmentsKm / 100);
-
-            // Apply average rate to odometer distance
             const finalPlanned = (odometerDistanceKm / 100) * avgRate;
             return Math.round(finalPlanned * 100) / 100;
         }
@@ -232,9 +192,6 @@ export function calculatePlannedFuelByMethod(params: {
     }
 }
 
-/**
- * Helper to get coefficients from segment flags and vehicle rates
- */
 function getCoefficientsForSegment(seg: FuelSegment, rates: FuelConsumptionRates): FuelCoefficients {
     const coeff: FuelCoefficients = {};
     if (seg.isCityDriving && rates.cityIncreasePercent) {
@@ -242,6 +199,10 @@ function getCoefficientsForSegment(seg: FuelSegment, rates: FuelConsumptionRates
     }
     if (seg.isWarming && rates.warmingIncreasePercent) {
         coeff.warming = rates.warmingIncreasePercent / 100;
+    }
+    // COEF-MOUNTAIN-001
+    if (seg.isMountainDriving && rates.mountainIncreasePercent) {
+        coeff.mountain = rates.mountainIncreasePercent / 100;
     }
     return coeff;
 }

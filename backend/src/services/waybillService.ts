@@ -1757,3 +1757,147 @@ export async function getWaybillPrefillData(
     };
 }
 
+// WB-RECALC-001: Bulk recalculate fuel consumption
+export async function bulkRecalculateFuel(
+    organizationId: string,
+    dateFrom: Date,
+    dateTo: Date,
+    vehicleId?: string
+): Promise<{ updated: number; total: number }> {
+    const where: Prisma.WaybillWhereInput = {
+        organizationId,
+        date: {
+            gte: dateFrom,
+            lte: dateTo
+        },
+        status: { not: WaybillStatus.CANCELLED }
+    };
+
+    if (vehicleId) {
+        where.vehicleId = vehicleId;
+    }
+
+    const waybills = await prisma.waybill.findMany({
+        where,
+        include: {
+            routes: true,
+            vehicle: true,
+            fuelLines: true
+        },
+        orderBy: [
+            { vehicleId: 'asc' },
+            { date: 'asc' },
+            { number: 'asc' }
+        ]
+    });
+
+    let updatedCount = 0;
+    const seasonSettings = await getSeasonSettings();
+
+    // Helper to track the fuel chain and odometer chain within the batch per vehicle
+    const lastFuelEndByVehicle: Record<string, number> = {};
+    const lastOdometerEndByVehicle: Record<string, number> = {};
+
+    for (const waybill of waybills) {
+        if (!waybill.vehicle || waybill.fuelLines.length === 0) continue;
+
+        // 1. Odometer Chaining Logic
+        // Determine current odometer values and distance
+        let odomStart = waybill.odometerStart ? Number(waybill.odometerStart) : 0;
+        let odomEnd = waybill.odometerEnd ? Number(waybill.odometerEnd) : 0;
+
+        // Calculate trip distance based on current readings (preserve this distance)
+        let tripDistance = odomEnd - odomStart;
+        if (tripDistance < 0) tripDistance = 0;
+
+        // If we have a previous odometer end for this vehicle in THIS batch, shift current start
+        if (lastOdometerEndByVehicle[waybill.vehicleId] !== undefined) {
+            odomStart = lastOdometerEndByVehicle[waybill.vehicleId];
+            // Shift end to preserve trip distance
+            odomEnd = odomStart + tripDistance;
+        }
+
+        // 2. Prepare segments
+        const segments: FuelSegment[] = waybill.routes.map(r => ({
+            distanceKm: r.distanceKm ? Number(r.distanceKm) : 0,
+            isCityDriving: r.isCityDriving || false,
+            isWarming: r.isWarming || false,
+            // @ts-ignore: field newly added to backend type
+            isMountainDriving: r.isMountainDriving || false
+        }));
+
+        // 3. Get rates
+        const rates = waybill.vehicle.fuelConsumptionRates as unknown as FuelConsumptionRates;
+        if (!rates) continue;
+
+        // 4. Calculate Planned Fuel
+        // Use the (potentially updated) tripDistance as odometerDistanceKm
+        const odometerDistance = tripDistance;
+
+        const method = (waybill.fuelCalculationMethod as FuelCalculationMethod) || 'BOILER';
+        const isWinter = isWinterDate(waybill.date, seasonSettings);
+        const baseRate = isWinter
+            ? (rates.winterRate || rates.summerRate || 0)
+            : (rates.summerRate || rates.winterRate || 0);
+
+        const planned = calculatePlannedFuelByMethod({
+            method,
+            baseRate,
+            odometerDistanceKm: odometerDistance,
+            segments,
+            rates
+        });
+
+        // 5. Fuel Chaining Logic
+        const fuelLine = waybill.fuelLines[0];
+        let fuelStart = fuelLine.fuelStart ? Number(fuelLine.fuelStart) : 0;
+
+        // If we processed previous waybill, use its fuel end
+        if (lastFuelEndByVehicle[waybill.vehicleId] !== undefined) {
+            fuelStart = lastFuelEndByVehicle[waybill.vehicleId];
+        }
+
+        const fuelReceived = fuelLine.fuelReceived ? Number(fuelLine.fuelReceived) : 0;
+
+        // CHECK-OVERFLOW: Throw error if capacity exceeded
+        const availableFuel = fuelStart + fuelReceived;
+        const tankCapacity = waybill.vehicle.fuelTankCapacity ? Number(waybill.vehicle.fuelTankCapacity) : 0;
+
+        if (tankCapacity > 0 && availableFuel > tankCapacity) {
+            throw new BadRequestError(`Переполнение бака в ПЛ №${waybill.number} от ${waybill.date.toLocaleDateString('ru-RU')}. Емкость: ${tankCapacity}, Факт: ${availableFuel.toFixed(2)}. Исправьте данные. [ID:${waybill.id}]`);
+        }
+
+        const newFuelEnd = availableFuel - planned;
+
+
+
+        // 6. Update Database
+        // Update Waybill (odometers) AND FuelLine (fuel)
+        await prisma.$transaction([
+            prisma.waybill.update({
+                where: { id: waybill.id },
+                data: {
+                    odometerStart: odomStart,
+                    odometerEnd: odomEnd
+                }
+            }),
+            prisma.waybillFuel.update({
+                where: { id: fuelLine.id },
+                data: {
+                    fuelStart: Math.round(fuelStart * 100) / 100,
+                    fuelPlanned: planned,
+                    fuelConsumed: planned, // Reset fact to plan
+                    fuelEnd: Math.round(newFuelEnd * 100) / 100
+                }
+            })
+        ]);
+
+        // Update tracking for next iteration
+        lastFuelEndByVehicle[waybill.vehicleId] = newFuelEnd;
+        lastOdometerEndByVehicle[waybill.vehicleId] = odomEnd;
+
+        updatedCount++;
+    }
+
+    return { updated: updatedCount, total: waybills.length };
+}
