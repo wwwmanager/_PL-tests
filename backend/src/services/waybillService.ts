@@ -61,6 +61,7 @@ export interface CreateWaybillInput {
         distanceKm?: number;
         isCityDriving?: boolean;
         isWarming?: boolean;
+        isMountainDriving?: boolean;  // COEF-MOUNTAIN-001
         comment?: string;
         date?: string;  // WB-ROUTE-DATE: Route-specific date for multi-day waybills
     }>;
@@ -561,6 +562,7 @@ export async function createWaybill(userInfo: UserInfo, input: CreateWaybillInpu
                     distanceKm: r.distanceKm || 0,
                     isCityDriving: r.isCityDriving || false,
                     isWarming: r.isWarming || false,
+                    isMountainDriving: r.isMountainDriving || false,  // COEF-MOUNTAIN-001
                     comment: r.comment || null,
                     date: r.date ? new Date(r.date) : null,  // WB-ROUTE-DATE: Support multi-day routes
                 }))
@@ -829,6 +831,7 @@ export async function updateWaybill(userInfo: UserInfo, id: string, data: Partia
                         distanceKm: r.distanceKm || 0,
                         isCityDriving: r.isCityDriving || false,
                         isWarming: r.isWarming || false,
+                        isMountainDriving: r.isMountainDriving || false,  // COEF-MOUNTAIN-001
                         comment: r.comment || null,
                         date: r.date ? new Date(r.date) : null,  // WB-ROUTE-DATE: Support multi-day routes
                     }))

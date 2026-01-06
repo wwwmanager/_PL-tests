@@ -448,6 +448,7 @@ model Vehicle {
   
   useCityModifier    Boolean  @default(false)
   useWarmingModifier Boolean  @default(false)
+  useMountainModifier Boolean @default(false)  // COEF-MOUNTAIN-001: Горная местность
   
   osagoSeries        String?  @db.Text
   osagoNumber        String?  @db.Text
@@ -970,6 +971,7 @@ model WaybillRoute {
   comment     String?  @db.Text
   isCityDriving Boolean?
   isWarming     Boolean?
+  isMountainDriving Boolean?  // COEF-MOUNTAIN-001: Горная местность
   date        DateTime? @db.Date  // Added: route-specific date for multi-day waybills
 
   waybill Waybill @relation(fields: [waybillId], references: [id], onDelete: Cascade)

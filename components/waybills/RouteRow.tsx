@@ -138,30 +138,40 @@ const RouteRowComponent: React.FC<RouteRowProps> = ({
                 />
             </FormField>
             <div className="flex items-center gap-4 pb-2">
-                {selectedVehicle?.useCityModifier && (
-                    <label className="flex items-center gap-1 text-sm">
-                        <input
-                            type="checkbox"
-                            checked={route.isCityDriving}
-                            onChange={(e) =>
-                                onChange(route.id, 'isCityDriving', e.target.checked)
-                            }
-                        />{' '}
-                        Город
-                    </label>
-                )}
-                {selectedVehicle?.useWarmingModifier && (
-                    <label className="flex items-center gap-1 text-sm">
-                        <input
-                            type="checkbox"
-                            checked={route.isWarming}
-                            onChange={(e) =>
-                                onChange(route.id, 'isWarming', e.target.checked)
-                            }
-                        />{' '}
-                        Прогрев
-                    </label>
-                )}
+                <label className={`flex items-center gap-1 text-sm ${!selectedVehicle?.useCityModifier ? 'opacity-50 cursor-not-allowed' : ''}`} title={!selectedVehicle?.useCityModifier ? 'Включите "Городской цикл" в настройках ТС' : ''}>
+                    <input
+                        type="checkbox"
+                        checked={route.isCityDriving}
+                        disabled={!selectedVehicle?.useCityModifier}
+                        onChange={(e) =>
+                            onChange(route.id, 'isCityDriving', e.target.checked)
+                        }
+                    />{' '}
+                    Город
+                </label>
+                <label className={`flex items-center gap-1 text-sm ${!selectedVehicle?.useWarmingModifier ? 'opacity-50 cursor-not-allowed' : ''}`} title={!selectedVehicle?.useWarmingModifier ? 'Включите "Прогрев" в настройках ТС' : ''}>
+                    <input
+                        type="checkbox"
+                        checked={route.isWarming}
+                        disabled={!selectedVehicle?.useWarmingModifier}
+                        onChange={(e) =>
+                            onChange(route.id, 'isWarming', e.target.checked)
+                        }
+                    />{' '}
+                    Прогрев
+                </label>
+                {/* COEF-MOUNTAIN-001: Горная местность */}
+                <label className={`flex items-center gap-1 text-sm ${!selectedVehicle?.useMountainModifier ? 'opacity-50 cursor-not-allowed' : ''}`} title={!selectedVehicle?.useMountainModifier ? 'Включите "Горная местность" в настройках ТС' : ''}>
+                    <input
+                        type="checkbox"
+                        checked={route.isMountainDriving}
+                        disabled={!selectedVehicle?.useMountainModifier}
+                        onChange={(e) =>
+                            onChange(route.id, 'isMountainDriving', e.target.checked)
+                        }
+                    />{' '}
+                    Горы
+                </label>
             </div>
             <button
                 onClick={() => onRemove(route.id)}

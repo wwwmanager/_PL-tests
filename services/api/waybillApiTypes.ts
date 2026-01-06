@@ -53,6 +53,7 @@ export interface BackendWaybillDto {
         distanceKm: number | null;
         isCityDriving: boolean | null;
         isWarming: boolean | null;
+        isMountainDriving: boolean | null;  // COEF-MOUNTAIN-001
         comment: string | null;
         date?: string | null; // WB-REPORT-001: Added for medical exam calculation
     }>;

@@ -26,6 +26,7 @@ export interface FuelRates {
     winterRate: number;
     cityIncreasePercent?: number;
     warmingIncreasePercent?: number;
+    mountainIncreasePercent?: number;  // COEF-MOUNTAIN-001
 }
 
 export interface FuelCalculationInput {
@@ -146,6 +147,11 @@ export const calculateSegments = (input: FuelCalculationInput): FuelCalculationR
             effectiveRate *= (1 + (rates.warmingIncreasePercent || 0) / 100);
         }
 
+        // COEF-MOUNTAIN-001: Горная местность
+        if (route.isMountainDriving && (rates.mountainIncreasePercent || 0) > 0) {
+            effectiveRate *= (1 + (rates.mountainIncreasePercent || 0) / 100);
+        }
+
         // Расход отрезка
         totalConsumption += (distanceKm / 100) * effectiveRate;
     }
@@ -196,6 +202,11 @@ export const calculateMixed = (input: FuelCalculationInput): FuelCalculationResu
 
         if (route.isWarming && (rates.warmingIncreasePercent || 0) > 0) {
             effectiveRate *= (1 + (rates.warmingIncreasePercent || 0) / 100);
+        }
+
+        // COEF-MOUNTAIN-001: Горная местность
+        if (route.isMountainDriving && (rates.mountainIncreasePercent || 0) > 0) {
+            effectiveRate *= (1 + (rates.mountainIncreasePercent || 0) / 100);
         }
 
         totalConsRaw += (distanceKm / 100) * effectiveRate;
@@ -387,6 +398,10 @@ export function calculatePlannedFuelByMethod(params: FuelCalculationParams): {
             if (route.isWarming && (rates.warmingIncreasePercent || 0) > 0) {
                 coeffTotal += (rates.warmingIncreasePercent || 0) / 100;
             }
+            // COEF-MOUNTAIN-001: Горная местность
+            if (route.isMountainDriving && (rates.mountainIncreasePercent || 0) > 0) {
+                coeffTotal += (rates.mountainIncreasePercent || 0) / 100;
+            }
 
             const segmentConsumption = (dist / 100) * baseRate * (1 + coeffTotal);
             totalPlanned += segmentConsumption;
@@ -421,6 +436,10 @@ export function calculatePlannedFuelByMethod(params: FuelCalculationParams): {
             }
             if (route.isWarming && (rates.warmingIncreasePercent || 0) > 0) {
                 coeffTotal += (rates.warmingIncreasePercent || 0) / 100;
+            }
+            // COEF-MOUNTAIN-001: Горная местность
+            if (route.isMountainDriving && (rates.mountainIncreasePercent || 0) > 0) {
+                coeffTotal += (rates.mountainIncreasePercent || 0) / 100;
             }
 
             totalConsRaw += (dist / 100) * baseRate * (1 + coeffTotal);

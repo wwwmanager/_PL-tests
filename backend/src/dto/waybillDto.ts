@@ -32,6 +32,11 @@ export const routeSchema = z.object({
     actualTime: z.string().optional().nullable(),
     comment: z.string().optional().nullable(),
     date: z.string().optional().nullable(), // WB-ROUTE-DATE: Route-specific date
+    // WB-FIX-ROUTES-FLAGS: City driving and warming flags for fuel calculation
+    isCityDriving: z.boolean().optional().default(false),
+    isWarming: z.boolean().optional().default(false),
+    // COEF-MOUNTAIN-001: Mountain terrain modifier
+    isMountainDriving: z.boolean().optional().default(false),
 });
 
 /**
@@ -108,6 +113,9 @@ export const createWaybillSchema = z.object({
     dispatcherId: z.string().uuid().optional().nullable(),
     controllerId: z.string().uuid().optional().nullable(),
 
+    // WB-FIX-FUEL-METHOD: Fuel calculation method
+    fuelCalculationMethod: z.enum(['BOILER', 'SEGMENTS', 'MIXED']).optional().default('BOILER'),
+
     // Legacy fuel fields (will be mapped to fuelLines if present)
 }).merge(legacyFuelFieldsSchema);
 
@@ -155,6 +163,9 @@ export const updateWaybillSchema = z.object({
     // Legacy aliases
     dispatcherId: z.string().uuid().optional().nullable(),
     controllerId: z.string().uuid().optional().nullable(),
+
+    // WB-FIX-FUEL-METHOD: Fuel calculation method
+    fuelCalculationMethod: z.enum(['BOILER', 'SEGMENTS', 'MIXED']).optional(),
 
     // Legacy fuel fields
 }).merge(legacyFuelFieldsSchema);

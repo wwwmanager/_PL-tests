@@ -123,6 +123,7 @@ export interface Route {
   distanceKm: number;
   isCityDriving?: boolean;
   isWarming?: boolean;
+  isMountainDriving?: boolean;  // COEF-MOUNTAIN-001: Горная местность
   date?: string;
   notes?: string;
 }
@@ -215,6 +216,7 @@ export interface FuelConsumptionRates {
   winterRate: number;
   cityIncreasePercent?: number;
   warmingIncreasePercent?: number;
+  mountainIncreasePercent?: number;  // COEF-MOUNTAIN-001: Горная местность
 }
 
 export enum VehicleStatus {
@@ -265,6 +267,7 @@ export interface Vehicle {
   maintenanceHistory?: MaintenanceRecord[];
   useCityModifier?: boolean;
   useWarmingModifier?: boolean;
+  useMountainModifier?: boolean;  // COEF-MOUNTAIN-001: Горная местность
   fuelTankCapacity?: number;
   disableFuelCapacityCheck?: boolean;
   osagoSeries?: string;

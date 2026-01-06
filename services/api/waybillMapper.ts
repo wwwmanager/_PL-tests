@@ -109,6 +109,7 @@ export function mapBackendWaybillToFront(dto: BackendWaybillDto): FrontWaybill {
                 distanceKm: Number(r.distanceKm) || 0,
                 isCityDriving: !!r.isCityDriving,
                 isWarming: !!r.isWarming,
+                isMountainDriving: !!r.isMountainDriving,  // COEF-MOUNTAIN-001
                 comment: r.comment ?? undefined,
                 date: routeDate, // WB-ROUTE-DATE-FIX: Now in YYYY-MM-DD format
             };
@@ -262,6 +263,7 @@ export function mapFrontWaybillToBackendUpdate(waybill: FrontWaybill) {
             distanceKm: r.distanceKm,
             isCityDriving: !!r.isCityDriving,
             isWarming: !!r.isWarming,
+            isMountainDriving: !!r.isMountainDriving,  // COEF-MOUNTAIN-001
             comment: r.notes ?? r.comment ?? null,
             date: r.date || null, // WB-ROUTE-DATE-FIX: Pass valid date string, use null instead of undefined
         })),

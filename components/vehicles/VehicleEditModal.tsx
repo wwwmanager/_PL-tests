@@ -24,6 +24,8 @@ const fuelConsumptionRatesSchema = z.object({
     winterRate: z.number().positive('Норма должна быть > 0').optional().nullable(),
     cityIncreasePercent: z.number().min(0, "Надбавка не может быть отрицательной").optional().nullable(),
     warmingIncreasePercent: z.number().min(0, "Надбавка не может быть отрицательной").optional().nullable(),
+    // COEF-MOUNTAIN-001: Горная местность
+    mountainIncreasePercent: z.number().min(0, "Надбавка не может быть отрицательной").optional().nullable(),
 });
 
 const maintenanceRecordSchema = z.object({
@@ -70,6 +72,8 @@ const vehicleSchema = z.object({
     maintenanceHistory: z.array(maintenanceRecordSchema).optional().nullable(),
     useCityModifier: z.boolean().optional(),
     useWarmingModifier: z.boolean().optional(),
+    // COEF-MOUNTAIN-001: Горная местность
+    useMountainModifier: z.boolean().optional(),
     fuelTankCapacity: z.number().min(0).optional().nullable(),
     disableFuelCapacityCheck: z.boolean().optional(),
     osagoSeries: z.string().optional().nullable(),
@@ -144,7 +148,7 @@ export const VehicleEditModal: React.FC<VehicleEditModalProps> = ({
                     fuelStockItemId: '',
                     vehicleModelId: '',
                     fuelTypeId: undefined,
-                    fuelConsumptionRates: { summerRate: null, winterRate: null, cityIncreasePercent: null, warmingIncreasePercent: null },
+                    fuelConsumptionRates: { summerRate: null, winterRate: null, cityIncreasePercent: null, warmingIncreasePercent: null, mountainIncreasePercent: null },
                     assignedDriverId: null,
                     organizationId: '',
                     currentFuel: 0,
@@ -162,6 +166,7 @@ export const VehicleEditModal: React.FC<VehicleEditModalProps> = ({
                     maintenanceHistory: [],
                     useCityModifier: false,
                     useWarmingModifier: false,
+                    useMountainModifier: false,  // COEF-MOUNTAIN-001
                     fuelTankCapacity: null,
                     disableFuelCapacityCheck: false,
                     osagoSeries: '',
@@ -342,6 +347,21 @@ export const VehicleEditModal: React.FC<VehicleEditModalProps> = ({
                                             step="0.1"
                                             {...register("fuelConsumptionRates.warmingIncreasePercent", { setValueAs: v => v === "" ? null : parseFloat(v) })}
                                             disabled={!watch("useWarmingModifier")}
+                                        />
+                                    </FormField>
+                                </div>
+                                {/* COEF-MOUNTAIN-001: Горная местность */}
+                                <div className="p-4 border rounded-lg dark:border-gray-600">
+                                    <label className="flex items-center gap-2 mb-2">
+                                        <FormCheckbox {...register("useMountainModifier")} />
+                                        <span className="font-medium text-gray-700 dark:text-gray-200">Горная местность</span>
+                                    </label>
+                                    <FormField label="Надбавка, %" error={(errors.fuelConsumptionRates as any)?.mountainIncreasePercent?.message}>
+                                        <FormInput
+                                            type="number"
+                                            step="0.1"
+                                            {...register("fuelConsumptionRates.mountainIncreasePercent", { setValueAs: v => v === "" ? null : parseFloat(v) })}
+                                            disabled={!watch("useMountainModifier")}
                                         />
                                     </FormField>
                                 </div>

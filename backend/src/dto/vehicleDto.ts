@@ -33,6 +33,8 @@ export const vehicleSchema = z.object({
             winterEndMonth: z.coerce.number().optional().nullable(),
             cityIncreasePercent: z.coerce.number().optional().default(0),
             warmingIncreasePercent: z.coerce.number().optional().default(0),
+            // COEF-MOUNTAIN-001: Mountain terrain modifier
+            mountainIncreasePercent: z.coerce.number().optional().default(0),
         }).passthrough().nullable().optional()
     ),
 
@@ -49,6 +51,8 @@ export const vehicleSchema = z.object({
     isActive: z.boolean().optional(),
     useCityModifier: z.boolean().optional(),
     useWarmingModifier: z.boolean().optional(),
+    // COEF-MOUNTAIN-001: Mountain terrain modifier
+    useMountainModifier: z.boolean().optional(),
     disableFuelCapacityCheck: z.boolean().optional(),
 }).passthrough(); // Allow extra fields without error
 

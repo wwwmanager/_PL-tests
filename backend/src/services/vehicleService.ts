@@ -40,7 +40,7 @@ function validateFuelConsumptionRates(rates: any): void {
         throw new BadRequestError('fuelConsumptionRates должен быть объектом');
     }
 
-    const allowedKeys = ['winterRate', 'summerRate', 'cityIncreasePercent', 'warmingIncreasePercent'];
+    const allowedKeys = ['winterRate', 'summerRate', 'cityIncreasePercent', 'warmingIncreasePercent', 'mountainIncreasePercent'];  // COEF-MOUNTAIN-001
 
     for (const key of Object.keys(rates)) {
         if (!allowedKeys.includes(key)) {
@@ -248,6 +248,7 @@ export async function createVehicle(organizationId: string, data: any) {
 
                     useCityModifier: !!data.useCityModifier,
                     useWarmingModifier: !!data.useWarmingModifier,
+                    useMountainModifier: !!data.useMountainModifier,  // COEF-MOUNTAIN-001
 
                     osagoSeries: data.osagoSeries || null,
                     osagoNumber: data.osagoNumber || null,
@@ -345,6 +346,7 @@ export async function updateVehicle(organizationId: string, id: string, data: an
 
                 useCityModifier: data.useCityModifier !== undefined ? !!data.useCityModifier : undefined,
                 useWarmingModifier: data.useWarmingModifier !== undefined ? !!data.useWarmingModifier : undefined,
+                useMountainModifier: data.useMountainModifier !== undefined ? !!data.useMountainModifier : undefined,  // COEF-MOUNTAIN-001
 
                 osagoSeries: data.osagoSeries,
                 osagoNumber: data.osagoNumber,
