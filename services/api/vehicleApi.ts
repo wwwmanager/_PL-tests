@@ -87,6 +87,7 @@ function sanitizeVehiclePayload(data: Record<string, unknown>): Record<string, u
 
         useCityModifier: data.useCityModifier ?? false,
         useWarmingModifier: data.useWarmingModifier ?? false,
+        useMountainModifier: data.useMountainModifier ?? false,  // COEF-MOUNTAIN-001
         disableFuelCapacityCheck: data.disableFuelCapacityCheck ?? false,
 
         // ОТПРАВЛЯЕМ ГАРАНТИРОВАННО СИНХРОНИЗИРОВАННУЮ ПАРУ
