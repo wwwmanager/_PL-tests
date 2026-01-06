@@ -1,6 +1,6 @@
 import { PrismaClient, Prisma, WaybillStatus, BlankStatus } from '@prisma/client';
 import { BadRequestError, NotFoundError } from '../utils/errors';
-import { validateOdometer, calculateDistanceKm, calculatePlannedFuelByMethod, FuelConsumptionRates, FuelCalculationMethod, FuelSegment } from '../domain/waybill/fuel';
+import { validateOdometer, calculateDistanceKm, calculatePlannedFuelByMethod, getBaseRateForDate, FuelConsumptionRates, FuelCalculationMethod, FuelSegment, SeasonSettings as FuelSeasonSettings } from '../domain/waybill/fuel';
 import { isWinterDate } from '../utils/dateUtils';
 import { getSeasonSettings, getAppSettings } from './settingsService';
 import { reserveNextBlankForDriver, reserveSpecificBlank, releaseBlank, spoilBlank } from './blankService';
@@ -425,11 +425,9 @@ export async function createWaybill(userInfo: UserInfo, input: CreateWaybillInpu
 
     if (vehicle.fuelConsumptionRates) {
         const seasonSettings = await getSeasonSettings();
-        const isWinter = isWinterDate(input.date, seasonSettings);
         const rates = vehicle.fuelConsumptionRates as FuelConsumptionRates;
-        const baseRate = isWinter
-            ? (rates.winterRate ?? rates.summerRate ?? 0)
-            : (rates.summerRate ?? rates.winterRate ?? 0);
+        // SSOT-SYNC: Использую getBaseRateForDate вместо inline вычисления (синхронизировано с FE)
+        const baseRate = getBaseRateForDate(input.date, rates, seasonSettings as unknown as FuelSeasonSettings);
 
         const calculationSegments: FuelSegment[] = (input.routes || []).map(r => ({
             distanceKm: r.distanceKm || 0,
@@ -736,11 +734,9 @@ export async function updateWaybill(userInfo: UserInfo, id: string, data: Partia
 
     if (vehicle?.fuelConsumptionRates) {
         const seasonSettings = await getSeasonSettings();
-        const isWinter = isWinterDate(waybillDate, seasonSettings);
         const rates = vehicle.fuelConsumptionRates as FuelConsumptionRates;
-        const baseRate = isWinter
-            ? (rates.winterRate ?? rates.summerRate ?? 0)
-            : (rates.summerRate ?? rates.winterRate ?? 0);
+        // SSOT-SYNC: Использую getBaseRateForDate вместо inline вычисления (синхронизировано с FE)
+        const baseRate = getBaseRateForDate(waybillDate, rates, seasonSettings as unknown as FuelSeasonSettings);
 
         let calculationSegments: FuelSegment[] = [];
         if (data.routes) {
@@ -1835,10 +1831,9 @@ export async function bulkRecalculateFuel(
         const odometerDistance = tripDistance;
 
         const method = (waybill.fuelCalculationMethod as FuelCalculationMethod) || 'BOILER';
-        const isWinter = isWinterDate(waybill.date, seasonSettings);
-        const baseRate = isWinter
-            ? (rates.winterRate || rates.summerRate || 0)
-            : (rates.summerRate || rates.winterRate || 0);
+        // SSOT-SYNC: Использую getBaseRateForDate вместо inline вычисления (синхронизировано с FE)
+        const dateStr = waybill.date instanceof Date ? waybill.date.toISOString().split('T')[0] : String(waybill.date);
+        const baseRate = getBaseRateForDate(dateStr, rates, seasonSettings as unknown as FuelSeasonSettings);
 
         const planned = calculatePlannedFuelByMethod({
             method,

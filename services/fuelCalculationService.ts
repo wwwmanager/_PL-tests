@@ -53,12 +53,13 @@ export interface FuelCalculationResult {
 
 /**
  * Определяет базовую норму расхода (зима/лето)
+ * Экспортируется для использования в UI компонентах
  */
-const getBaseRate = (date: string, rates: FuelRates, seasonSettings: SeasonSettings | null): number => {
+export const getBaseRateForDate = (date: string, rates: FuelRates, seasonSettings: SeasonSettings | null): number => {
     const isWinter = isWinterDate(date, seasonSettings);
     return isWinter
-        ? (rates.winterRate || rates.summerRate || 10)
-        : (rates.summerRate || rates.winterRate || 10);
+        ? (rates.winterRate || rates.summerRate || 0)
+        : (rates.summerRate || rates.winterRate || 0);
 };
 
 /**
@@ -93,7 +94,7 @@ export const calculateBoiler = (input: FuelCalculationInput): FuelCalculationRes
     const distance = Math.round(rawDistance);
 
     // 3. Получить базовую норму (зима/лето)
-    const baseRate = getBaseRate(baseDate, rates, seasonSettings);
+    const baseRate = getBaseRateForDate(baseDate, rates, seasonSettings);
 
     // 4. Расчёт: (км / 100) * норма
     const rawConsumption = (distance / 100) * baseRate;
@@ -134,7 +135,7 @@ export const calculateSegments = (input: FuelCalculationInput): FuelCalculationR
         const routeDate = (dayMode === 'multi' && route.date) ? route.date : baseDate;
 
         // Базовая норма для этого отрезка
-        const baseRate = getBaseRate(routeDate, rates, seasonSettings);
+        const baseRate = getBaseRateForDate(routeDate, rates, seasonSettings);
 
         // Эффективная норма с модификаторами
         // Аддитивная модель коэффициентов (как на бэкенде)
@@ -195,7 +196,7 @@ export const calculateMixed = (input: FuelCalculationInput): FuelCalculationResu
         if (distanceKm === 0) continue;
 
         const routeDate = (dayMode === 'multi' && route.date) ? route.date : baseDate;
-        const baseRate = getBaseRate(routeDate, rates, seasonSettings);
+        const baseRate = getBaseRateForDate(routeDate, rates, seasonSettings);
 
         // Аддитивная модель коэффициентов
         let totalCoeff = 0;

@@ -162,6 +162,9 @@ const calculateGroupConsumption = (group: BatchPreviewItem[], vehicle: Vehicle, 
                 fromPoint: seg.from || '',
                 toPoint: seg.to || '',
                 distanceKm: seg.distanceKm || 0,
+                // BATCH-MODIFIER-DECISION: Модификаторы город/прогрев/горы НЕ применяются при batch-загрузке.
+                // Причина: HTML-отчёты не содержат информацию о типе маршрута.
+                // Если нужно учитывать — требуется добавить UI для ручного указания или брать из настроек ТС.
                 isCityDriving: false,
                 isWarming: false,
                 date: item.dateStr,

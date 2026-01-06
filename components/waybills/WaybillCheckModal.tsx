@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { getVehicles } from '../../services/vehicleApiFacade';
 import { getWaybills } from '../../services/waybillApi';
 import { getSeasonSettings } from '../../services/settingsApi';
-import { calculatePlannedFuelByMethod, calculateOdometerEnd, FuelCalculationMethod, mapLegacyMethod } from '../../services/fuelCalculationService';
+import { calculatePlannedFuelByMethod, calculateOdometerEnd, FuelCalculationMethod, FuelRates, mapLegacyMethod } from '../../services/fuelCalculationService';
 import { Vehicle, Waybill } from '../../types';
 import { XIcon, CheckCircleIcon, ExclamationCircleIcon, FunnelIcon } from '../Icons';
 
@@ -119,7 +119,11 @@ const WaybillCheckModal: React.FC<WaybillCheckModalProps> = ({ isOpen, onClose, 
         const errors: string[] = [];
 
         // Get consumption rates from vehicle
-        const rates = vehicle.fuelConsumptionRates as any || { summerRate: 10, winterRate: 12 };
+        // SSOT-FIX: Убран fallback {summerRate:10,winterRate:12} — если rates нет, добавляем ошибку
+        const rates = vehicle.fuelConsumptionRates as FuelRates | null;
+        if (!rates || (!rates.summerRate && !rates.winterRate)) {
+          errors.push('У ТС не настроены нормы расхода топлива (summerRate/winterRate). Настройте в карточке ТС.');
+        }
 
         // Calculate odometer values
         const odometerStart = Number(currentWaybill.odometerStart) || 0;
@@ -155,7 +159,7 @@ const WaybillCheckModal: React.FC<WaybillCheckModalProps> = ({ isOpen, onClose, 
         });
 
         const { totalDistance, plannedFuel: consumption, baseRateUsed } = calcResult;
-        const baseRate = baseRateUsed || rates.summerRate || 10;  // Use actual used rate or fallback
+        const baseRate = baseRateUsed || rates?.summerRate || 0;  // Use actual used rate, fallback to 0 if no rates
 
         // --- BLOCK 1: Internal Document Consistency ---
 

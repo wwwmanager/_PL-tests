@@ -44,6 +44,55 @@ export interface DrivingFlags {
     isMountainDriving?: boolean; // COEF-MOUNTAIN-001
 }
 
+/**
+ * SeasonSettings - синхронизировано с frontend types.ts
+ */
+export interface SeasonSettings {
+    winterStartMonth: number;  // 1-12
+    winterStartDay: number;    // 1-31
+    winterEndMonth: number;    // 1-12
+    winterEndDay: number;      // 1-31
+}
+
+/**
+ * Определяет, является ли дата зимней согласно настройкам сезона
+ * Синхронизировано с frontend services/dateUtils.ts
+ */
+export function isWinterDate(dateStr: string, settings: SeasonSettings | null | undefined): boolean {
+    if (!settings) return false;
+
+    const date = new Date(dateStr);
+    const month = date.getMonth() + 1;  // 1-12
+    const day = date.getDate();         // 1-31
+
+    const { winterStartMonth, winterStartDay, winterEndMonth, winterEndDay } = settings;
+
+    // Зима охватывает новый год (например, ноябрь - март)
+    if (winterStartMonth > winterEndMonth) {
+        return (month > winterStartMonth || (month === winterStartMonth && day >= winterStartDay)) ||
+            (month < winterEndMonth || (month === winterEndMonth && day <= winterEndDay));
+    }
+
+    // Зима в пределах одного года (редкий случай)
+    return (month > winterStartMonth || (month === winterStartMonth && day >= winterStartDay)) &&
+        (month < winterEndMonth || (month === winterEndMonth && day <= winterEndDay));
+}
+
+/**
+ * Определяет базовую норму расхода (зима/лето)
+ * Синхронизировано с frontend services/fuelCalculationService.ts → getBaseRateForDate
+ */
+export function getBaseRateForDate(
+    date: string,
+    rates: FuelConsumptionRates,
+    seasonSettings: SeasonSettings | null | undefined
+): number {
+    const isWinter = isWinterDate(date, seasonSettings);
+    return isWinter
+        ? (rates.winterRate ?? rates.summerRate ?? 0)
+        : (rates.summerRate ?? rates.winterRate ?? 0);
+}
+
 // ... unchanged ...
 
 /**
