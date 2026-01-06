@@ -40,7 +40,7 @@ import { createPortal } from 'react-dom';
 import { Column } from '../shared/DataTable';
 
 
-type EnrichedWaybill = Waybill & { mileage?: number; rowNumber?: number; };
+type EnrichedWaybill = Waybill & { mileage?: number; rowNumber?: number; tankCapacity?: number; };
 
 interface WaybillListProps {
   waybillToOpen: string | null;
@@ -107,9 +107,21 @@ const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpene
         { key: 'odometerStart', label: 'Одом. нач.', sortable: true, align: 'center' as const },
         { key: 'odometerEnd', label: 'Одом. кон.', sortable: true, align: 'center' as const, render: (w) => w.odometerEnd ?? '—' },
         { key: 'mileage', label: 'Пробег', sortable: true, align: 'center' as const },
-        { key: 'fuelAtStart', label: 'Топл. нач.', sortable: true, align: 'right' as const, render: (w) => <span className={Number(w.fuelAtStart) < 0 ? 'text-red-600' : ''}>{w.fuelAtStart ?? '—'}</span> },
+        {
+          key: 'fuelAtStart', label: 'Топл. нач.', sortable: true, align: 'right' as const, render: (w) => {
+            const val = Number(w.fuelAtStart);
+            const isError = val < 0 || (w.tankCapacity && val > w.tankCapacity);
+            return <span className={isError ? 'text-red-600 font-semibold' : ''} title={isError ? `Ёмкость бака: ${w.tankCapacity ?? '?'} л` : undefined}>{w.fuelAtStart ?? '—'}</span>;
+          }
+        },
         { key: 'fuelReceived', label: 'Запр.', sortable: true, align: 'center' as const, render: (w) => <span className="text-green-600 dark:text-green-400 font-medium">{(w as any).fuelReceived > 0 ? `+${(w as any).fuelReceived}` : '—'}</span> },
-        { key: 'fuelAtEnd', label: 'Топл. кон.', sortable: true, align: 'right' as const, render: (w) => <span className={Number(w.fuelAtEnd) < 0 ? 'text-red-600' : ''}>{w.fuelAtEnd ?? '—'}</span> },
+        {
+          key: 'fuelAtEnd', label: 'Топл. кон.', sortable: true, align: 'right' as const, render: (w) => {
+            const val = Number(w.fuelAtEnd);
+            const isError = val < 0 || (w.tankCapacity && val > w.tankCapacity);
+            return <span className={isError ? 'text-red-600 font-semibold' : ''} title={isError ? `Ёмкость бака: ${w.tankCapacity ?? '?'} л` : undefined}>{w.fuelAtEnd ?? '—'}</span>;
+          }
+        },
         { key: 'status', label: 'Статус', sortable: true, align: 'center' as const, render: (w) => <WaybillStatusBadge status={w.status} /> },
       ];
     }
@@ -274,6 +286,8 @@ const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpene
         fuelAtStart: firstFuel?.fuelStart ?? w.fuelAtStart,
         fuelReceived: firstFuel?.fuelReceived ?? (w as any).fuelReceived ?? 0,
         fuelAtEnd: firstFuel?.fuelEnd ?? w.fuelAtEnd,
+        // FUEL-OVERFLOW-UI: Tank capacity for overflow detection
+        tankCapacity: vehicle?.fuelTankCapacity,
       };
     });
   }, [preFilteredWaybills, drivers, vehicles, organizations]);

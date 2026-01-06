@@ -1854,15 +1854,38 @@ export async function bulkRecalculateFuel(
 
         const fuelReceived = fuelLine.fuelReceived ? Number(fuelLine.fuelReceived) : 0;
 
-        // CHECK-OVERFLOW: Throw error if capacity exceeded
+        // CHECK-OVERFLOW: Check tank capacity
         const availableFuel = fuelStart + fuelReceived;
         const tankCapacity = waybill.vehicle.fuelTankCapacity ? Number(waybill.vehicle.fuelTankCapacity) : 0;
 
-        if (tankCapacity > 0 && availableFuel > tankCapacity) {
-            throw new BadRequestError(`Переполнение бака в ПЛ №${waybill.number} от ${waybill.date.toLocaleDateString('ru-RU')}. Емкость: ${tankCapacity}, Факт: ${availableFuel.toFixed(2)}. Исправьте данные. [ID:${waybill.id}]`);
-        }
+        // MULTIDAY-FIX: Determine if waybill spans multiple days
+        // Use startAt (or date) as start, validTo as end. validFrom doesn't exist in schema!
+        const wbAny = waybill as any;
+        const startDate = wbAny.startAt ? new Date(wbAny.startAt).toISOString().split('T')[0]
+            : (wbAny.date ? new Date(wbAny.date).toISOString().split('T')[0] : '');
+        const endDate = wbAny.validTo ? new Date(wbAny.validTo).toISOString().split('T')[0] : '';
+        const isMultiDay = startDate && endDate && startDate !== endDate;
 
         const newFuelEnd = availableFuel - planned;
+
+        if (tankCapacity > 0) {
+            if (isMultiDay) {
+                // MULTIDAY-MODEL: Для многодневных ПЛ заправки происходят ПОСЛЕ частичного расхода.
+                // Простая формула (start + received) не отражает реальность, поэтому
+                // не проверяем переполнение. Проверяем только отрицательный остаток.
+                if (newFuelEnd < -0.01) {  // небольшой допуск на погрешность округления
+                    console.warn(`[MULTIDAY-WARN] WB ${waybill.number}: отрицательный остаток ${newFuelEnd.toFixed(2)}`);
+                }
+            } else {
+                // Для однодневных ПЛ: строгая проверка (заправка разовая в начале дня)
+                if (availableFuel > tankCapacity) {
+                    throw new BadRequestError(
+                        `Переполнение бака в ПЛ №${waybill.number} от ${waybill.date.toLocaleDateString('ru-RU')}. ` +
+                        `Емкость: ${tankCapacity}, Факт: ${availableFuel.toFixed(2)}. Исправьте данные. [ID:${waybill.id}]`
+                    );
+                }
+            }
+        }
 
 
 

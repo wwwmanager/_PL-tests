@@ -46,12 +46,18 @@ export interface DrivingFlags {
 
 /**
  * SeasonSettings - синхронизировано с frontend types.ts
+ * Frontend использует recurring/manual type с разными полями
  */
 export interface SeasonSettings {
-    winterStartMonth: number;  // 1-12
-    winterStartDay: number;    // 1-31
-    winterEndMonth: number;    // 1-12
-    winterEndDay: number;      // 1-31
+    type?: 'recurring' | 'manual';
+    // Для recurring типа
+    summerDay?: number;    // день начала лета (1-31)
+    summerMonth?: number;  // месяц начала лета (1-12)
+    winterDay?: number;    // день начала зимы (1-31)  
+    winterMonth?: number;  // месяц начала зимы (1-12)
+    // Для manual типа
+    winterStartDate?: string;
+    winterEndDate?: string;
 }
 
 /**
@@ -65,17 +71,34 @@ export function isWinterDate(dateStr: string, settings: SeasonSettings | null | 
     const month = date.getMonth() + 1;  // 1-12
     const day = date.getDate();         // 1-31
 
-    const { winterStartMonth, winterStartDay, winterEndMonth, winterEndDay } = settings;
+    // Обработка manual типа
+    if (settings.type === 'manual' && settings.winterStartDate && settings.winterEndDate) {
+        const dateOnly = dateStr.split('T')[0];
+        return dateOnly >= settings.winterStartDate && dateOnly <= settings.winterEndDate;
+    }
 
-    // Зима охватывает новый год (например, ноябрь - март)
-    if (winterStartMonth > winterEndMonth) {
-        return (month > winterStartMonth || (month === winterStartMonth && day >= winterStartDay)) ||
-            (month < winterEndMonth || (month === winterEndMonth && day <= winterEndDay));
+    // Обработка recurring типа (по умолчанию)
+    const winterStartMonth = settings.winterMonth ?? 11;  // По умолчанию ноябрь
+    const winterStartDay = settings.winterDay ?? 1;
+    const summerStartMonth = settings.summerMonth ?? 4;   // По умолчанию апрель
+    const summerStartDay = settings.summerDay ?? 1;
+
+    // Зима: от winterDay.winterMonth до summerDay.summerMonth (охватывает новый год)
+    // Например: с 1 ноября по 1 апреля
+
+    // Создаем "порядковый номер" для дня в году (month * 100 + day)
+    const current = month * 100 + day;
+    const winterStart = winterStartMonth * 100 + winterStartDay;
+    const summerStart = summerStartMonth * 100 + summerStartDay;
+
+    // Зима охватывает новый год (ноябрь → апрель)
+    if (winterStart > summerStart) {
+        // Текущая дата в зиме если: после начала зимы ИЛИ до начала лета
+        return current >= winterStart || current < summerStart;
     }
 
     // Зима в пределах одного года (редкий случай)
-    return (month > winterStartMonth || (month === winterStartMonth && day >= winterStartDay)) &&
-        (month < winterEndMonth || (month === winterEndMonth && day <= winterEndDay));
+    return current >= winterStart && current < summerStart;
 }
 
 /**
