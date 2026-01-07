@@ -14,7 +14,7 @@ import { postWaybill, cancelWaybill } from './postingService';
 // PERIOD-LOCK-001: Import period lock check
 import { checkPeriodLock } from './periodLockService';
 
-const prisma = new PrismaClient();
+import { prisma } from '../db/prisma';
 
 export interface UserInfo {
     id: string;
@@ -103,8 +103,16 @@ export async function listWaybills(
     pagination?: PaginationParams
 ) {
     const organizationId = userInfo.organizationId;
+
+    // ORG-HIERARCHY: Include waybills from this org AND all child orgs
+    const childOrgs = await prisma.organization.findMany({
+        where: { parentOrganizationId: organizationId },
+        select: { id: true }
+    });
+    const orgIds = [organizationId, ...childOrgs.map(o => o.id)];
+
     const where: any = {
-        organizationId,
+        organizationId: { in: orgIds },
     };
 
     // WB-906: Restriction for driver role
@@ -200,7 +208,15 @@ export async function listWaybills(
 
 export async function getWaybillById(userInfo: UserInfo, id: string) {
     const organizationId = userInfo.organizationId;
-    const where: any = { id, organizationId };
+
+    // ORG-HIERARCHY: Include waybills from this org AND all child orgs
+    const childOrgs = await prisma.organization.findMany({
+        where: { parentOrganizationId: organizationId },
+        select: { id: true }
+    });
+    const orgIds = [organizationId, ...childOrgs.map(o => o.id)];
+
+    const where: any = { id, organizationId: { in: orgIds } };
 
     // WB-906: Driver can only see their own waybills
     if (userInfo.role === 'driver' && userInfo.employeeId) {
@@ -609,7 +625,15 @@ export async function createWaybill(userInfo: UserInfo, input: CreateWaybillInpu
 
 export async function updateWaybill(userInfo: UserInfo, id: string, data: Partial<CreateWaybillInput>) {
     const organizationId = userInfo.organizationId;
-    const where: any = { id, organizationId };
+
+    // ORG-HIERARCHY: Include waybills from this org AND all child orgs
+    const childOrgs = await prisma.organization.findMany({
+        where: { parentOrganizationId: organizationId },
+        select: { id: true }
+    });
+    const orgIds = [organizationId, ...childOrgs.map(o => o.id)];
+
+    const where: any = { id, organizationId: { in: orgIds } };
 
     if (userInfo.role === 'driver' && userInfo.employeeId) {
         const driver = await prisma.driver.findUnique({

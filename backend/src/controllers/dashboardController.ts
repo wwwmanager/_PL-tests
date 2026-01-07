@@ -21,12 +21,8 @@ export async function getStats(req: Request, res: Response, next: NextFunction) 
 
 export async function getIssues(req: Request, res: Response, next: NextFunction) {
     try {
-        const orgId = req.user!.organizationId;
-        const { vehicleId } = req.query;
-
-        const expiringDocs = await dashboardService.getExpiringDocs(orgId, vehicleId as string | undefined);
-
-        res.json({ success: true, data: { expiringDocs } });
+        // Deprecated: Issues are now returned in getDashboardStats
+        res.json({ success: true, data: { expiringDocs: [] } });
     } catch (err) {
         next(err);
     }

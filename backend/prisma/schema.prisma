@@ -429,6 +429,8 @@ model Vehicle {
   fuelTankCapacity   Decimal? @db.Decimal(10, 2)
   mileage            Decimal  @default(0) @db.Decimal(10, 1) // Added
   currentFuel        Decimal  @default(0) @db.Decimal(10, 2) // Added
+  lastMaintenanceMileage Int      @default(0) // REL-DASH-001: For maintenance tracking
+  maintenanceIntervalKm  Int      @default(10000) // REL-DASH-001: Standard interval
   fuelConsumptionRates Json? // Added: { winterRate, summerRate, cityIncreasePercent, warmingIncreasePercent }
   
   year               Int?

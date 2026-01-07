@@ -174,6 +174,7 @@ const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpene
           status: topLevelFilter.status || undefined,
           startDate: topLevelFilter.dateFrom || undefined,
           endDate: topLevelFilter.dateTo || undefined,
+          vehicleId: selectedVehicleId || undefined,
         }),
         getVehicles(),
         listDrivers(),
@@ -204,7 +205,7 @@ const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpene
       }
     });
     return unsubscribe;
-  }, [currentPage, topLevelFilter.status, topLevelFilter.dateFrom, topLevelFilter.dateTo]);
+  }, [currentPage, topLevelFilter.status, topLevelFilter.dateFrom, topLevelFilter.dateTo, selectedVehicleId]);
 
   useEffect(() => {
     if (waybillToOpen) {
@@ -236,11 +237,12 @@ const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpene
       if (from && date < from) return false;
       if (to && date > to) return false;
       if (topLevelFilter.status && w.status !== topLevelFilter.status) return false;
-      if (selectedVehicleId && w.vehicleId !== selectedVehicleId) return false;
+      // Client-side vehicle filtering removed as it is now handled by the backend
+      // if (selectedVehicleId && w.vehicleId !== selectedVehicleId) return false;
 
       return true;
     });
-  }, [waybills, topLevelFilter, selectedVehicleId]);
+  }, [waybills, topLevelFilter]);
 
 
 

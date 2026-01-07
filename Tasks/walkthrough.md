@@ -1,36 +1,44 @@
-# Walkthrough - Nomenclature Improvements (REL-200) & Groups (UI-050)
+# Dashboard Enhancement Walkthrough
 
 ## Overview
-This update refined the "Nomenclature" (StockItem) dictionary by:
-1.  Expanding fields (Group, Description, Initial Balance).
-2.  **Groups Configuration**: Replacing the generic "Category" selector with a specific "Group" dropdown list (ГСМ, Техжидкости, Запчасти, etc.) as the primary method of classification.
-3.  **Auto-Classification**: The system now automatically maps the selected "Group" to the internal system "Category" (e.g., ГСМ -> FUEL).
+We have completely redesigned the Dashboard to address user needs for operational monitoring and analytics. The new dashboard includes 6 new widgets/charts and aggregates data primarily from "Posted" (Проведены) waybills to ensure accuracy.
 
-## Changes
+## Changes Implemented
 
-### 1. Groups & UI
-- **Fixed Groups List**: Defines strict groups: 'ГСМ', 'Техжидкости', 'Запчасти', 'Шины', 'АКБ', 'Агрегаты', 'Услуги'.
-- **UI Interaction**:
-    - The **Group** field is now a dropdown menu.
-    - The **Category** field has been removed from the Form UI to simplify the experience.
-    - Selecting a Group automatically sets the correct internal system Category and Fuel flags.
-- **Table**: Moving forward, the "Group" column is the primary visual identifier.
+### 1. Database Schema
+- **Modified `Vehicle` table**: Added fields for maintenance tracking.
+    - `lastMaintenanceMileage`: Last service mileage.
+    - `maintenanceIntervalKm`: Service interval (default 10,000 km).
 
-### 2. Schema & Data Model
-- **New Fields**: `group` (Text) and `description` (Text) persisted in DB.
-- **Initial Balance**: Implemented `INITIAL_BALANCE` movement creation on item creation.
+### 2. Backend Logic (`dashboardService.ts`)
+- **New Aggregation Logic**:
+    - **Fuel Dynamics**: Monthly fuel consumption from *Posted* waybills.
+    - **Medical Exams**: Monthly exam counts (smart counting: multi-day waybills count as multiple exams).
+    - **Top 10 Consumers**: Vehicles with highest fuel consumption.
+    - **Driver Workload**: Exam counts per driver.
+    - **Maintenance Monitor**: Real-time tracking of mileage vs interval.
+    - **Issue Detection**: Consolidated check for expired docs (OSAGO, License, Medical, Tacho) and maintenance.
+    - **Birthdays**: List of employees with birthdays in current month.
+
+### 3. Frontend (`Dashboard.tsx`)
+- **New Layout**:
+    - **Row 1**: Status Cards (Draft, Review, Posted, Issues).
+    - **Row 2**: KPI Cards (Odometer, Fuel Balance, Card Balance, Year Expense).
+    - **Row 3**: Dynamics Charts (Fuel & Medical).
+    - **Row 4**: Top Lists (Vehicles & Drivers).
+    - **Row 5**: Operational Lists (Upcoming Maintenance & Birthdays).
+- **Usability Features**:
+    - **Persistence**: Selected dates are saved in browser storage.
+    - **Auto-Refresh**: Dashboard updates immediately when filtered by vehicle.
+    - **Interactive Issues**: "Issues" card opens a detailed modal with critical/warning alerts.
+    - **Chart Refinements**: "Top" charts always show global data (ignoring filters); improved label readability.
 
 ## Verification
-
-### Manual Usage
-1.  Go to **Warehouse -> Nomenclature**.
-2.  Click **Add**.
-3.  Select a **Group** (e.g., 'ГСМ').
-    - *System creates item as FUEL category internally.*
-    - *Density field appears automatically for ГСМ.*
-4.  Select a **Group** (e.g., 'Запчасти').
-    - *System creates item as SPARE_PART category internally.*
-    - *Density field disappears.*
-5.  Fill in Name, Description, Initial Balance.
-6.  Click **Create**.
-7.  Verify the item appears in the list with the correct Group name.
+1.  **Check Issues**:
+    - Ensure red counter appears if docs are expired.
+    - Click "problems" card to see details.
+2.  **Check Charts**:
+    - Verify data matches "Posted" waybills.
+3.  **Check Filters**:
+    - Select a vehicle -> Charts should update.
+    - Refresh page -> Dates should persist.
