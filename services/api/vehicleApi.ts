@@ -90,6 +90,17 @@ function sanitizeVehiclePayload(data: Record<string, unknown>): Record<string, u
         useMountainModifier: data.useMountainModifier ?? false,  // COEF-MOUNTAIN-001
         disableFuelCapacityCheck: data.disableFuelCapacityCheck ?? false,
 
+        // OSAGO Policy
+        osagoSeries: toNullIfEmpty(data.osagoSeries),
+        osagoNumber: toNullIfEmpty(data.osagoNumber),
+        osagoStartDate: toNullIfEmpty(data.osagoStartDate),
+        osagoEndDate: toNullIfEmpty(data.osagoEndDate),
+
+        // Diagnostic Card
+        diagnosticCardNumber: toNullIfEmpty(data.diagnosticCardNumber),
+        diagnosticCardIssueDate: toNullIfEmpty(data.diagnosticCardIssueDate),
+        diagnosticCardExpiryDate: toNullIfEmpty(data.diagnosticCardExpiryDate),
+
         // ОТПРАВЛЯЕМ ГАРАНТИРОВАННО СИНХРОНИЗИРОВАННУЮ ПАРУ
         isActive: calculatedIsActive,
         status: finalStatus,

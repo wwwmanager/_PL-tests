@@ -676,6 +676,7 @@ export async function createExpenseMovement(
 
 /**
  * Создает движение прихода на склад
+ * COST-001: Also accepts unitCost and updates StockItem.avgCost (weighted average)
  */
 export async function createIncomeMovement(
     organizationId: string,
@@ -687,12 +688,44 @@ export async function createIncomeMovement(
     warehouseId: string | null = null,
     comment?: string,
     stockLocationId?: string,
-    occurredAt?: Date
+    occurredAt?: Date,
+    unitCost?: number  // COST-001: Unit cost for weighted average calculation
 ) {
     const effectiveOccurredAt = occurredAt || new Date();
     return prisma.$transaction(async (tx) => {
         // P0-4: Period lock check
         await checkPeriodLock(tx, organizationId, effectiveOccurredAt);
+
+        // COST-001: Calculate new weighted average if unitCost is provided
+        if (unitCost !== undefined && unitCost > 0) {
+            const stockItem = await tx.stockItem.findUnique({
+                where: { id: stockItemId },
+                select: { balance: true, avgCost: true }
+            });
+
+            if (stockItem) {
+                const currentBalance = Number(stockItem.balance) || 0;
+                const currentAvgCost = Number(stockItem.avgCost) || 0;
+
+                // Weighted average formula:
+                // newAvgCost = (currentBalance × currentAvgCost + newQty × newPrice) / (currentBalance + newQty)
+                let newAvgCost: number;
+                if (currentBalance <= 0) {
+                    // If no previous stock, new cost becomes the average
+                    newAvgCost = unitCost;
+                } else {
+                    newAvgCost = (currentBalance * currentAvgCost + quantity * unitCost) / (currentBalance + quantity);
+                }
+
+                // Update StockItem.avgCost
+                await tx.stockItem.update({
+                    where: { id: stockItemId },
+                    data: { avgCost: Math.round(newAvgCost * 100) / 100 }
+                });
+
+                console.log(`[COST-001] Updated avgCost for ${stockItemId}: ${currentAvgCost} -> ${newAvgCost.toFixed(2)} (qty: ${quantity}, unitCost: ${unitCost})`);
+            }
+        }
 
         return tx.stockMovement.create({
             data: {
@@ -707,6 +740,7 @@ export async function createIncomeMovement(
                 documentId,
                 comment,
                 createdByUserId: userId,
+                unitCost,  // COST-001: Save unit cost to movement
             },
         });
     });

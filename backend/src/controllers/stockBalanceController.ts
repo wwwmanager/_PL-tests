@@ -305,6 +305,7 @@ export async function createMovement(
             documentId,
             externalRef,
             comment,
+            unitCost,  // COST-001: Unit cost for INCOME
         } = req.body;
 
         if (!movementType) {
@@ -319,6 +320,11 @@ export async function createMovement(
         if (isNaN(parsedQuantity) || parsedQuantity <= 0) {
             throw new BadRequestError('quantity должен быть положительным числом');
         }
+
+        // COST-001: Parse unitCost
+        const parsedUnitCost = unitCost !== undefined && unitCost !== null && unitCost !== ''
+            ? (typeof unitCost === 'string' ? parseFloat(unitCost) : Number(unitCost))
+            : undefined;
 
         let result;
         const occurredAtDate = occurredAt ? new Date(occurredAt) : new Date();
@@ -359,7 +365,8 @@ export async function createMovement(
                     null,  // warehouseId deprecated
                     comment,
                     stockLocationId,
-                    occurredAtDate
+                    occurredAtDate,
+                    parsedUnitCost  // COST-001: Pass unit cost
                 );
                 if (stockLocationId) affectedLocationIds.push(stockLocationId);
                 break;

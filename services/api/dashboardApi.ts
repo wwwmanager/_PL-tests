@@ -35,6 +35,8 @@ export interface BirthdayData {
     id: string;
     name: string;
     date: string;
+    fullDate: string; // DD.MM.YYYY
+    age?: number;
     isToday: boolean;
 }
 
@@ -74,6 +76,10 @@ export interface DashboardData {
     upcomingMaintenance: MaintenanceData[];
     birthdays: BirthdayData[];
     issuesList: IssueItem[];
+    // DASH-EXP-001: New expense/mileage widgets
+    topFuelExpense: TopVehicleData[];      // Топ ТС по тратам на топливо (руб)
+    topOtherExpense: TopVehicleData[];     // Топ ТС по тратам без топлива (руб)
+    topMileage: TopVehicleData[];          // Топ ТС по пробегу (км)
 }
 
 export interface DashboardFilters {

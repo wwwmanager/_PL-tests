@@ -6,16 +6,14 @@ import { Vehicle, VehicleStatus, Employee, Organization } from '../../types';
 import { VehicleModel } from '../../services/api/vehicleModelApi';
 import { StockItem } from '../../services/stockItemApi';
 import { createVehicle, updateVehicle } from '../../services/api/vehicleApi';
-import { getVehicleSets, VehicleSet } from '../../services/vehicleSetApi';
-import { getVehicleAssets, VehicleAsset } from '../../services/vehicleAssetApi';
+
 import { validation } from '../../services/faker';
 import { useToast } from '../../hooks/useToast';
 import Modal from '../shared/Modal';
 import CollapsibleSection from '../shared/CollapsibleSection';
 import { FormField, FormInput, FormSelect, FormCheckbox } from '../shared/FormComponents';
 import { VEHICLE_STATUS_TRANSLATIONS } from '../../constants';
-import { VehicleSetList } from './tabs/VehicleSetList';
-import { VehicleAssetList } from './tabs/VehicleAssetList';
+
 
 // --- Types & Schemas ---
 
@@ -66,7 +64,10 @@ const vehicleSchema = z.object({
     ptsSeries: z.string().optional().nullable(),
     ptsNumber: z.string().optional().nullable(),
     eptsNumber: z.string().optional().nullable(),
-    diagnosticCardNumber: z.string().optional().nullable(),
+    diagnosticCardNumber: z.string().optional().nullable().refine(
+        (val) => !val || /^\d{15}$/.test(val),
+        { message: "Рег. номер должен содержать 15 цифр" }
+    ),
     diagnosticCardIssueDate: z.string().optional().nullable(),
     diagnosticCardExpiryDate: z.string().optional().nullable(),
     maintenanceHistory: z.array(maintenanceRecordSchema).optional().nullable(),
@@ -76,8 +77,14 @@ const vehicleSchema = z.object({
     useMountainModifier: z.boolean().optional(),
     fuelTankCapacity: z.number().min(0).optional().nullable(),
     disableFuelCapacityCheck: z.boolean().optional(),
-    osagoSeries: z.string().optional().nullable(),
-    osagoNumber: z.string().optional().nullable(),
+    osagoSeries: z.string().optional().nullable().refine(
+        (val) => !val || /^[A-ZА-ЯЁ]{3}$/.test(val),
+        { message: "Серия должна содержать 3 заглавных буквы" }
+    ),
+    osagoNumber: z.string().optional().nullable().refine(
+        (val) => !val || /^\d{10}$/.test(val),
+        { message: "Номер должен содержать 10 цифр" }
+    ),
     osagoStartDate: z.string().optional().nullable(),
     osagoEndDate: z.string().optional().nullable(),
     storageLocationId: z.string().optional().nullable(),
@@ -109,33 +116,19 @@ export const VehicleEditModal: React.FC<VehicleEditModalProps> = ({
     const { showToast } = useToast();
     const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({});
 
-    const [sets, setSets] = useState<VehicleSet[]>([]);
-    const [assets, setAssets] = useState<VehicleAsset[]>([]);
+
 
     const { register, handleSubmit, reset, watch, setValue, formState: { errors, isDirty } } = useForm<VehicleFormData>({
         resolver: zodResolver(vehicleSchema),
     });
 
-    const fetchSetsAndAssets = async (vehicleId: string) => {
-        try {
-            const [s, a] = await Promise.all([
-                getVehicleSets(vehicleId),
-                getVehicleAssets(vehicleId)
-            ]);
-            setSets(s);
-            setAssets(a);
-        } catch (error) {
-            console.error(error);
-            showToast("Не удалось загрузить комплекты/активы", "error");
-        }
-    };
+
 
     // Reset form when vehicle changes
     useEffect(() => {
         if (isOpen) {
             if (vehicle) {
                 reset(vehicle);
-                fetchSetsAndAssets(vehicle.id);
             } else {
                 // Full reset for new vehicle - clear ALL fields
                 reset({
@@ -175,8 +168,7 @@ export const VehicleEditModal: React.FC<VehicleEditModalProps> = ({
                     osagoEndDate: '',
                     storageLocationId: null,
                 } as any);
-                setSets([]);
-                setAssets([]);
+
             }
         }
     }, [isOpen, vehicle, reset]);
@@ -377,26 +369,121 @@ export const VehicleEditModal: React.FC<VehicleEditModalProps> = ({
                     </div>
                 </CollapsibleSection>
 
-                {/* Sets and Assets */}
-                {vehicle && (
-                    <>
-                        <CollapsibleSection title="Комплекты (Шины/Диски)" isCollapsed={collapsedSections.sets || false} onToggle={() => toggleSection('sets')}>
-                            <VehicleSetList
-                                vehicleId={vehicle.id}
-                                sets={sets}
-                                onRefresh={() => vehicle && fetchSetsAndAssets(vehicle.id)}
-                            />
-                        </CollapsibleSection>
+                {/* Documents Section */}
+                <CollapsibleSection title="Документы" isCollapsed={collapsedSections.documents || false} onToggle={() => toggleSection('documents')}>
+                    <div className="space-y-6">
+                        {/* OSAGO Policy */}
+                        <div className="p-4 border rounded-lg dark:border-gray-600">
+                            <h4 className="font-medium text-gray-900 dark:text-white mb-4">Полис ОСАГО</h4>
+                            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                                <FormField label="Серия" error={errors.osagoSeries?.message}>
+                                    <FormInput
+                                        {...register("osagoSeries")}
+                                        placeholder="XXX"
+                                        maxLength={3}
+                                        onChange={(e) => {
+                                            const value = e.target.value.toUpperCase().replace(/[^A-ZА-ЯЁ]/g, '');
+                                            setValue("osagoSeries", value);
+                                        }}
+                                    />
+                                </FormField>
+                                <FormField label="Номер" error={errors.osagoNumber?.message}>
+                                    <FormInput
+                                        {...register("osagoNumber")}
+                                        placeholder="1234567890"
+                                        maxLength={10}
+                                        onChange={(e) => {
+                                            const value = e.target.value.replace(/\D/g, '');
+                                            setValue("osagoNumber", value);
+                                        }}
+                                    />
+                                </FormField>
+                                <FormField label="Дата начала" error={errors.osagoStartDate?.message}>
+                                    <FormInput
+                                        type="date"
+                                        {...register("osagoStartDate")}
+                                        onChange={(e) => {
+                                            const startDate = e.target.value;
+                                            setValue("osagoStartDate", startDate);
+                                            if (startDate) {
+                                                // Calculate end date: start + 1 year - 1 day
+                                                const start = new Date(startDate);
+                                                const end = new Date(start);
+                                                end.setFullYear(end.getFullYear() + 1);
+                                                end.setDate(end.getDate() - 1);
+                                                setValue("osagoEndDate", end.toISOString().split('T')[0]);
+                                            }
+                                        }}
+                                    />
+                                </FormField>
+                                <FormField label="Дата окончания" error={errors.osagoEndDate?.message}>
+                                    <FormInput
+                                        type="date"
+                                        {...register("osagoEndDate")}
+                                    />
+                                </FormField>
+                            </div>
+                        </div>
 
-                        <CollapsibleSection title="Активы (АКБ, Агрегаты)" isCollapsed={collapsedSections.assets || false} onToggle={() => toggleSection('assets')}>
-                            <VehicleAssetList
-                                vehicleId={vehicle.id}
-                                assets={assets}
-                                onRefresh={() => vehicle && fetchSetsAndAssets(vehicle.id)}
-                            />
-                        </CollapsibleSection>
-                    </>
-                )}
+                        {/* Diagnostic Card */}
+                        <div className="p-4 border rounded-lg dark:border-gray-600">
+                            <h4 className="font-medium text-gray-900 dark:text-white mb-4">Диагностическая карта ТС</h4>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <FormField label="Рег. номер карты" error={errors.diagnosticCardNumber?.message}>
+                                    <FormInput
+                                        {...register("diagnosticCardNumber")}
+                                        placeholder="123456789012345"
+                                        maxLength={15}
+                                        onChange={(e) => {
+                                            const value = e.target.value.replace(/\D/g, '');
+                                            setValue("diagnosticCardNumber", value);
+                                        }}
+                                    />
+                                </FormField>
+                                <FormField label="Дата выдачи" error={errors.diagnosticCardIssueDate?.message}>
+                                    <FormInput
+                                        type="date"
+                                        {...register("diagnosticCardIssueDate")}
+                                        onChange={(e) => {
+                                            const issueDate = e.target.value;
+                                            setValue("diagnosticCardIssueDate", issueDate);
+                                            if (issueDate) {
+                                                const vehicleYear = watch("year");
+                                                const currentYear = new Date().getFullYear();
+                                                const vehicleAge = vehicleYear ? currentYear - vehicleYear : 0;
+
+                                                // Calculate expiry based on vehicle age
+                                                // < 4 years: no inspection required (don't set expiry)
+                                                // 4-10 years: every 24 months
+                                                // > 10 years: every 12 months
+                                                const issue = new Date(issueDate);
+                                                const expiry = new Date(issue);
+
+                                                if (vehicleAge >= 10) {
+                                                    expiry.setMonth(expiry.getMonth() + 12);
+                                                } else if (vehicleAge >= 4) {
+                                                    expiry.setMonth(expiry.getMonth() + 24);
+                                                } else {
+                                                    // Under 4 years - set 24 months as default
+                                                    expiry.setMonth(expiry.getMonth() + 24);
+                                                }
+                                                expiry.setDate(expiry.getDate() - 1);
+                                                setValue("diagnosticCardExpiryDate", expiry.toISOString().split('T')[0]);
+                                            }
+                                        }}
+                                    />
+                                </FormField>
+                                <FormField label="Срок действия до" error={errors.diagnosticCardExpiryDate?.message}>
+                                    <FormInput
+                                        type="date"
+                                        {...register("diagnosticCardExpiryDate")}
+                                    />
+                                </FormField>
+                            </div>
+                        </div>
+                    </div>
+                </CollapsibleSection>
+
             </form>
         </Modal>
     );

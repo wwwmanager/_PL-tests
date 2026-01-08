@@ -835,7 +835,7 @@ const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpene
               Проверка
             </Button>
             <Button onClick={() => setIsBatchModalOpen(true)} variant="outline" size="sm" leftIcon={<DocumentArrowUpIcon className="h-4 w-4" />}>
-              Пакетная
+              Загрузка
             </Button>
             <Button onClick={handleCreateNew} variant="primary" size="sm" leftIcon={<PlusIcon className="h-4 w-4" />}>
               Создать новый

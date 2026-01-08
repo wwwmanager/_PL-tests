@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { getRoutes, createRoute, updateRoute, deleteRoute, Route } from '../../services/api/routeApi';
-import { PencilIcon, TrashIcon, PlusIcon, GlobeAltIcon } from '../Icons';
+import { PencilIcon, TrashIcon, PlusIcon, MapPinPlusIcon } from '../Icons';
 import DataTable, { Column } from '../shared/DataTable';
 import { Button } from '../shared/Button';
 import Modal from '../shared/Modal';
@@ -152,7 +152,7 @@ const RouteList: React.FC = () => {
             <div className="space-y-6">
                 <div className="flex justify-between items-center mb-6">
                     <div className="flex items-center gap-3">
-                        <GlobeAltIcon className="h-6 w-6 text-gray-600 dark:text-gray-400" />
+                        <MapPinPlusIcon className="h-6 w-6 text-gray-600 dark:text-gray-400" />
                         <h2 className="text-xl font-bold text-gray-900 dark:text-white tracking-tight">Маршруты</h2>
                         <span className="px-2.5 py-0.5 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 text-xs font-semibold">
                             {routes.length}

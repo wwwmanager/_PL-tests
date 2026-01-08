@@ -61,6 +61,7 @@ export interface BirthdayData {
     id: string;
     name: string;
     date: string; // DD.MM
+    fullDate: string; // DD.MM.YYYY - полная дата рождения
     age?: number;
     isToday: boolean;
 }
@@ -84,6 +85,10 @@ export interface DashboardData {
     upcomingMaintenance: MaintenanceData[];
     birthdays: BirthdayData[];
     issuesList: IssueItem[];
+    // DASH-EXP-001: New expense/mileage widgets with period selection
+    topFuelExpense: TopVehicleData[];      // Топ ТС по тратам на топливо (руб)
+    topOtherExpense: TopVehicleData[];     // Топ ТС по тратам без топлива (руб)
+    topMileage: TopVehicleData[];          // Топ ТС по пробегу (км)
 }
 
 // =============================================================================
@@ -367,8 +372,8 @@ export async function getDashboardStats(filters: DashboardFilters): Promise<Dash
             if (v.assignedDriver.driver?.licenseValidTo) {
                 checkDate(v.assignedDriver.driver.licenseValidTo, 'ВУ Водителя', 'doc_driver', v.id, driverName);
             }
-            // Medical check
-            checkDate(v.assignedDriver.medicalCertificateExpiryDate, 'Медсправка', 'doc_driver', v.id, driverName);
+            // TEMPORARILY HIDDEN: Medical certificate check - will be moved to separate module
+            // checkDate(v.assignedDriver.medicalCertificateExpiryDate, 'Медсправка', 'doc_driver', v.id, driverName);
             // Driver card
             checkDate(v.assignedDriver.driverCardExpiryDate, 'Карта тахографа', 'doc_driver', v.id, driverName);
         }
@@ -580,9 +585,10 @@ export async function getDashboardStats(filters: DashboardFilters): Promise<Dash
 
     // 9. Birthdays (Current Month)
     // -------------------------------------------------------------------------
+    // DASH-FIX-006: Include employees from child organizations (subdivisions)
     const birthdayEmployees = await prisma.employee.findMany({
         where: {
-            organizationId: filters.organizationId,
+            ...orgFilterWithChildren,
             isActive: true,
             dateOfBirth: { not: null }
         },
@@ -599,10 +605,13 @@ export async function getDashboardStats(filters: DashboardFilters): Promise<Dash
 
         if (dob.getMonth() === currentMonth) {
             const isToday = dob.getDate() === now.getDate();
+            const age = currentYear - dob.getFullYear();
             birthdays.push({
                 id: e.id,
                 name: e.shortName || e.fullName,
                 date: `${String(dob.getDate()).padStart(2, '0')}.${String(dob.getMonth() + 1).padStart(2, '0')}`,
+                fullDate: `${String(dob.getDate()).padStart(2, '0')}.${String(dob.getMonth() + 1).padStart(2, '0')}.${dob.getFullYear()}`,
+                age,
                 isToday
             });
         }
@@ -613,6 +622,128 @@ export async function getDashboardStats(filters: DashboardFilters): Promise<Dash
         const dayB = parseInt(b.date.split('.')[0]);
         return dayA - dayB;
     });
+
+    // 10. DASH-EXP-001: Top Vehicles by Fuel Expense (руб)
+    // -------------------------------------------------------------------------
+    // Calculate fuel expense = liters refueled × avgCost from StockItem
+    const fuelExpenseWaybills = await prisma.waybill.findMany({
+        where: {
+            ...orgFilterWithChildren,
+            status: WaybillStatus.POSTED,
+            date: { gte: dateFrom, lte: dateTo }
+        },
+        select: {
+            vehicleId: true,
+            fuelLines: {
+                select: {
+                    fuelReceived: true,
+                    stockItem: { select: { avgCost: true } }
+                }
+            }
+        }
+    });
+
+    const fuelExpenseMap = new Map<string, number>();
+    fuelExpenseWaybills.forEach(w => {
+        let expense = 0;
+        w.fuelLines.forEach(fl => {
+            const liters = toNumber(fl.fuelReceived);
+            const price = toNumber(fl.stockItem?.avgCost) || 55; // Default price if not set
+            expense += liters * price;
+        });
+        if (expense > 0) {
+            fuelExpenseMap.set(w.vehicleId, (fuelExpenseMap.get(w.vehicleId) || 0) + expense);
+        }
+    });
+
+    const topFuelExpense: TopVehicleData[] = Array.from(fuelExpenseMap.entries())
+        .map(([id, val]) => ({
+            id,
+            name: vehicleInfoMap.get(id) || 'Unknown',
+            value: Math.round(val)
+        }))
+        .sort((a, b) => b.value - a.value)
+        .slice(0, 10);
+
+    // 11. DASH-EXP-002: Top Vehicles by Other Expenses (без топлива) (руб)
+    // -------------------------------------------------------------------------
+    // Use StockMovement with movementType = EXPENSE joined through StockLocation to get vehicleId
+    const otherExpenseMovements = await prisma.stockMovement.findMany({
+        where: {
+            organizationId: { in: allOrgIds },
+            movementType: 'EXPENSE',
+            isVoid: false,
+            occurredAt: { gte: dateFrom, lte: dateTo },
+            stockLocation: {
+                vehicleId: { not: null }
+            }
+        },
+        select: {
+            quantity: true,
+            stockItem: { select: { avgCost: true, isFuel: true } },
+            stockLocation: { select: { vehicleId: true } }
+        }
+    });
+
+    const otherExpenseMap = new Map<string, number>();
+    otherExpenseMovements.forEach(m => {
+        const vehicleId = m.stockLocation?.vehicleId;
+        if (!vehicleId) return;
+        // Exclude fuel items from "other" expenses
+        if (m.stockItem?.isFuel) return;
+        const qty = Math.abs(toNumber(m.quantity));
+        const price = toNumber(m.stockItem?.avgCost) || 0;
+        const expense = qty * price;
+        if (expense > 0) {
+            otherExpenseMap.set(vehicleId, (otherExpenseMap.get(vehicleId) || 0) + expense);
+        }
+    });
+
+    const topOtherExpense: TopVehicleData[] = Array.from(otherExpenseMap.entries())
+        .map(([id, val]) => ({
+            id,
+            name: vehicleInfoMap.get(id) || 'Unknown',
+            value: Math.round(val)
+        }))
+        .sort((a, b) => b.value - a.value)
+        .slice(0, 10);
+
+    // 12. DASH-EXP-003: Top Vehicles by Mileage (км)
+    // -------------------------------------------------------------------------
+    const mileageMap = new Map<string, number>();
+    fuelExpenseWaybills.forEach(w => {
+        // We already have this data in fuelExpenseWaybills but need odometer
+    });
+
+    // Re-query with odometer data
+    const mileageWaybills = await prisma.waybill.findMany({
+        where: {
+            ...orgFilterWithChildren,
+            status: WaybillStatus.POSTED,
+            date: { gte: dateFrom, lte: dateTo }
+        },
+        select: {
+            vehicleId: true,
+            odometerStart: true,
+            odometerEnd: true
+        }
+    });
+
+    mileageWaybills.forEach(w => {
+        const mileage = toNumber(w.odometerEnd) - toNumber(w.odometerStart);
+        if (mileage > 0) {
+            mileageMap.set(w.vehicleId, (mileageMap.get(w.vehicleId) || 0) + mileage);
+        }
+    });
+
+    const topMileage: TopVehicleData[] = Array.from(mileageMap.entries())
+        .map(([id, val]) => ({
+            id,
+            name: vehicleInfoMap.get(id) || 'Unknown',
+            value: Math.round(val)
+        }))
+        .sort((a, b) => b.value - a.value)
+        .slice(0, 10);
 
     return {
         kpi: {
@@ -638,6 +769,10 @@ export async function getDashboardStats(filters: DashboardFilters): Promise<Dash
         driverExams,
         upcomingMaintenance,
         birthdays,
-        issuesList
+        issuesList,
+        // DASH-EXP-001: New expense/mileage widgets
+        topFuelExpense,
+        topOtherExpense,
+        topMileage
     };
 }

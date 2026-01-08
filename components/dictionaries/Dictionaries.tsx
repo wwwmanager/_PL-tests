@@ -17,7 +17,8 @@ import {
     HomeModernIcon,
     GlobeAltIcon,
     NomenclatureIcon,
-    CalendarDaysIcon
+    CalendarDaysIcon,
+    MapPinPlusIcon
 } from '../Icons';
 
 import StockItemList from '../warehouse/StockItemList';
@@ -44,7 +45,7 @@ const Dictionaries: React.FC<DictionariesProps> = ({ subViewToOpen }) => {
         // { id: 'fuelTypes', label: 'Топливо', icon: FireIcon }, // Hidden as per user request (duplicate of Nomenclature)
         { id: 'storageLocations', label: 'Места хранения', icon: HomeModernIcon },
         { id: 'calendar', label: 'Календарь', icon: CalendarDaysIcon },
-        { id: 'routes', label: 'Маршруты', icon: GlobeAltIcon },
+        { id: 'routes', label: 'Маршруты', icon: MapPinPlusIcon },
     ];
     // Calendar is missing in original list but present in design, keeping existing for now or adding placeholder?
     // Design has: Transport, Employees, Organizations, Fuel, Stock, Routes, Calendar.

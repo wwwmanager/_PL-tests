@@ -792,6 +792,9 @@ model StockMovement {
   voidedAt        DateTime?         @db.Timestamp(6)
   voidedByUserId  String?           @db.Uuid
   voidReason      String?           @db.Text
+  
+  // COST-001: Unit cost for INCOME operations (weighted average calculation)
+  unitCost        Decimal?          @db.Decimal(14, 2)  // Цена за единицу
 
   organization      Organization   @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   warehouse         Warehouse?     @relation(fields: [warehouseId], references: [id], onDelete: SetNull)

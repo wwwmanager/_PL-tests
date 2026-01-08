@@ -19,6 +19,7 @@ const movementSchema = z.object({
     comment: z.string().optional(),
     externalRef: z.string().optional(),
     baseMovementId: z.string().optional(), // Документ для корректировки
+    unitCost: z.preprocess((val) => val === '' || val === undefined || val === null ? undefined : Number(val), z.number().optional()), // COST-001: Unit cost for INCOME
 }).refine(data => {
     if (data.movementType === 'TRANSFER' && !data.fromStockLocationId) return false;
     if (data.movementType === 'INCOME' && !data.toStockLocationId) return false;
@@ -64,6 +65,7 @@ const MovementCreateModal: React.FC<Props> = ({ isOpen, onClose, initialData }) 
             occurredAt: new Date().toISOString().slice(0, 16),
             movementType: 'INCOME',
             quantity: 0,
+            unitCost: undefined, // COST-001
         },
     });
 
@@ -219,6 +221,10 @@ const MovementCreateModal: React.FC<Props> = ({ isOpen, onClose, initialData }) 
                 payload.stockLocationId = data.toStockLocationId;
                 payload.fromStockLocationId = undefined;
                 payload.toStockLocationId = undefined;
+                // COST-001: Pass unit cost
+                if (data.unitCost !== undefined && data.unitCost > 0) {
+                    payload.unitCost = data.unitCost;
+                }
                 // Store supplier org ID in documentId
                 if (data.supplierOrgId) {
                     payload.documentId = data.supplierOrgId;
@@ -357,6 +363,21 @@ const MovementCreateModal: React.FC<Props> = ({ isOpen, onClose, initialData }) 
                         />
                         {errors.quantity && <p className="mt-1 text-xs text-red-500">{errors.quantity.message}</p>}
                     </div>
+
+                    {/* COST-001: Unit cost field for INCOME */}
+                    {movementType === 'INCOME' && (
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Стоимость за ед.</label>
+                            <input
+                                type="number"
+                                step="0.01"
+                                {...register('unitCost')}
+                                onWheel={(e) => e.currentTarget.blur()}
+                                placeholder="₽"
+                                className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white"
+                            />
+                        </div>
+                    )}
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

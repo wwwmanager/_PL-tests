@@ -522,6 +522,7 @@ const EmployeeList: React.FC = () => {
                                         </FormField>
                                     </div>
                                 </CollapsibleSection>
+                                {/* TEMPORARILY HIDDEN: Medical Certificate Section - will be moved to separate module
                                 <CollapsibleSection title="Медицинская справка" isCollapsed={collapsedSections.medical || false} onToggle={() => toggleSection('medical')}>
                                     <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                                         <FormField label="Серия"><FormInput name="medicalCertificateSeries" value={currentItem.medicalCertificateSeries || ''} onChange={handleFormChange} /></FormField>
@@ -530,6 +531,7 @@ const EmployeeList: React.FC = () => {
                                         <FormField label="Срок действия"><FormInput name="medicalCertificateExpiryDate" type="date" value={currentItem.medicalCertificateExpiryDate || ''} onChange={handleFormChange} /></FormField>
                                     </div>
                                 </CollapsibleSection>
+                                */}
                             </>
                         )}
                         {currentItem.employeeType === 'driver' && currentItem.id && (
